@@ -497,16 +497,21 @@ def test_web_ui_session_route_is_get_and_unauthenticated():
     assert "'http://127.0.0.1:8080/api/session'" in _web_ui_probe()
 
 
-def test_web_ui_app_serves_session_to_an_anonymous_probe(monkeypatch):
+def test_web_ui_app_serves_session_to_an_anonymous_probe(monkeypatch, tmp_path):
     """The real app, not its source text: catches any auth layer the static
     test above cannot see. paho is stubbed as in test_web_ui_auth.py, so
-    the import-time broker connect returns at once."""
+    the import-time broker connect returns at once. The import writes a
+    config_loaded audit record; it goes to tmp_path, not the machine's
+    /var/log/lifetrac/audit.jsonl (2026-10-17 review)."""
     pytest.importorskip("paho.mqtt.client")
     pytest.importorskip("fastapi")
     pytest.importorskip("httpx")
     from fastapi.testclient import TestClient
 
     monkeypatch.syspath_prepend(str(_BS))
+    # web_ui._get_audit_log() reads audit_log.DEFAULT_PATH when it first
+    # opens the log, and the reload below resets its cached _AUDIT_LOG.
+    monkeypatch.setattr("audit_log.DEFAULT_PATH", str(tmp_path / "audit.jsonl"))
     if not os.environ.get("LIFETRAC_PIN"):
         monkeypatch.setenv("LIFETRAC_PIN", "424242")
     with mock.patch("paho.mqtt.client.Client") as mqtt_class:

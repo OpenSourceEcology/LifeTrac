@@ -38,7 +38,8 @@ services:
     # embedded DNS resolves that alias (seen on the board: bench-evidence/
     # board_state_2026-10-04/base/61_inspect_design-controller-mosquitto-1.json)
     # to this container's compose-network address, never 127.0.0.1, so a
-    # loopback-only listener (the eclipse-mosquitto:2 default) fails it.
+    # loopback-only listener (`listener 1883 127.0.0.1`, or a config with no
+    # listener line, which mosquitto 2 runs local-only) fails it.
     # `$$` is compose's escape for one `$`. Needs the $SYS tree on (no
     # `sys_interval 0` in base_station/mosquitto.conf). Docker counts any
     # non-zero exit as a failed probe. Cost: each probe is a connect and a

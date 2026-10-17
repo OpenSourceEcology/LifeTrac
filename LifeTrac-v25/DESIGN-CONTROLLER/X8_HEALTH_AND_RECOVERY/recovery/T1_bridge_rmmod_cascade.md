@@ -18,8 +18,10 @@ is the recovery; modules come back fresh on the other side.
 > dog active with no petter and reboots the board 60 s later (tractor, kernel
 > 5.10.93). A timeout asserts WDOG_B into the PMIC, so WRSR always reads POR.
 > (2026-10-17, inferred; L2 is armed on no board yet: once PID 1 has armed
-> the L2 drop-in -- at the next `daemon-reload`, daemon-reexec or boot after
-> install, when `systemctl show -p RuntimeWatchdogUSec` stops reading `0` --
+> the L2 drop-in -- at its next reload after install (`daemon-reload` or
+> daemon-reexec, or any `systemctl enable/disable/mask/unmask/preset/revert/edit`
+> run without `--no-reload`) or the next boot, when
+> `systemctl show -p RuntimeWatchdogUSec` stops reading `0` --
 > it holds the single-open device at 30 s, so a second open gets `EBUSY` and
 > never reaches the dog; VERIFY under PWR-1. Until then a close without `'V'`
 > still reboots the board 60 s later.)

@@ -41,10 +41,12 @@ WDO_D_Installer
     with no drop-in, and says "present-unverified" (not "differs") when
     only the script was pushed, finding the repo copies through a symlinked
     invocation; --role is required, tractor is refused without
-    --i-accept-tractor-prereqs (naming PWR-8, PWR-9 and PWR-11) and bench
-    without --bench-opt-in, the bench sudoers marker makes base and tractor
-    need --bench-opt-in too, install notes a live wdt_pet petter, and a
-    refusal writes nothing.
+    --i-accept-tractor-prereqs (naming PWR-8, PWR-9 and PWR-11), bench is
+    refused on a board without the bench sudoers marker and needs
+    --bench-opt-in where it has one, the marker makes base and tractor need
+    --bench-opt-in too, base prints the PWR-1 OTA/shutdown-timing caveat,
+    install tells the operator to stop a live wdt_pet petter before any
+    reload, and a refusal writes nothing.
 
 WDO_E_ReadOnlyTripwires
     ``capture_board_state.sh`` (outside comments) has no i2c tool, no
@@ -482,6 +484,12 @@ class WDO_D_Installer(_ScriptHarness):
             self.assertEqual(stat.S_IMODE(p.stat().st_mode), 0o644)
         self.assertIn("sudo systemctl daemon-reload", r.stdout)   # printed, not run
         self.assertIn("whoever runs it", r.stdout)
+        # a reload is more than daemon-reload (2026-10-17 review)
+        self.assertIn("without --no-reload", r.stdout)
+        # production arming of the base waits on PWR-1's OTA/shutdown checks
+        self.assertIn("BASE: install for the PWR-1 checks", r.stdout)
+        self.assertIn("staged", r.stdout)
+        self.assertIn("ostree-finalize-staged", r.stdout)
         # no temp files left beside the drop-ins
         self.assertEqual(sorted(p.name for p in self._wd().parent.iterdir()),
                          ["90-lifetrac-watchdog.conf"])
@@ -593,7 +601,21 @@ class WDO_D_Installer(_ScriptHarness):
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertTrue(self._wd().exists() and self._rt().exists())
 
+    def test_bench_role_needs_the_bench_marker(self) -> None:
+        # 2026-10-17 review: --role bench --bench-opt-in on a production
+        # tractor (no marker) installed both drop-ins and never met the
+        # tractor gate
+        for extra in ((), ("--bench-opt-in",)):
+            with self.subTest(extra=extra):
+                r = self.installer("install", "--role", "bench", *extra)
+                self.assertEqual(r.returncode, 3, r.stdout + r.stderr)
+                self.assertIn("not a bench board (no %s)" % self.bench_marker, r.stderr)
+                self.assertIn("--role tractor", r.stderr)
+                self._assert_nothing_written()
+
     def test_bench_needs_opt_in(self) -> None:
+        self.bench_marker.parent.mkdir()
+        self.bench_marker.write_text("fio ALL=(ALL) NOPASSWD: ALL\n")
         r = self.installer("install", "--role", "bench")
         self.assertEqual(r.returncode, 3, r.stdout + r.stderr)
         self.assertIn("BENCH WARNING", r.stdout)
@@ -630,14 +652,19 @@ class WDO_D_Installer(_ScriptHarness):
         self.assertTrue(self._wd().exists() and self._rt().exists())
 
     def test_install_notes_a_live_petter(self) -> None:
-        # a live wdt_pet petter will race the next reload: say so (it is safe:
-        # systemd retries the open at each ping)
+        # a live wdt_pet petter will race the next reload: say so. Not
+        # harmless (2026-10-17 review): systemd retries the open, but after an
+        # earlier arm/disarm in the same boot PID 1 busy-loops on EBUSY until
+        # the petter closes, so the note says to stop the petter first
         self.pet_dir.mkdir()
         pidfile = self.pet_dir / "wdt_pet.pid"
         pidfile.write_text("%d\n" % os.getpid())     # alive, and not a petter
         r = self.installer("install", "--role", "base")
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertIn("NOTE: wdt_pet.sh's petter (pid %d) holds" % os.getpid(), r.stdout)
+        note = next(ln for ln in r.stdout.splitlines() if ln.startswith("NOTE:"))
+        self.assertIn("'bash wdt_pet.sh stop'", note)
+        self.assertIn("before any reload", note)
         pidfile.write_text("999999999\n")             # stale: no note
         r = self.installer("install", "--role", "base")
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)

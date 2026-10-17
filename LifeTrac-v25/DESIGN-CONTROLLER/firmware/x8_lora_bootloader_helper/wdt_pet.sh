@@ -31,8 +31,10 @@
 # 2026-10-17 SYSTEMD MAY OWN THE DOG (L2 of
 # X8_HEALTH_AND_RECOVERY/REBOOT_AND_POWER_CYCLE.md, TODO.md PWR-2):
 #   With firmware/x8_recovery's 90-lifetrac-watchdog.conf drop-in installed
-#   (on no board yet), PID 1 opens /dev/watchdog0 from the next daemon-reload
-#   or boot with RuntimeWatchdogSec=30s: the 60 s above becomes 30 s at
+#   (on no board yet), PID 1 opens /dev/watchdog0 from its next reload (a
+#   daemon-reload or daemon-reexec, or any systemctl enable/disable/mask/
+#   unmask/preset/revert/edit run without --no-reload) or the next boot,
+#   with RuntimeWatchdogSec=30s: the 60 s above becomes 30 s at
 #   runtime, systemd pets it about every 15 s, and the device is single-open,
 #   so our open() gets EBUSY. Without this change that EBUSY would kill the
 #   petter and `start` would print a misleading "failed to start" (inferred

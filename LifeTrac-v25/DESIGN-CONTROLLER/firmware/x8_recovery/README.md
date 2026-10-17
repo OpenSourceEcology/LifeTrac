@@ -54,9 +54,9 @@ SIL tests, run from `base_station/` with `python -m pytest tests -q`:
 | cap | `consecutive_reboots` ≥ cap → writes `held` (unless the OTA override applies) | `HELD entering hold` |
 | armed | `/etc/lifetrac/supervisor.armed` is absent | `WOULD reboot` |
 
-**ROLE defaults to tractor** (2026-10-17 review; the plan said "default
-base"). Only an explicit `ROLE=base` in a config that loads cleanly makes a
-node a base. A missing config, a file without a `ROLE` line (or with
+**ROLE defaults to tractor** (2026-10-17 review). Only an explicit
+`ROLE=base` in a config that loads cleanly makes a node a base. A missing
+config, a file without a `ROLE` line (or with
 lower-case `role=`), an invalid value, or a rejected file all read as
 tractor, so a typo cannot turn a tractor's reboot rungs on. The whole config
 file is rejected (all defaults, `ROLE=tractor`, logged with the shell's own
@@ -87,9 +87,13 @@ If `systemctl reboot` was accepted but the supervisor is still alive
 `FORCE_REBOOT_AFTER_S` (180 s) later, the same forced path runs only when
 the board is still armed, not HELD, past the tractor gate, a node fault is
 still present, and the request is not stale (older than
-`FORCE_REBOOT_AFTER_S + 2 × CHECK_INTERVAL_S`). Otherwise the pending marker
-is dropped (`BLOCKED forced reboot gate=...`, `PENDING marker stale`, or
-`not forcing`) and the normal checks resume.
+`FORCE_REBOOT_AFTER_S + 2 × CHECK_INTERVAL_S`). Both are counted from the
+uptime read right after `systemctl reboot` was accepted, not from the start
+of the pass. Otherwise the pending marker is dropped (`BLOCKED forced reboot
+gate=...`, `PENDING marker stale`, or `not forcing`) and the normal checks
+resume. A dropped marker, or a forced path that returns, rewrites
+`last_action` as `reboot_abandoned` (`ABANDONED reboot` in the log), because
+the board then stays up in that boot.
 
 ### Why it is shaped this way
 
@@ -112,10 +116,17 @@ is dropped (`BLOCKED forced reboot gate=...`, `PENDING marker stale`, or
   behind a latch that needs a person at the machine. TODO.md PWR-8, PWR-9 and
   PWR-11 gate `TRACTOR_REBOOT_ENABLED=1`. Because the role is not always
   known for sure, an unknown role counts as tractor (see above).
-- **Empty allowlist.** Restarting `web_ui` republishes retained radio
-  settings (a restart once caused a live on-air profile switch, TODO.md
-  RS-0.6); restarting a radio daemon sends the L072 a `RESET_REQ`. mosquitto
-  is the only safe starting entry.
+- **Empty allowlist; no LifeTrac container is safe on it yet** (2026-10-17
+  review). Restarting a broker silently drops the subscriptions of clients
+  that subscribe once after `connect()`, with a clean session and no
+  `on_connect`: on the base `lora_bridge` (`cmd/estop`, `cmd/control`) and
+  `audit_tail`, on the tractor `camera_service`, so E-stop forwarding and
+  the audit trail stop with nothing logged (the compose files say the same;
+  TODO.md PWR-3 tracks the resubscribe fix). Restarting `web_ui` republishes
+  retained radio settings (a restart once caused a live on-air profile
+  switch, TODO.md RS-0.6); restarting `image_tx` / `image_rx` sends the L072
+  a `RESET_REQ`; `lora_bridge` is obsolete (RS-5.11). The example config has
+  no commented entry to uncomment.
 - **Never-do list** (header of the script): no GPIOs (gpio10, gpio163), no
   openocd, no `x8h7_*` module loads/unloads, no restart of
   `stm32h7-program.service` or `docker.service`, nothing on `/dev/ttymxc3`, no
@@ -140,8 +151,8 @@ both share the state directory.
 |---|---|
 | `status` | key=value snapshot of the last pass: armed, held, faults, decision, `reboot_blocked`. |
 | `supervisor.log` (+ `.1`) | `boot=<8 chars of boot_id> up=<uptime> <event>`, one line per event; rotated past 256 KiB. The same lines go to the journal. |
-| `last_action` | Written before every reboot action: `action`, `reason`, `boot_id`, `uptime_s`, `consecutive`, `role`, `detail`. |
-| `last_reset_reason` | Set once per boot: `supervisor:<action>:<reason>` if the previous boot ended in a supervisor reboot, else `external_or_unknown`. No telemetry route yet; a container can read this file. |
+| `last_action` | Written before every reboot action: `action`, `reason`, `boot_id`, `uptime_s`, `consecutive`, `role`, `detail`. Rewritten with `action=reboot_abandoned` when a requested reboot did not happen and will not be forced. |
+| `last_reset_reason` | Set once per boot: `supervisor:reboot:<reason>` or `supervisor:force_reboot:<reason>` if the previous boot ended in a supervisor reboot; `supervisor:reboot_abandoned:<reason>` if a supervisor reboot was requested in that boot but abandoned, so the boot ended some other way later (or that reboot completed late: the cause is uncertain); else `external_or_unknown`. No telemetry route yet; a container can read this file. |
 | `boot_id` | Boot id of the last run, for the classification above. |
 | `consecutive_reboots`, `held` | Boot-loop guard. |
 | `probation_reboot` | Boot id and u-boot `bootcount` at the last reboot issued under the OTA override; read in the next boot. |
@@ -168,7 +179,10 @@ line before it runs the config, so such a copy still loads.
 Arming is a separate, deliberate step: `touch /etc/lifetrac/supervisor.armed`
 (not on a bench board without a GO; reboots additionally need `ROLE=base`,
 or on a tractor `TRACTOR_REBOOT_ENABLED=1`). Remove the file to disarm; the
-next pass logs the change.
+next pass logs the change. Arming also arms the forced-reboot rung (sysrq
+`s`,`u`,`b`, then `systemctl reboot -ff`), which has no switch of its own and
+can land mid-write on `/mnt/boot` (FAT, the only u-boot env copy), so arming
+any production node waits on TODO.md PWR-7 (crash-only storage) as well.
 
 The unit orders itself `After=docker.service` with no `Wants=` or
 `Requires=`: starting or restarting the supervisor never starts a stopped
@@ -189,5 +203,5 @@ LmP's `multi-user.target` already starts docker at boot.
 - An install step in provisioning (an `install_supervisor` script or part of
   X8OS-4), merging with OTA_STRATEGY.md's `lifetrac-health`, and publishing
   `last_reset_reason` in telemetry.
-- The L3 rungs in the plan that touch the L072 or H7 (NRST, openocd) are left
-  out on purpose: they are on the never-do list above.
+- The plan dropped the L072/H7 NRST rungs (§L3 "Removed from the earlier
+  draft"); they stay on the never-do list above.

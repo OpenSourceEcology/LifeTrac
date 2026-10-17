@@ -19,6 +19,10 @@
 # GO. Reboots also need an explicit ROLE=base in a config that loads cleanly,
 # or, on a tractor, TRACTOR_REBOOT_ENABLED=1: a missing config, a missing or
 # unparseable ROLE line, or a rejected file all count as ROLE=tractor.
+# Arming also arms the forced-reboot rung (sysrq s,u,b, `systemctl reboot
+# -ff`), which has no switch of its own and can land mid-write on /mnt/boot,
+# so arming a production node also waits on TODO.md PWR-7 (crash-only
+# storage).
 #
 # Why these settings:
 #   - Host service, not a container, so it keeps working when Docker does not.
@@ -35,7 +39,7 @@
 #     restart, and before the reboot rung), so a supervisor stuck for 5 min
 #     is killed and restarted. The commands in a pass are bounded by their
 #     timeouts (docker info 20 s, inspect 20 s and restart 60 s per
-#     allowlisted container; the reboot rung ~190 s after its own ping); with
+#     allowlisted container; the reboot rung ~210 s after its own ping); with
 #     more than three allowlisted containers raise WatchdogSec. Not bounded:
 #     file writes, renames and sync on wedged storage (a process in
 #     uninterruptible I/O cannot be killed by timeout or by this watchdog;

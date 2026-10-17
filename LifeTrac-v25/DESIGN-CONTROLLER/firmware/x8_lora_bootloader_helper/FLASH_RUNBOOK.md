@@ -170,9 +170,13 @@ default.
   bullet if the L2 drop-in is armed).
 - **Once [`firmware/x8_recovery`](../x8_recovery/install_watchdog.sh)'s L2
   drop-in is armed** (2026-10-17, not yet on either bench board). Copying the
-  file is not enough: PID 1 arms it at the next `systemctl daemon-reload`,
-  daemon-reexec or boot, and `systemctl show -p RuntimeWatchdogUSec` then
-  reads `30s`, not `0`. From then on systemd owns the dog, so the 60 s above
+  file is not enough: PID 1 arms it at its next reload — `systemctl
+  daemon-reload` or daemon-reexec, or any `systemctl enable`, `disable`,
+  `mask`, `unmask`, `preset`, `revert` or `edit` run without `--no-reload`
+  (the bench provisioning scripts run several) — or at the next boot.
+  `systemctl show -p RuntimeWatchdogUSec` (or `install_watchdog.sh check`)
+  then reads `30s`, not `0`, and is the only reliable reading of the armed
+  state. From then on systemd owns the dog, so the 60 s above
   becomes 30 s at runtime and `WCR` reads about `0x3b3d` (`WT=59`; inferred,
   not yet read). `wdt_pet.sh start` sees it and logs `systemd owns
   /dev/watchdog0 ...; relying on it, no petter started` (exit 0, no pidfile, a

@@ -3961,28 +3961,37 @@ an engine stop**, so tractor arming waits on PWR-8, PWR-9 and PWR-11.
   Dorkmo's OK and the bench power-up procedure (`power_up_guard.sh`): does
   `systemctl reboot` go through `WDOG_B` (`wdog_regs.py`, both boards); does a
   reboot or WDOG1 bite reset the L072 (`RFCO_SUMMARY` uptime); L2 installed
-  on one board with the bench opt-in; PB1/PB2/J1-73 from the DT first; 18650
-  behaviour (BQ24195 REG01 first); `poweroff`/`halt` vs the 128 s re-arm;
-  whether a module-only reset clears the camera USB wedge. No RF transmit.
+  on one board with the bench opt-in; with it installed, time a normal
+  `systemctl reboot` on each board against `reboot.target`'s 3 min bound and
+  do one reboot with a staged OTA deployment (gates production arming of L2
+  on the base, PWR-2); PB1/PB2/J1-73 from the DT first; 18650 behaviour
+  (BQ24195 REG01 first); `poweroff`/`halt` vs the 128 s re-arm; whether a
+  module-only reset clears the camera USB wedge. No RF transmit.
   Start with the new read-only `capture_board_state.sh` captures.
 - [ ] **PWR-2 systemd owns the hardware watchdog (L2)** — built:
   `x8_recovery/systemd/` drop-ins (`RuntimeWatchdogSec=30s`,
   `RebootWatchdogSec=2min`, `reboot.target` `JobTimeoutSec=3min`),
   `install_watchdog.sh`, and `wdt_pet.sh` now relies on systemd instead of
-  reporting a false start failure. Remaining: install on the base, verify per
-  PWR-1, then `watchdog.open_timeout=` (X8OS-4) and a `HandlePowerKey`
-  decision. Tractor waits on PWR-8/PWR-9.
+  reporting a false start failure. Remaining: install on the base under the
+  bench opt-in and verify per PWR-1; production arming of the base only after
+  PWR-1's shutdown-timing and staged-OTA reboot checks; then
+  `watchdog.open_timeout=` (X8OS-4) and a `HandlePowerKey` decision. Tractor
+  waits on PWR-8, PWR-9 and PWR-11.
 - [ ] **PWR-3 Container health status (L1)** — built: compose healthchecks on
   mosquitto (base, tractor) and web_ui (base), and a tractor
   `mosquitto.conf` with a non-loopback listener. Remaining: radio daemons
   after RS-1.2 gives them a worker-loop heartbeat; a deploy path (RS-5.11,
-  tractor compose install).
+  tractor compose install); `lora_bridge`, `audit_tail` and `camera_service`
+  resubscribe in `on_connect` (or are retired) before either broker goes on
+  the supervisor's allowlist: today a broker restart leaves them connected
+  with no subscriptions (base E-stop forwarding and audit trail stop).
 - [ ] **PWR-4 `lifetrac-supervisor` (L3)** — built and disarmed: allowlisted
   container restart → `systemctl reboot` → sysrq `s`,`u`,`b`; uptime-based
   boot-loop cap with HELD state, OTA probation, reset-reason record, tractor
   reboots off. Remaining: install path in provisioning, merge with
-  OTA_STRATEGY's `lifetrac-health`, publish the reset reason, and the tractor
-  reboot decision.
+  OTA_STRATEGY's `lifetrac-health`, publish the reset reason, the tractor
+  reboot decision, and PWR-7 before arming any production node (arming arms
+  the forced-reboot rung, which has no switch of its own).
 - [ ] **PWR-5 Independent hard power cycle (L4)** — decide where it lives
   (recommended: standalone node-watchdog board; alternative: Opta R4 or
   D1608S channel 7) against the plan's seven requirements: trigger from a
@@ -4016,11 +4025,12 @@ an engine stop**, so tractor arming waits on PWR-8, PWR-9 and PWR-11.
   D1608S SSRs; only channel 7 is free. The M7 must read the Opta
   `safety_state` at boot and stay latched unless it is `NORMAL` (its own
   E-stop latch is in RAM).
-- [ ] **PWR-12 POWER_MANAGEMENT corrections** — `halt` is not a final state
-  (the base came back ~4.5 min after `poweroff`; `imx2_wdt` re-arms to
-  128 s), so use `poweroff` and plan for it; the self-holding relay drops
-  whenever the H747 resets and must survive it; the 18650 reaches +5V only in
-  BQ24195 boost mode.
+- [ ] **PWR-12 POWER_MANAGEMENT corrections** — neither `halt` nor
+  `poweroff` is a final state (the base came back ~4.5 min after `poweroff`;
+  `imx2_wdt` re-arms to 128 s), so POWER_MANAGEMENT's release timing must
+  assume the node comes back; the self-holding relay drops whenever the H747
+  resets and must survive it; the 18650 reaches +5V only in BQ24195 boost
+  mode.
 
 ---
 

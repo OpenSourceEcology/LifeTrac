@@ -18,7 +18,11 @@
 # Arming is NOT a setting here. The supervisor restarts and reboots nothing
 # unless /etc/lifetrac/supervisor.armed exists; without it every action is
 # logged as "WOULD ...". Bench boards stay disarmed unless there is an
-# explicit GO for supervisor-initiated restarts and reboots.
+# explicit GO for supervisor-initiated restarts and reboots. Arming also arms
+# the forced-reboot rung (sysrq s,u,b, then `systemctl reboot -ff`), which has
+# no setting of its own and can land mid-write on /mnt/boot (FAT, the only
+# u-boot env copy): arm a production node only after TODO.md PWR-7
+# (crash-only storage).
 #
 # All times are seconds of UPTIME, never wall-clock time (the tractor has no
 # battery-backed RTC; the base clock steps when it syncs at boot).
@@ -31,8 +35,8 @@
 # ROLE defaults to tractor. Only an explicit ROLE=base in a file that loads
 # cleanly makes a node a base; a missing file, a missing or misspelt ROLE
 # line, an invalid value or a rejected file (see Format above) all read as
-# tractor, so a typo cannot turn tractor reboots on (2026-10-17 review; the
-# plan said "default base"). This example therefore ships ROLE=tractor:
+# tractor, so a typo cannot turn tractor reboots on (2026-10-17 review).
+# This example therefore ships ROLE=tractor:
 # CHANGE IT TO ROLE=base ON THE BASE STATION, or the base never reboots
 # itself (its status file shows reboot_blocked=tractor_reboot_disabled).
 ROLE=tractor
@@ -58,17 +62,27 @@ FAIL_THRESHOLD=3
 # would resolve an absent one as another container's ID prefix), and a
 # container whose inspected name is not exactly this one is never restarted.
 #
-# EMPTY BY DEFAULT ON PURPOSE. Restarting a LifeTrac container is not free:
+# EMPTY BY DEFAULT ON PURPOSE, and no LifeTrac container is safe to list yet
+# (2026-10-17 review), so there is no commented example to uncomment:
+#   - mosquitto (base design-controller-mosquitto-1, tractor-mosquitto): a
+#     broker restart silently drops the subscriptions of every client that
+#     subscribes once after connect(), with paho's default clean session and
+#     no on_connect; paho reconnects them with no subscriptions and nothing
+#     logs it. On the base that is lora_bridge (cmd/estop, cmd/control) and
+#     audit_tail, so E-stop forwarding and the audit trail stop; on the
+#     tractor camera_service (keyframe requests, link_budget,
+#     encode_mode_override). The notes in both docker-compose.yml files say
+#     the same. Do not list a broker until those resubscribe in on_connect or
+#     are retired (lora_bridge: RS-5.11); TODO.md PWR-3.
 #   - web_ui: restarting it republishes the retained radio settings at
 #     startup; a web_ui restart once caused a live on-air radio profile switch
-#     (TODO.md RS-0.6, retained-pin incident class). Re-check that path before
-#     listing it.
-#   - radio daemons (lora_bridge, image_tx / image_rx): each sends the L072 a
+#     (TODO.md RS-0.6, retained-pin incident class). Never list it.
+#   - image daemons (image_tx / image_rx): each sends the L072 a
 #     HOST_TYPE_RESET_REQ at link open (SETTINGS_REFERENCE.md), so a restart
-#     resets the radio mid-session. Do not list them until they have a
-#     worker-loop heartbeat (RS-1.2) and a restart has been bench-checked.
-# mosquitto is the only safe example to start with:
-#CONTAINERS="design-controller-mosquitto-1"
+#     resets the radio mid-session. Never list them (REBOOT_AND_POWER_CYCLE.md
+#     L1).
+#   - lora_bridge: the obsolete KISS bridge (replaced under RS-5.11), with no
+#     healthcheck or heartbeat; it carries cmd/estop to the radio. Never list it.
 CONTAINERS=""
 
 # docker restarts allowed per container per boot; after that an unhealthy

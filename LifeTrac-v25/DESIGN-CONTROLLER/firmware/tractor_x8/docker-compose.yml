@@ -13,11 +13,13 @@
 # or lifetrac-supervisor reboot included, PWR-3/PWR-4) starts this stack.
 # camera_service opens LIFETRAC_M7_UART=/dev/ttymxc3, which on the bench is
 # the L072 radio UART, starts its back-channel reader on it before connect(),
-# and writes IPC frames to it once connected. With ./mosquitto.conf the
-# broker accepts that connection (the old image-default config probably
-# refused it: inferred, see the note on the config bind below). RS-5.13 gates
-# installing this stack on a bench tractor. README-DEPLOY step 2 does not
-# carry this caution yet (open item).
+# and writes IPC frames to it once connected. The broker accepts that
+# connection with ./mosquitto.conf, and the old compose accepted it too: its
+# config volume came from the eclipse-mosquitto 2.1.2 image, whose default
+# listens anonymously on 1883 (see the note on the config bind below), so
+# the camera connected and wrote IPC frames to /dev/ttymxc3 then as well.
+# RS-5.13 gates installing this stack on a bench tractor. README-DEPLOY step
+# 2 does not carry this caution yet (open item).
 version: '3.8'
 services:
   camera:
@@ -56,16 +58,19 @@ services:
       # 2026-10-17 (PWR-3): the repo's broker config, bound read-only. Until
       # now a named volume `mosquitto_config` sat on /mosquitto/config. Docker
       # seeds an empty named volume from the image and nothing in the repo
-      # ever put a config in it, so a fresh install runs the
-      # eclipse-mosquitto:2 default: no listener line, which mosquitto 2.x
-      # runs in local-only mode (loopback only), refusing the camera's
-      # mqtt://mosquitto:1883 (the video-test v2 compose notes the same
-      # failure). INFERRED from the image default, not seen on the bench: the
-      # bench tractor's copy of that volume was never captured, and the
-      # 2026-07-25 tractor-camera crash inside _build_frame, which runs only
-      # after connect() (bench-evidence/RS_firmware_patch_flash_2026-07-25/
-      # NOTES.md), suggests its broker took the camera anyway, perhaps through
-      # an unrecorded hand edit. VERIFY before citing the old behaviour.
+      # ever put a config in it, so the broker ran the image's default, and
+      # `eclipse-mosquitto:2` is a moving tag. 2.0.x images shipped a config
+      # with no listener line, which mosquitto 2 runs local-only (loopback),
+      # refusing the camera's mqtt://mosquitto:1883 (the video-test v2
+      # compose notes that failure). The 2.1.2 image on both boards (image
+      # ID 2a23a3e427e4, bench-evidence/board_state_2026-10-10/tractor/
+      # 60_docker.txt; tractor-mosquitto was created from it on 2026-05-26)
+      # ships `listener 1883` with `allow_anonymous true`, plus an
+      # unauthenticated http_api/dashboard listener on 9883, so the old stack
+      # took the camera: its 2026-07-25 crash inside _build_frame came after
+      # connect() (bench-evidence/RS_firmware_patch_flash_2026-07-25/
+      # NOTES.md). The repo file pins the 1883 listener across tag bumps and
+      # drops the 9883 one.
       # The volume is dropped, not kept beside this bind: a file bind inside a
       # directory that is itself a volume mount only wins because Docker
       # mounts the shorter path first, and the stale default would still sit

@@ -1,7 +1,10 @@
 """SIL gate for the L3 host supervisor -- TODO.md PWR-4.
 
 Drives ``firmware/x8_recovery/lifetrac-supervisor.sh`` (POSIX sh, runs on
-the X8 host) through its ``once`` command, one invocation per health pass.
+the X8 host) through its ``once`` command, one invocation per health pass,
+and, for what only a long-lived process can show (disarm and clear-hold
+taking effect on the next pass), through its ``run`` loop with
+CHECK_INTERVAL_S=1 in a bounded child process group that the test stops.
 Everything the script would touch on a board is redirected into a temp dir:
 
 * ``docker``, ``systemctl``, ``fw_printenv``, ``systemd-notify`` and ``sync``
@@ -12,12 +15,16 @@ Everything the script would touch on a board is redirected into a temp dir:
   which ``last_action`` and ``consecutive_reboots`` were on disk at the
   moment it was called, and the fake ``sync`` records which ``*.tmp`` files
   existed when it ran (so "tmp, sync, rename" is checked, not just "a sync
-  happened somewhere earlier"). The fake ``docker inspect`` prints
-  ``/<name>`` first, like the real ``{{.Name}}``, unless a test makes the
-  name resolve to another container.
+  happened somewhere earlier"). It also keeps a copy of ``last_action`` as
+  it was at each reboot call (what the next boot reads if that reboot
+  really happened: a real one never returns) and can move the uptime on
+  when ``systemctl reboot`` is accepted (a slow rung). The fake ``docker
+  inspect`` prints ``/<name>`` first, like the real ``{{.Name}}``, unless a
+  test makes the name resolve to another container.
 * uptime and boot id come from files the test writes
   (``LIFETRAC_PROC_UPTIME``, ``LIFETRAC_BOOT_ID_FILE``), so "time passing"
-  and "the board rebooted" are just file writes. No sleeps.
+  and "the board rebooted" are just file writes. Real sleeps only in the
+  ``run`` loop tests and one SYSRQ_SETTLE_S=1 test (a few seconds each).
 * the sysrq trigger is a regular file (``LIFETRAC_SYSRQ``); the script
   appends one character per write, so the file content is the write order.
 
@@ -40,8 +47,10 @@ from __future__ import annotations
 import os
 import re
 import shutil
+import signal
 import subprocess
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -102,6 +111,18 @@ if [ -f "$FAKE_STATE/consecutive_reboots" ]; then
   read -r n < "$FAKE_STATE/consecutive_reboots"
 fi
 printf 'systemctl %s [last_action=%s consecutive=%s]\n' "$*" "$act" "$n" >> "$FAKE_LOG"
+# The record on disk at the moment of a reboot call: what the next boot reads
+# if this reboot really happened (a real one never returns).
+if [ -f "$FAKE_STATE/last_action" ]; then
+  case $* in
+    reboot) cat "$FAKE_STATE/last_action" > "$FAKE_DIR/last_action.at_reboot" ;;
+    "reboot -ff") cat "$FAKE_STATE/last_action" > "$FAKE_DIR/last_action.at_reboot_ff" ;;
+  esac
+fi
+# A slow rung: uptime has moved on by the time systemd takes the reboot.
+if [ "$*" = reboot ] && [ -f "$FAKE_DIR/uptime_at_accept" ]; then
+  cat "$FAKE_DIR/uptime_at_accept" > "$FAKE_UPTIME"
+fi
 rc=0
 if [ "$*" = reboot ] && [ -f "$FAKE_DIR/systemctl_reboot_rc" ]; then
   read -r rc < "$FAKE_DIR/systemctl_reboot_rc"
@@ -224,10 +245,24 @@ class X8SUP_A_Static(unittest.TestCase):
         )
 
     def test_every_external_board_command_runs_under_timeout(self) -> None:
+        # Command position: line start, after ; & | ( ` ! or $(, or after a
+        # keyword, optionally negated -- so `if systemctl ...`, `elif docker
+        # ...`, `! systemctl ...` and backticks count too (2026-10-17 review).
         cmd = re.compile(
-            r"(?:^|[;&|(]|\$\(|\bthen\b|\bdo\b|\belse\b)\s*"
+            r"(?:^|[;&|(`!]|\$\(|\b(?:then|do|else|if|elif|while|until)\b)\s*(?:!\s*)?"
             r"(docker|systemctl|fw_printenv|systemd-notify|sync|stat)\b"
         )
+        for bare_form in ("  if systemctl reboot >/dev/null 2>&1; then",
+                          '  if ! docker restart "$_ct"; then',
+                          "  elif docker info; then",
+                          "  while docker info; do :; done",
+                          "  ! systemctl reboot -ff",
+                          "  _x=`docker info`"):
+            self.assertTrue(cmd.search(bare_form), bare_form)
+        for wrapped in ("  if timeout 20 docker info; then",
+                        '  if ! timeout 60 docker restart "$_ct"; then',
+                        "  until timeout 20 docker info; do :; done"):
+            self.assertFalse(cmd.search(wrapped), wrapped)
         bare = [ln.strip() for ln in _code_lines(self.text) if cmd.search(ln)]
         self.assertEqual(bare, [], "external command without timeout")
         self.assertIn("timeout 20 docker info", self.text)
@@ -273,12 +308,17 @@ class X8SUP_A_Static(unittest.TestCase):
         self.assertIn("TRACTOR_REBOOT_ENABLED=0", [ln.strip() for ln in active])
         # A verbatim copy must be tractor-safe; the base edits it to base.
         self.assertEqual([ln.strip() for ln in active if ln.startswith("ROLE")], ["ROLE=tractor"])
-        commented = [ln for ln in text.splitlines() if ln.lstrip().startswith("#CONTAINERS=")]
-        self.assertTrue(commented, "commented CONTAINERS examples expected")
-        self.assertIn("mosquitto", commented[0])
-        # web_ui must never be one uncomment away from the allowlist: a
-        # restart republishes the retained radio settings.
-        self.assertFalse([ln for ln in commented if "web_ui" in ln])
+        # No LifeTrac container is safe on the allowlist yet (2026-10-17
+        # review), so none may be listed or one uncomment away: a broker
+        # restart drops the subscriptions of clients without on_connect
+        # (lora_bridge's cmd/estop), web_ui republishes retained radio
+        # settings, the image daemons send the L072 a RESET_REQ.
+        for ln in text.splitlines():
+            body = ln.strip().lstrip("#").strip()
+            if body.startswith("CONTAINERS="):
+                for name in ("mosquitto", "web_ui", "lora_bridge", "image_"):
+                    self.assertNotIn(name, body, ln)
+        self.assertRegex(text, r"(?is)mosquitto.*on_connect")
         self.assertRegex(text, r"(?is)web_ui.*retained")
         self.assertIn("RESET_REQ", text)
 
@@ -415,6 +455,7 @@ class X8SUP_B_Supervisor(unittest.TestCase):
             "FAKE_LOG": str(self.fake_log),
             "FAKE_DIR": str(self.fake),
             "FAKE_STATE": str(self.state),
+            "FAKE_UPTIME": str(self.uptime_file),
         }
         if extra:
             env.update(extra)
@@ -438,6 +479,48 @@ class X8SUP_B_Supervisor(unittest.TestCase):
             if start is not None:
                 self.set_uptime(start + i * step)
             self.run_sv("once")
+
+    def fake_kv(self, name: str) -> dict[str, str]:
+        p = self.fake / name
+        text = p.read_text(encoding="utf-8") if p.exists() else ""
+        return dict(ln.split("=", 1) for ln in text.splitlines() if "=" in ln)
+
+    # `run` loop (what lifetrac-supervisor.service runs). Own process group,
+    # so stopping it also stops a `sleep` or `timeout` child; cleanup kills
+    # whatever is left before the temp dir goes.
+    def start_run(self) -> None:
+        self.run_err = self.root / "run.stderr"
+        with open(self.root / "run.stdout", "w", encoding="utf-8") as out, \
+                open(self.run_err, "w", encoding="utf-8") as err:
+            self.run_proc = subprocess.Popen(
+                [self.shell, str(_SCRIPT), "run"], env=self.env(),
+                stdout=out, stderr=err, start_new_session=True)
+        self.addCleanup(self._kill_run)
+
+    def _kill_run(self) -> None:
+        if self.run_proc.poll() is None:
+            try:
+                os.killpg(self.run_proc.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            self.run_proc.wait(timeout=10)
+
+    def stop_run(self) -> None:
+        self.assertIsNone(self.run_proc.poll(), "the run loop exited by itself")
+        os.killpg(self.run_proc.pid, signal.SIGTERM)
+        self.run_proc.wait(timeout=10)
+        self.assertEqual(self.run_err.read_text(encoding="utf-8"), "")
+
+    def wait_for(self, cond, what: str, timeout: float = 20.0) -> None:
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            if cond():
+                return
+            if self.run_proc.poll() is not None:
+                self.fail(f"run loop exited (rc={self.run_proc.returncode}) waiting for {what}: "
+                          f"{self.run_err.read_text(encoding='utf-8')}")
+            time.sleep(0.05)
+        self.fail(f"timed out waiting for {what}; supervisor.log:\n{self.sv_log()}")
 
     # --------------------------------------------------------------- tests
     def test_disarmed_logs_would_and_never_acts(self) -> None:
@@ -639,6 +722,63 @@ class X8SUP_B_Supervisor(unittest.TestCase):
         self.run_sv("once")
         self.assertEqual(self.calls("docker restart"), ["docker restart mosq"])
 
+    def test_disarmed_at_the_cap_logs_would_hold_and_writes_no_hold(self) -> None:
+        self.write_conf(FAIL_THRESHOLD="1", REBOOT_GRACE_S="0", REBOOT_MAX_CONSECUTIVE="2")
+        self.put_state("consecutive_reboots", "2")
+        self.set_docker_info_rc(1)
+        self.run_sv("once")
+        self.assertIn("WOULD hold (disarmed): consecutive_reboots=2 reached cap=2 reason=docker_down",
+                      self.sv_log())
+        self.assertIsNone(self.state_text("held"))
+        status = self.state_kv("status")
+        self.assertEqual(status["held"], "0")
+        self.assertIn("would_hold", status["decision"])
+        self.assertEqual(self.calls("systemctl"), [])
+        self.assertEqual(self.counter(), "2")
+
+    def test_run_loop_disarm_takes_effect_on_the_next_pass(self) -> None:
+        # README: "Remove the file to disarm; the next pass logs the change".
+        # Only the service's `run` loop re-reads it from pass to pass; `once`
+        # starts disarmed in every process, so it cannot show this.
+        self.arm()
+        self.write_conf(CONTAINERS="mosq", FAIL_THRESHOLD="1",
+                        CONTAINER_RESTART_MAX="100", CHECK_INTERVAL_S="1")
+        self.set_container("mosq", "running unhealthy")
+        self.start_run()
+        self.wait_for(lambda: len(self.calls("docker restart")) >= 2, "two armed restarts")
+        self.armed.unlink()
+        mark = "ARMED state 1 -> 0"
+        self.wait_for(lambda: mark in self.sv_log(), "the disarm log line")
+        self.wait_for(lambda: self.sv_log().split(mark, 1)[1].count("WOULD restart") >= 2,
+                      "two disarmed passes")
+        self.stop_run()
+        log = self.sv_log()
+        # A pass reads the armed file once, at its start: nothing after the
+        # line that logs the change acts.
+        self.assertNotIn("ACTION", log.split(mark, 1)[1])
+        self.assertEqual(len(self.calls("docker restart")),
+                         log.count("ACTION restart container=mosq reason="))
+        self.assertEqual(self.calls("systemctl"), [])
+        self.assertEqual(self.state_kv("status")["armed"], "0")
+
+    def test_run_loop_clear_hold_takes_effect_on_the_next_pass(self) -> None:
+        self.arm()
+        self.write_conf(FAIL_THRESHOLD="1", REBOOT_GRACE_S="0", CHECK_INTERVAL_S="1")
+        self.put_state("held", "reason=docker_down\nconsecutive=3\ncap=3")
+        self.put_state("consecutive_reboots", "3")
+        self.set_docker_info_rc(1)
+        self.start_run()
+        self.wait_for(lambda: "HELD reboot suppressed" in self.sv_log(), "a held pass")
+        self.assertEqual(self.calls("systemctl"), [])
+        self.run_sv("clear-hold")
+        self.wait_for(lambda: self.calls("systemctl reboot"), "the reboot after clear-hold")
+        self.wait_for(lambda: self.state_kv("status").get("decision") == "reboot_pending",
+                      "a pass that waits on the accepted reboot")
+        self.stop_run()
+        self.assertEqual(self.calls("systemctl reboot"),
+                         ["systemctl reboot [last_action=reboot consecutive=1]"])
+        self.assertEqual(self.state_kv("status")["held"], "0")
+
     def test_clear_hold(self) -> None:
         self.arm()
         self.write_conf(FAIL_THRESHOLD="1", REBOOT_GRACE_S="0", REBOOT_MAX_CONSECUTIVE="3")
@@ -756,19 +896,41 @@ class X8SUP_B_Supervisor(unittest.TestCase):
         sysctl = self.calls("systemctl")
         self.assertEqual(sysctl[0], "systemctl reboot [last_action=reboot consecutive=1]")
         self.assertEqual(sysctl[-1], "systemctl reboot -ff [last_action=force_reboot consecutive=1]")
-        la = self.state_kv("last_action")
+        # The record on disk when `reboot -ff` ran.
+        la = self.fake_kv("last_action.at_reboot_ff")
         self.assertEqual(la["action"], "force_reboot")
         self.assertEqual(la["reason"], "docker_down")
         self.assertEqual(la["detail"], "systemctl_reboot_rc_1")
         self.assertEqual(la["consecutive"], "1")  # the forced path does not count twice
+        # The fake returns, so this forced path came back: the record says so.
+        la = self.state_kv("last_action")
+        self.assertEqual(la["action"], "reboot_abandoned")
+        self.assertEqual(la["detail"], "forced_path_returned:systemctl_reboot_rc_1")
         log = self.sv_log()
         self.assertLess(log.index("SYSRQ wrote 's'"), log.index("SYSRQ wrote 'u'"))
         self.assertLess(log.index("SYSRQ wrote 'u'"), log.index("SYSRQ wrote 'b'"))
+        self.assertIn("ABANDONED reboot reason=docker_down", log)
+        # A forced reboot that did happen: the next boot finds the record as
+        # it was at the `reboot -ff` call.
+        shutil.copyfile(self.fake / "last_action.at_reboot_ff", self.state / "last_action")
         self.set_boot(BOOT_B)
         self.set_docker_info_rc(0)
         self.run_sv("once")
         self.assertEqual((self.state_text("last_reset_reason") or "").strip(),
                          "supervisor:force_reboot:docker_down")
+
+    def test_sysrq_writes_are_settle_seconds_apart(self) -> None:
+        # The SIL fixture pins SYSRQ_SETTLE_S=0; this one sleeps for real:
+        # s, 1 s, u, 1 s, b.
+        self.arm()
+        self.write_conf(FAIL_THRESHOLD="1", REBOOT_GRACE_S="0", SYSRQ_SETTLE_S="1")
+        self.set_docker_info_rc(1)
+        self.set_fake("systemctl_reboot_rc", "1")
+        self.sysrq.write_text("", encoding="utf-8")
+        t0 = time.monotonic()
+        self.run_sv("once")
+        self.assertGreaterEqual(time.monotonic() - t0, 1.9)
+        self.assertEqual(self.sysrq_text(), "sub")
 
     def test_forced_path_without_sysrq_file_uses_reboot_ff(self) -> None:
         self.arm()
@@ -874,6 +1036,59 @@ class X8SUP_B_Supervisor(unittest.TestCase):
         self.assertIn("no node fault now: not forcing", self.sv_log())
         self.assertFalse(self.pending_marker().exists())
 
+    def test_force_window_counts_from_the_accept_not_the_pass_start(self) -> None:
+        # Review finding (2026-10-17): the marker held the pass-start uptime,
+        # so a slow rung (syncs, fw_printenv, systemctl) ate the window, the
+        # marker read as stale and a second counted reboot went out instead.
+        self.set_fake("uptime_at_accept", "1150.00 3450.00")
+        self._accepted_reboot(FORCE_REBOOT_AFTER_S="180", CHECK_INTERVAL_S="30")
+        self.assertEqual(self.pending_marker().read_text(encoding="utf-8").split()[0], "1150")
+        self.set_uptime(1329)
+        self.run_sv("once")
+        self.assertEqual(self.sysrq_text(), "")
+        self.assertIn("PENDING reboot requested 179s ago", self.sv_log())
+        self.set_uptime(1330)
+        self.run_sv("once")
+        self.assertEqual(self.sysrq_text(), "sub")
+        self.assertNotIn("PENDING marker stale", self.sv_log())
+        self.assertEqual(self.calls("systemctl reboot -ff"),
+                         ["systemctl reboot -ff [last_action=force_reboot consecutive=1]"])
+
+    def test_abandoned_reboot_is_not_read_as_a_supervisor_reboot_later(self) -> None:
+        # Review finding (2026-10-17): after a pending reboot was dropped the
+        # board stayed up with last_action naming this boot, so a power cut
+        # hours later read as supervisor:reboot:<reason>.
+        for case in ("healthy", "disarmed", "stale"):
+            with self.subTest(case=case):
+                self.fresh()
+                self.set_boot(BOOT_A)
+                self._accepted_reboot()
+                if case == "healthy":
+                    self.set_docker_info_rc(0)
+                    up, want = 1180, "no node fault now: not forcing"
+                elif case == "disarmed":
+                    self.armed.unlink()
+                    up, want = 1180, "BLOCKED forced reboot gate=disarmed"
+                else:
+                    self.set_docker_info_rc(0)
+                    up, want = 1241, "PENDING marker stale"
+                self.set_uptime(up)
+                self.run_sv("once")
+                self.assertIn(want, self.sv_log())
+                la = self.state_kv("last_action")
+                self.assertEqual((la["action"], la["reason"], la["boot_id"]),
+                                 ("reboot_abandoned", "docker_down", BOOT_A))
+                self.set_uptime(50000)
+                self.run_sv("once")
+                self.set_boot(BOOT_B)
+                self.set_docker_info_rc(0)
+                self.set_uptime(40)
+                self.run_sv("once")
+                self.assertEqual((self.state_text("last_reset_reason") or "").strip(),
+                                 "supervisor:reboot_abandoned:docker_down")
+                self.assertEqual(self.sysrq_text(), "")
+                self.assertEqual(len(self.calls("systemctl")), 1)
+
     def test_stale_pending_marker_is_dropped_not_forced(self) -> None:
         self._accepted_reboot(FORCE_REBOOT_AFTER_S="180", CHECK_INTERVAL_S="30")
         self.set_uptime(1241)  # > 180 + 2 x 30: the supervisor was not running
@@ -954,7 +1169,7 @@ class X8SUP_B_Supervisor(unittest.TestCase):
         self.assertEqual(self.state_kv("held")["cap"], "2")
 
     def test_watchdog_ping_precedes_the_reboot_rung(self) -> None:
-        # The rung (syncs, systemctl, forced path) can take ~140 s by itself;
+        # The rung (syncs, systemctl, forced path) can take ~210 s by itself;
         # it starts with a fresh WatchdogSec budget.
         self.arm()
         self.write_conf(FAIL_THRESHOLD="1", REBOOT_GRACE_S="0")

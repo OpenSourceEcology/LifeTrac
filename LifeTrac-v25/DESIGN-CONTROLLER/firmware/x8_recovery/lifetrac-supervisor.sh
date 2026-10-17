@@ -20,8 +20,11 @@
 #     runs under `timeout N`, so a wedged dockerd cannot hang the loop. Not
 #     bounded: a file write, rename or `sync` stuck on wedged storage. A
 #     process in uninterruptible I/O cannot be killed by `timeout` or by the
-#     unit watchdog (VERIFY on the bench; only L2's hardware watchdog, fed by
-#     PID 1, covers that case).
+#     unit watchdog (VERIFY on the bench), and nothing on the X8 recovers a
+#     supervisor stuck that way while PID 1 is healthy: L2's hardware
+#     watchdog bites only if PID 1 or the kernel stalls too (2026-10-17
+#     review). The backstop is L4 (design only), which stops getting the L3
+#     heartbeat.
 #   - No wall-clock time anywhere. The tractor has no battery-backed RTC (its
 #     clock is not wall time) and the base clock steps when it syncs at boot.
 #     Every rate limit, grace period and staleness test is in seconds of
@@ -41,15 +44,20 @@
 #     TRACTOR_REBOOT_ENABLED=1; a reboot that would be needed is logged and put
 #     in the status file, and nothing else happens. TODO.md PWR-8, PWR-9 and
 #     PWR-11 gate turning it on.
-#   - ROLE has no permissive default (2026-10-17 review; the plan said
-#     "default base"). A missing config, a file that does not set ROLE, a
-#     ROLE line the shell could not run (`ROLE = tractor`, a UTF-8 BOM), an
-#     invalid value, or a file that fails to load all mean ROLE=tractor. Only
+#   - ROLE has no permissive default (2026-10-17 review). A missing config,
+#     a file that does not set ROLE, a ROLE line the shell could not run
+#     (`ROLE = tractor`, a UTF-8 BOM), an invalid value, or a file that
+#     fails to load all mean ROLE=tractor. Only
 #     an explicit ROLE=base in a cleanly loaded file turns the reboot rung on
 #     without TRACTOR_REBOOT_ENABLED=1, so a typo on a tractor cannot.
 #   - Docker never restarts a container just for being "unhealthy" (restart
 #     policies react to exit only), so this is the piece that acts on the
-#     compose healthcheck status (mosquitto, web_ui healthchecks: PWR-3).
+#     compose healthcheck status (PWR-3) of the containers in CONTAINERS.
+#     That allowlist ships empty and no LifeTrac container is safe on it yet
+#     (2026-10-17 review): a broker restart silently drops the subscriptions
+#     of clients that never resubscribe (lora_bridge's cmd/estop on the base),
+#     web_ui republishes retained radio settings, and the image daemons reset
+#     the L072. See supervisor.conf.example.
 #
 # Each pass (CHECK_INTERVAL_S, default 30 s):
 #   1. `docker info` (CHECK_DOCKER=1).
@@ -103,7 +111,11 @@
 # present and the pending marker is not stale (older than
 # FORCE_REBOOT_AFTER_S + 2 x CHECK_INTERVAL_S, i.e. the supervisor was not
 # running meanwhile); otherwise the marker is dropped, logged, and the normal
-# ladder resumes. The forced path records its intent in last_action, then
+# ladder resumes. "Later" counts from the uptime read right after systemd
+# accepted the reboot, not from the start of the pass (2026-10-17 review:
+# the rung's own syncs and fw_printenv calls could eat the whole window, so
+# the marker read as stale and a second counted reboot was issued instead of
+# the forced path). The forced path records its intent in last_action, then
 # writes s, u, b to /proc/sysrq-trigger as three separate writes
 # SYSRQ_SETTLE_S apart, then `systemctl reboot -ff` as the last resort (also
 # the only step when the sysrq file does not exist). Never sysrq 'c': a plain
@@ -114,8 +126,16 @@
 # Reset reason (no telemetry route exists yet; a container can read the file):
 # at startup in a new boot, if $STATE/last_action names the boot id stored in
 # $STATE/boot_id by the previous run, $STATE/last_reset_reason becomes
-# "supervisor:<action>:<reason>", otherwise "external_or_unknown". Limitation:
-# a power cut between writing last_action and the reboot reads as supervisor.
+# "supervisor:<action>:<reason>", otherwise "external_or_unknown". <action> is
+# reboot or force_reboot, or reboot_abandoned: a supervisor reboot that was
+# requested but then did not happen and will not be forced (pending marker
+# dropped by a gate, as stale or because the node is healthy again, or a
+# forced path that returned). The record is rewritten, not deleted, at that
+# point (2026-10-17 review): the board stays up in that boot with no time
+# limit, and a later external reset used to read as a supervisor reboot.
+# reboot_abandoned says the cause is uncertain; it is also what a late
+# completion of that systemd reboot reads as. Limitation: a power cut between
+# writing last_action and the reboot reads as supervisor.
 #
 # NEVER-DO list. Enforced by not implementing any of it; do not add it here.
 # Each is a bench tool with its own runbook under X8_HEALTH_AND_RECOVERY/
@@ -477,10 +497,11 @@ cfg_bool() {
 validate_config() {
   # Upper bounds keep the unit's WatchdogSec=300 satisfiable: the longest
   # stretch without a WATCHDOG=1 is one sleep plus the checks (120 + ~100 s
-  # with three allowlisted containers), or the reboot rung on its own after
-  # its own ping (three fw_printenv, four synced records, `systemctl reboot`,
-  # the forced path with 2 x SYSRQ_SETTLE_S and `reboot -ff`: ~190 s), not
-  # counting file writes on wedged storage (see the header).
+  # with three allowlisted containers, + 20 s when a dropped pending reboot
+  # rewrites last_action), or the reboot rung on its own after its own ping
+  # (three fw_printenv, five synced records, `systemctl reboot`, the forced
+  # path with 2 x SYSRQ_SETTLE_S and `reboot -ff`: ~210 s), not counting file
+  # writes on wedged storage (see the header).
   cfg_num CHECK_INTERVAL_S 30 1 120
   cfg_num FAIL_THRESHOLD 3 1
   cfg_bool CHECK_DOCKER 1
@@ -916,6 +937,12 @@ bootcount=$PROBATION_BC"
   timeout 30 systemctl reboot >/dev/null 2>&1
   _rr_rc=$?
   if [ "$_rr_rc" -eq 0 ]; then
+    # The forced-path clock starts now, when systemd took the reboot, not at
+    # the pass-start $UP (2026-10-17 review): the syncs, fw_printenv calls and
+    # `systemctl reboot` above can take minutes. Keep the old value if the
+    # uptime file cannot be read.
+    _rr_up=$UP
+    read_uptime || UP=$_rr_up
     kv_put "$RUN/reboot_pending" "$UP $PROBATION $_rr"
     log "ACTION reboot: systemctl reboot accepted; forced path if still alive after ${FORCE_REBOOT_AFTER_S}s"
     return 0
@@ -960,6 +987,7 @@ check_pending_reboot() {
     rm -f "$RUN/reboot_pending" 2>/dev/null
     log "BLOCKED forced reboot gate=$_pr_gate: systemctl reboot was accepted ${_pr_el}s ago (reason=$_pr_rsn) and will not be forced; pending marker dropped, checks resume"
     add_decision "force_blocked:$_pr_gate"
+    abandon_reboot "$_pr_rsn" "force_blocked:$_pr_gate"
     return 1
   fi
   if [ "$_pr_el" -lt "$FORCE_REBOOT_AFTER_S" ]; then
@@ -974,6 +1002,7 @@ check_pending_reboot() {
   if [ "$_pr_el" -gt "$_pr_late" ]; then
     log "PENDING marker stale: systemctl reboot accepted ${_pr_el}s ago (> ${_pr_late}s, so the supervisor was not running meanwhile) reason=$_pr_rsn; dropped, not forcing"
     add_decision force_skipped:stale
+    abandon_reboot "$_pr_rsn" force_skipped:stale
     return 1
   fi
   PENDING_DUE=1
@@ -1017,6 +1046,19 @@ force_reboot() {  # REASON WHY
   _fr_rc=$?
   rc_note "$_fr_rc"
   log "ACTION force_reboot: still alive after systemctl reboot -ff rc=$_fr_rc$RCNOTE"
+  abandon_reboot "$1" "forced_path_returned:$2"
+}
+
+# abandon_reboot REASON WHY: the reboot that last_action announces did not
+# happen and will not be forced in this boot (2026-10-17 review). Rewrite the
+# record with action=reboot_abandoned, same boot id and reason, so a later
+# reset in this boot (power cut, brown-out, L2 bite, or the accepted reboot
+# completing late) reads as supervisor:reboot_abandoned:<reason> instead of a
+# plain supervisor reboot. Not deleted: that late completion stays possible.
+abandon_reboot() {
+  kv_int "$STATE/consecutive_reboots" 0
+  write_last_action reboot_abandoned "$1" "$INT" "$2"
+  log "ABANDONED reboot reason=$1 why=$2: last_action rewritten, so a later reset in this boot is not read as a supervisor reboot"
 }
 
 # --------------------------------------------------------------------- pass
@@ -1116,7 +1158,7 @@ pass() {
       notify_watchdog
       force_reboot "$PENDING_RSN" "alive_${PENDING_EL}s_after_systemctl_reboot"
     elif [ "$_ps_s" -ge "$FAIL_THRESHOLD" ]; then
-      # The rung can take ~190 s on its own (fw_printenv, syncs, systemctl,
+      # The rung can take ~210 s on its own (fw_printenv, syncs, systemctl,
       # the forced path); start it with a fresh unit-watchdog budget.
       notify_watchdog
       reboot_rung "$FAULTS"
@@ -1125,6 +1167,7 @@ pass() {
     if [ "$PENDING_DUE" = 1 ]; then
       log "PENDING systemctl reboot accepted ${PENDING_EL}s ago (reason=$PENDING_RSN) but no node fault now: not forcing"
       add_decision force_skipped:healthy
+      abandon_reboot "$PENDING_RSN" force_skipped:healthy
     fi
     if [ "$_ps_s" -gt 0 ]; then
       log "NODE fault cleared after $_ps_s pass(es)"

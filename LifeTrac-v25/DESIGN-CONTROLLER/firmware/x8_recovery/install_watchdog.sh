@@ -29,16 +29,21 @@
 #   `ostree admin config-diff` (capture_board_state.sh records it).
 #
 # When it goes live -- treat 'install' as arming, 'remove' as disarming:
-#   systemd 250 re-reads system.conf.d at EVERY `systemctl daemon-reload`, not
-#   only at daemon-reexec or boot (v250 src/core/main.c MANAGER_RELOAD ->
+#   systemd 250 re-reads system.conf.d at EVERY manager reload, not only at
+#   daemon-reexec or boot (v250 src/core/main.c MANAGER_RELOAD ->
 #   parse_configuration() -> set_manager_settings() -> manager_set_watchdog()
 #   -> watchdog_setup(); read in the source 2026-10-17, not yet seen on a
-#   board). So the 30 s runtime watchdog arms at the next daemon-reload or
-#   daemon-reexec run by ANYONE -- x8_recovery/README.md's supervisor install,
-#   provision_x8.sh, bench_tools/provision_bench_board.sh and any unit install
-#   all run one -- or at the next boot.
-#   After 'remove' the next one closes /dev/watchdog0 with 'V' and disarms it.
-#   This script runs neither; it prints the command.
+#   board). A reload is `systemctl daemon-reload`, and also any `systemctl
+#   enable`, `disable`, `reenable`, `preset`, `link`, `mask`, `unmask`,
+#   `revert` or `edit` run without --no-reload (v250 systemctl-enable.c and
+#   systemctl-edit.c reload after the change; 2026-10-17 review). So the 30 s
+#   runtime watchdog arms at the next reload or daemon-reexec caused by
+#   ANYONE -- x8_recovery/README.md's supervisor install, provision_x8.sh,
+#   bench_tools/provision_bench_board.sh (`systemctl mask`, `enable`,
+#   `disable`) and any unit install all cause one -- or at the next boot.
+#   `check` (RuntimeWatchdogUSec) is the only reliable reading of the armed
+#   state. After 'remove' the next one closes /dev/watchdog0 with 'V' and
+#   disarms it. This script runs neither; it prints the command.
 #
 # What it never does:
 #   - systemctl daemon-reexec / daemon-reload / reboot (see above).
@@ -48,20 +53,25 @@
 #   - touch /proc/sysrq-trigger, the PMIC, u-boot env, or any other file.
 #
 # Role gate ('install' needs --role; check and remove do not):
-#   base     production base station: installs.
-#   bench    any bench board, whichever role it plays: needs --bench-opt-in.
+#   base     production base station: installs, and says that production
+#            arming waits on the PWR-1 shutdown-timing and staged-OTA reboot
+#            checks (systemd/reboot.target.d/90-lifetrac-timeout.conf: the
+#            3 min bound can cut ostree-finalize-staged short).
+#   bench    a bench board (one carrying the bench marker below), whichever
+#            role it plays: needs --bench-opt-in. Refused on a board without
+#            the marker (2026-10-17 review: --role bench on a production
+#            tractor skipped the tractor gate).
 #            An unattended reboot on the bench wipes the /tmp staging and
 #            re-triggers the tractor's lifetrac-camera.service, which grabs
 #            /dev/ttymxc3 (the L072 UART); on the bench tractor it also
 #            reflashes H747 bank 1 and resets the H747 (BENCH_BOARDS.md).
-#            It arms at the next daemon-reload, whoever runs it (see above).
+#            It arms at PID 1's next reload, whoever causes it (see above).
 #   tractor  refused unless --i-accept-tractor-prereqs: every reboot, watchdog
 #            power cycles included, reflashes and resets the H747 until the
 #            TODO.md PWR prerequisites land (PWR-8: no per-boot bank-1 erase by
 #            stm32h7-program, X8OS-3; PWR-9: H747 nonce RNG, H7-13; PWR-11:
 #            what the Opta's engine-kill latch does after an H747 reset is
-#            settled -- TODO.md's PWR intro lists all three; PWR-2 and the
-#            design doc name only the first two as of 2026-10-17).
+#            settled).
 #   The role is the operator's word, so the bench marker overrides it
 #   (2026-10-17 review): a board carrying the bench-only sudoers drop-in
 #   ($LIFETRAC_BENCH_MARKER, default /etc/sudoers.d/99-lifetrac-bench-nopasswd,
@@ -144,8 +154,9 @@ unattended PMIC power cycle about 30 s later. On the bench that wipes the /tmp s
 lifetrac-camera.service, which grabs /dev/ttymxc3 (the L072 UART): stop it again before
 any radio work. On the bench tractor each power cycle also runs stm32h7-program.service,
 which erases and reflashes H747 bank 1 and resets the H747 (TODO.md PWR-8). It arms at
-the next `systemctl daemon-reload` anyone runs, not only yours. When the session that
-needed it is over: remove, then daemon-reload.
+PID 1's next reload, whoever causes it: `systemctl daemon-reload`, or any `systemctl
+enable/disable/mask/unmask/preset/revert/edit` run without --no-reload. When the session
+that needed it is over: remove, then daemon-reload.
 EOF
 }
 
@@ -158,21 +169,35 @@ restarts the H747's nonce state. Arm the tractor only after the TODO.md PWR
 prerequisites land: PWR-8, no per-boot bank-1 erase by stm32h7-program (X8OS-3);
 PWR-9, H747 nonce seeds from its RNG (H7-13); and PWR-11, the Opta latch semantics
 after an H747 reset settled. When they have, re-run with --i-accept-tractor-prereqs
-(the next daemon-reload, anyone's, then arms it).
+(PID 1's next reload, anyone's, then arms it).
 EOF
 }
 
 next_steps() {
   cat <<'EOF'
-Not armed by this script, but it arms at the next `systemctl daemon-reload` or
-`daemon-reexec`, whoever runs it (any other installer's daemon-reload too, such as the
-supervisor install in x8_recovery/README.md), or at the next boot: from then on PID 1
-owns /dev/watchdog0 at 30 s and a 3 min reboot.target timeout applies. To arm it now:
+Not armed by this script, but it arms at PID 1's next reload or at the next boot. A
+reload is `systemctl daemon-reload` or `daemon-reexec`, whoever runs it (any other
+installer's too, such as the supervisor install in x8_recovery/README.md), and also any
+`systemctl enable/disable/mask/unmask/preset/revert/edit` run without --no-reload. From
+then on PID 1 owns /dev/watchdog0 at 30 s and a 3 min reboot.target timeout applies.
+To arm it now:
     sudo systemctl daemon-reload
-Best when `bash wdt_pet.sh status` says NOT running. If a petter holds the device,
-systemd's open gets EBUSY and it retries at each ping, taking the device within about
-15 s of the petter's 'V' close (v250 source; not yet seen on a board). Then verify:
+First run `bash wdt_pet.sh status`; if a petter is running, `bash wdt_pet.sh stop` it (or
+let the flash finish) before any reload. While a petter holds the device systemd's open
+gets EBUSY and it retries: on a PID 1 that never owned the device that only delays the
+open, but after an earlier arm and disarm in the same boot PID 1 retries in a busy loop,
+stalling 1 s at a time, until the petter closes (v250 source; not seen on a board).
+Then verify:
     sudo sh install_watchdog.sh check   (RuntimeWatchdogUSec=30s, held by 1(systemd))
+EOF
+}
+
+base_note() {
+  cat <<'EOF'
+BASE: install for the PWR-1 checks. Production arming of the base, where OTAs run, waits
+on PWR-1 timing a normal `systemctl reboot` on this board and one reboot with a staged
+OTA deployment: the 3 min reboot.target bound can cut ostree-finalize-staged short and
+the update is then silently not applied (systemd/reboot.target.d/90-lifetrac-timeout.conf).
 EOF
 }
 
@@ -203,6 +228,12 @@ case "$cmd" in
       tractor_refusal >&2
       exit 3
     fi
+    # bench is a statement about the board, so the marker must back it: a
+    # production tractor installed as "bench" would skip the tractor gate
+    if [ "$ROLE" = bench ] && [ ! -e "$BENCH_MARKER" ]; then
+      echo "install_watchdog: refused: not a bench board (no $BENCH_MARKER): use --role base or --role tractor" >&2
+      exit 3
+    fi
     # bench gate: --role bench, or any role on a board with the bench marker
     if [ "$ROLE" = bench ] || [ -e "$BENCH_MARKER" ]; then
       bench_warning
@@ -216,6 +247,7 @@ case "$cmd" in
       fi
     fi
     [ "$ROLE" = tractor ] && echo "TRACTOR: installing on the operator's word that the PWR prerequisites have landed."
+    [ "$ROLE" = base ] && base_note
     for f in "$WD_SRC" "$RT_SRC"; do
       [ -f "$f" ] || { echo "install_watchdog: missing $f (push the whole x8_recovery folder)" >&2; exit 2; }
     done
@@ -224,9 +256,10 @@ case "$cmd" in
     put "$RT_SRC" "$ETC/$RT_REL" || rc=2
     sync
     [ "$rc" -eq 0 ] && next_steps
-    # any later reload races a live petter; say so now (safe, but not silent)
+    # any later reload races a live petter, and that is not harmless (a busy
+    # PID 1 after an earlier arm/disarm in this boot, see next_steps): say so
     if [ "$rc" -eq 0 ] && [ -f "$PET_PIDFILE" ] && kill -0 "$(cat "$PET_PIDFILE" 2>/dev/null)" 2>/dev/null; then
-      echo "NOTE: wdt_pet.sh's petter (pid $(cat "$PET_PIDFILE")) holds $WDT_DEV now: a reload before its 'stop' only delays systemd's open, as above."
+      echo "NOTE: wdt_pet.sh's petter (pid $(cat "$PET_PIDFILE")) holds $WDT_DEV now: run 'bash wdt_pet.sh stop' (or let the flash finish) before any reload, as above."
     fi
     exit "$rc"
     ;;
@@ -242,10 +275,12 @@ case "$cmd" in
     done
     sync
     cat <<'EOF'
-Not disarmed by this script. At the next `systemctl daemon-reload` or `daemon-reexec`
-(whoever runs it) or the next boot, PID 1 closes /dev/watchdog0 with the magic 'V' and
-the kernel keepalive takes over again (the hardware timeout stays 30 s until u-boot
-re-arms 60 s at the next boot -- inferred). To disarm it now:
+Not disarmed by this script. At PID 1's next reload (`systemctl daemon-reload` or
+`daemon-reexec`, whoever runs it, or any
+`systemctl enable/disable/mask/unmask/preset/revert/edit` without --no-reload) or the
+next boot, PID 1 closes /dev/watchdog0 with the magic 'V' and the kernel keepalive takes
+over again (the hardware timeout stays 30 s until u-boot re-arms 60 s at the next boot
+-- inferred). To disarm it now:
     sudo systemctl daemon-reload
 EOF
     exit "$rc"
@@ -296,7 +331,7 @@ EOF
           # not a systemd boot. Don't steer anyone into reloading a wedged PID 1.
           echo "NOTE: systemctl gave no RuntimeWatchdogUSec within 5 s (PID 1 wedged, or not systemd); armed state unknown" ;;
         0|0s|off)
-          [ "$state" = absent ] || echo "NOTE: drop-in present but PID 1 has not re-read it: the next systemctl daemon-reload (anyone's) or boot arms it; now: sudo systemctl daemon-reload" ;;
+          [ "$state" = absent ] || echo "NOTE: drop-in present but PID 1 has not re-read it: its next reload (anyone's daemon-reload, or a systemctl enable/disable/mask without --no-reload) or boot arms it; now: sudo systemctl daemon-reload" ;;
         *)
           [ "$state" = absent ] && echo "NOTE: armed (RuntimeWatchdogUSec=$rwd) without our drop-in: another system.conf file sets it (below), or 'remove' ran and no daemon-reload since" ;;
       esac

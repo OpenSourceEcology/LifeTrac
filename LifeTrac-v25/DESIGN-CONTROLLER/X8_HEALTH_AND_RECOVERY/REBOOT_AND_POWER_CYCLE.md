@@ -170,11 +170,23 @@ override the valve watchdogs.
   them a heartbeat written from the worker loop. Never as a Dockerfile
   `HEALTHCHECK`: the bench harness runs the same images with bare
   `docker run` and must keep failing loudly (RS-4.8).
-- The tractor compose now mounts a repo `mosquitto.conf` with a non-loopback
-  listener; without it `eclipse-mosquitto:2` refuses the camera container.
+- The tractor compose now mounts a repo `mosquitto.conf` with an anonymous
+  listener on 1883. `eclipse-mosquitto:2` is a moving tag: 2.0.x images
+  shipped a listener-less config (local-only, which refuses the camera), but
+  the 2.1.2 image on both boards already listens anonymously on 1883 and
+  also serves an unauthenticated `http_api` dashboard on 9883. The repo file
+  pins the 1883 behaviour across tag bumps and drops the 9883 listener.
 - **Restart side effects:** restarting `web_ui` republishes retained radio
   settings (once switched a live profile on air); restarting a radio daemon
   sends `RESET_REQ`. Neither belongs on the supervisor's restart allowlist.
+  Nor does a broker yet: `lora_bridge` (`cmd/estop`, `cmd/control`),
+  `audit_tail` and the tractor's `camera_service` subscribe once after
+  `connect()` with a clean session and no `on_connect`, so after a broker
+  restart they reconnect with no subscriptions and E-stop forwarding, the
+  audit trail and the camera's keyframe requests stop with nothing logged.
+  A broker goes on the allowlist only after they resubscribe in
+  `on_connect` or are retired (TODO PWR-3). The supervisor's example
+  config ships with no container listed or one uncomment away.
 - Blocked for production on a deploy path: RS-5.11 (base) and a scripted
   install of the tractor compose app.
 
@@ -189,15 +201,22 @@ override the valve watchdogs.
   `JobTimeoutAction=reboot-force`, so a shutdown stuck on a D-state process
   (wedged camera USB) cannot hold a reboot for upstream's 30 min.
 - `install_watchdog.sh check|install|remove --role base|tractor|bench`:
-  base can be armed in production now; tractor refuses without an explicit
-  prerequisites flag (PWR-8, PWR-9, operator decision); bench needs an
-  explicit opt-in and is only for the PWR-1 checks.
+  base: install for PWR-1 under the bench opt-in (the only base X8 is a
+  bench board); production arming after the PWR-1 shutdown-timing and
+  staged-OTA reboot checks, because the 3 min `reboot.target` bound can cut
+  `ostree-finalize-staged` short (the installer prints this for
+  `--role base`); tractor refuses without an explicit prerequisites flag
+  (PWR-8, PWR-9, PWR-11, operator decision); bench needs an explicit opt-in,
+  is refused on a board without the bench marker, and is only for the PWR-1
+  checks.
 - Coexistence: once systemd owns `/dev/watchdog0`, `wdt_pet.sh start` sees
   that and relies on systemd instead of reporting a false failure. The
   runtime timeout becomes 30 s, and the close-without-`'V'` trick
-  (SOFT_RESET_INDEX 4.3) returns `EBUSY`.
+  (SOFT_RESET_INDEX 4.3) should fail with `EBUSY` (inferred from the
+  single-open driver, **VERIFY** under PWR-1).
 - Follow-ups: `watchdog.open_timeout=` (X8OS-4); decide `HandlePowerKey`
-  (a stray PB1 short press is a clean poweroff today).
+  (a stray PB1 short press is a clean poweroff today: inferred, **VERIFY**
+  under PWR-1).
 
 ### L3 — `lifetrac-supervisor` (built, disarmed)
 
@@ -213,6 +232,11 @@ Ladder, cheapest first:
 3. if the reboot command fails or the supervisor is still alive after a
    timeout: `sysrq` `s`, `u`, `b` (sync, read-only remount, immediate
    reboot), falling back to `systemctl reboot -ff`.
+
+Rung 3 has no switch of its own: arming the supervisor arms it. So the PWR-7
+gate on the forced-reboot rung (§4) is enforced by not arming the supervisor
+on any production node before PWR-7; the README, unit file and example
+config say so.
 
 Removed from the earlier draft, with reasons:
 
@@ -232,10 +256,10 @@ Guards:
 | Arming | Acts only if `/etc/lifetrac/supervisor.armed` exists; otherwise logs `WOULD …` and does nothing. Bench boards never get the file without a GO. |
 | Tractor | Reboot rungs off unless `TRACTOR_REBOOT_ENABLED=1` (§4: engine stop, flash wear, nonces). `ROLE` defaults to tractor: only an explicit `ROLE=base` in a config that loads cleanly allows base reboots, so a missing or broken config never turns tractor reboots on. |
 | Grace | No reboot before 600 s uptime. |
-| Boot loop | Consecutive supervisor reboots persisted; at the cap (default 3) it enters HELD and stops rebooting until `clear-hold`. The count resets after 30 min of continuous health. |
+| Boot loop | Consecutive supervisor reboots persisted; at the cap (default 3) it enters HELD and stops rebooting until `clear-hold`, except during an OTA trial boot (next row). The count resets after 30 min of continuous health. |
 | Clock | No wall clock anywhere (no RTC; the tractor clock is not wall time): uptime and `boot_id` only. Heartbeat staleness = mtime unchanged for N seconds of uptime. |
-| OTA trial boot | While `upgrade_available=1`, the cap is raised to `bootlimit + 1` so a bad image still rolls back. |
-| Reason | Writes an atomic `last_action` record before every reboot; on the next start classifies the previous reset as `supervisor:<action>:<reason>` or `external_or_unknown`. |
+| OTA trial boot | While `upgrade_available=1`, the cap is raised to `bootlimit + 1`, and while u-boot's `bootcount` ≤ `bootlimit` (rollback not due yet) neither HELD nor the cap stops a reboot, so a counter or `held` file carried over from before the update cannot block the rollback. u-boot bounds that loop (its rollback clears `upgrade_available`), and the override also needs `bootcount` to have risen after the supervisor's own probation reboot in the previous boot (guard against a stale env copy). The tractor gate is never overridden. |
+| Reason | Writes an atomic `last_action` record before every reboot, rewritten as `reboot_abandoned` when a requested reboot does not happen and will not be forced; on the next start classifies the previous reset as `supervisor:<action>:<reason>` or `external_or_unknown`. |
 | Self-liveness | `WatchdogSec=300` with `systemd-notify WATCHDOG=1` after each pass. |
 | Never | GPIOs, openocd, x8h7 modules, `stm32h7-program`, `docker.service`, `/dev/ttymxc3`, L072 flash/unprotect tools, `sysrq c`. |
 
@@ -360,6 +384,11 @@ Then, in this order:
 - [ ] **L2 installed** (bench opt-in on the board under test, removed
   afterwards): `systemctl show -p RuntimeWatchdogUSec`, `wdt_pet.sh start`
   prints that it relies on systemd, `wdog_regs.py` shows the 30 s timeout.
+- [ ] **Shutdown timing and a staged OTA under L2** (same install): time a
+  normal `systemctl reboot` on each board against `reboot.target`'s 3 min
+  `JobTimeoutSec`, and do one reboot with a staged deployment to see
+  `ostree-finalize-staged` finish inside it. Production arming of L2 where
+  OTAs run (the base) waits on this.
 - [ ] **PB1 short and long press, PB2, J1-73:** answer from the DT and the
   input device first; press only with an OK.
 - [ ] **18650 behaviour:** with a cell fitted, does a 12 V cut keep the X8
