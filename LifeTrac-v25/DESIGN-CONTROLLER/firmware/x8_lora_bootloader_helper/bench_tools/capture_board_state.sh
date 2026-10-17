@@ -12,10 +12,13 @@
 #   - docker run/start/stop/rm/pull/build/save
 #   - openocd, or anything that opens /dev/ttymxc3 (the L072 radio UART)
 #   - nmcli/rfkill changes, fw_setenv, modprobe/rmmod
-#   - opening /dev/watchdog0
+#   - opening /dev/watchdog0 (section 5b only stats it: fuser reads /proc/*/fd, ls -l)
+#   - writing /proc/sysrq-trigger or any /proc/sys value (section 5b only reads them)
+#   - i2cget/i2cset/i2cdump or any other bus access to the PMIC (5b reads the device tree)
 # Secrets are not copied: NetworkManager connection files, /var/sota keys, ssh host
 # keys, shadow, the base's secrets/ dir and .env values are listed (name and size only)
 # or redacted.
+# shellcheck disable=SC2016 # run() takes sh -c strings; their $ expands in the child on purpose
 set -u
 PATH=/usr/sbin:/sbin:/usr/bin:/bin:$PATH
 export PATH
@@ -106,6 +109,37 @@ run 30_kernel  'ls -la /dev/ttymxc* /dev/video* /dev/lifetrac-c2 /dev/watchdog* 
 run 30_kernel  'for d in /sys/bus/usb/devices/*/idVendor; do p=$(dirname $d); echo "$(basename $p) $(cat $d):$(cat $p/idProduct) $(cat $p/product 2>/dev/null)"; done'
 run 30_kernel  'dmesg -T 2>/dev/null | tail -400'
 run 31_journal 'journalctl --list-boots --no-pager 2>/dev/null | tail -20'
+
+# ---- 5b. watchdog owner, panic/sysrq, PMIC power key, OSTree trial boot ---------------
+# 2026-10-17: the facts X8_HEALTH_AND_RECOVERY/REBOOT_AND_POWER_CYCLE.md L2/L3 rest on.
+# All reads. Nothing here opens /dev/watchdog0 (fuser and ls stat it), writes sysrq or
+# a sysctl, or talks to the PMIC over i2c. /proc/cmdline is already in 01_identity.
+# effective watchdog config: who owns the dog (systemd with firmware/x8_recovery's L2
+# drop-in, else nobody: the kernel keepalive) and what bounds a hung reboot.
+# systemd 250 has no WatchdogDevice D-Bus property: the configured device shows only
+# in cat-config below and the journal's "Using hardware watchdog ..., device ..." line.
+run 32_watchdog 'systemctl show -p RuntimeWatchdogUSec -p RebootWatchdogUSec -p KExecWatchdogUSec'
+run 32_watchdog 'systemctl show -p JobTimeoutUSec -p JobTimeoutAction reboot.target; systemctl cat --no-pager reboot.target'
+run 32_watchdog 'systemd-analyze cat-config systemd/system.conf'
+run 32_watchdog 'ls -la /etc/systemd/system.conf.d /usr/lib/systemd/system.conf.d /etc/systemd/system/reboot.target.d'
+run 32_watchdog 'fuser -v /dev/watchdog0 /dev/watchdog'
+run 32_watchdog 'for f in /sys/class/watchdog/*/*; do [ -f "$f" ] && echo "$f=$(cat "$f" 2>&1)"; done'
+run 32_watchdog 'dmesg 2>/dev/null | grep -i -E "watchdog|wdog|imx2"; journalctl -b --no-pager 2>/dev/null | grep -i watchdog | tail -40'
+# panic -> reboot path: kernel.panic decides whether a panic reboots by itself or hangs
+# until WDOG1 bites (L2). No LifeTrac rung crashes the kernel on purpose (never sysrq c);
+# CONFIG_MAGIC_SYSRQ and /proc/sysrq-trigger say whether L3's s,u,b rung can work at all
+# (kernel.sysrq masks only the keyboard, not root's writes to the trigger file).
+run 33_panic_sysrq 'for k in panic panic_on_oops sysrq hung_task_panic softlockup_panic; do echo "kernel.$k=$(cat /proc/sys/kernel/$k 2>&1)"; done'
+run 33_panic_sysrq 'ls -l /proc/sysrq-trigger'
+run 33_panic_sysrq '{ zcat /proc/config.gz 2>/dev/null || cat "/boot/config-$(uname -r)"; } | grep -E "MAGIC_SYSRQ|PANIC_TIMEOUT|PANIC_ON_OOPS|IMX2_WDT|WATCHDOG_NOWAYOUT|WATCHDOG_HANDLE_BOOT|WATCHDOG_OPEN_TIMEOUT|LOCKUP|HUNG_TASK"'
+# BD71847 power key (Max Carrier PB1 -> PWRON): press timings from the device tree, and
+# how the key reaches userspace (input device, logind)
+run 34_pmic_powerkey 'for n in $(find /proc/device-tree/ \( -name "pmic@4b" -o -name "bd718*@4b" \) 2>/dev/null); do echo "node $n"; ls "$n" | grep "^rohm,"; for p in rohm,short-press-ms rohm,long-press-ms; do [ -f "$n/$p" ] && { echo "$p:"; hexdump -C "$n/$p" 2>/dev/null || od -An -tx1 "$n/$p"; }; done; done'
+run 34_pmic_powerkey 'grep -B2 -A8 -i pwrkey /proc/bus/input/devices'
+run 34_pmic_powerkey 'systemd-analyze cat-config systemd/logind.conf | grep -i -E "^# /|HandlePowerKey"'
+# OSTree/u-boot trial-boot state: watchdog power cycles during a trial boot count
+# toward bootlimit and can roll the board back to the previous deployment
+run 35_trial_boot 'fw_printenv bootcount bootlimit upgrade_available rollback 2>&1'
 
 # ---- 6. STM32H747: stock x8h7 (M7) image on disk, M4 sketch traces --------------------
 # Reads files and journals only. It does NOT read the H7's flash (that needs openocd and halts the H7).

@@ -1,0 +1,193 @@
+# x8_recovery — reboot and watchdog recovery for the Portenta X8
+
+Host-side pieces of the reboot / power-cycle plan in
+[X8_HEALTH_AND_RECOVERY/REBOOT_AND_POWER_CYCLE.md](../../X8_HEALTH_AND_RECOVERY/REBOOT_AND_POWER_CYCLE.md)
+(TODO.md **PWR-2** and **PWR-4**). Targets: Portenta X8 on a Max Carrier,
+Arduino LmP Linux, systemd 250, Docker 20.10 (tractor) / 24.0 (base).
+
+**Status (2026-10-17): built, installed nowhere, disarmed.** Nothing here has
+run on a bench board. Valve safety stays with the M4 and Opta 200 ms
+watchdogs; nothing in this folder may gate or wait on them.
+
+## Files
+
+| File | Layer | What it is |
+|---|---|---|
+| `systemd/system.conf.d/90-lifetrac-watchdog.conf` | L2 | systemd drop-in: PID 1 owns the i.MX hardware watchdog (`RuntimeWatchdogSec`, `RebootWatchdogSec`). |
+| `systemd/reboot.target.d/90-lifetrac-timeout.conf` | L2 | systemd drop-in: bounds a hung `systemctl reboot` (`JobTimeoutSec`, then `reboot-force`). |
+| `install_watchdog.sh` | L2 | Installs, removes or checks the two drop-ins above, with a role gate (base / bench / tractor). See its header. |
+| `lifetrac-supervisor.sh` | L3 | Host health supervisor: checks, allowlisted container restarts, guarded reboot rung. POSIX sh. |
+| `lifetrac-supervisor.service` | L3 | systemd unit for the supervisor (`run` loop, `WatchdogSec=300`). Not installed by any script yet. |
+| `supervisor.conf.example` | L3 | Annotated config; copy to `/etc/lifetrac/supervisor.conf`. Ships with an empty container allowlist. |
+
+SIL tests, run from `base_station/` with `python -m pytest tests -q`:
+`tests/test_x8_supervisor_sil.py` (L3 supervisor) and
+`tests/test_x8_watchdog_ownership_sil.py` (L2).
+
+## L3 — `lifetrac-supervisor`
+
+### What one pass does (every `CHECK_INTERVAL_S`, default 30 s)
+
+1. `timeout 20 docker info` (when `CHECK_DOCKER=1`).
+2. For each name in the `CONTAINERS` allowlist:
+   `timeout 20 docker inspect --type container -f '{{.Name}} {{.State.Status}} {{if .State.Health}}…'`.
+   Unhealthy = not `running`, health `unhealthy`, or no such container.
+   After `FAIL_THRESHOLD` bad passes in a row: `timeout 60 docker restart`,
+   at most `CONTAINER_RESTART_MAX` times per container per boot. Docker never
+   restarts a container just for being unhealthy, so this is what acts on the
+   compose healthchecks. Docker looks an unknown name up as a container ID
+   prefix, so hex-only names are refused at config time, and a container
+   whose inspected name is not exactly `/<name>` is never restarted
+   (`REFUSED restart`). Duplicate entries are ignored.
+3. `HEARTBEATS` files: stale when the mtime **value** has not changed for more
+   than `max_age` seconds of **uptime** (missing file: since the supervisor
+   started watching it).
+4. A node-level fault (docker down, stale heartbeat, a container whose
+   restarts are used up) in `FAIL_THRESHOLD` passes in a row goes to the
+   reboot rung, through these gates in order:
+
+| Gate | Blocks the reboot when | Logged as |
+|---|---|---|
+| grace | uptime < `REBOOT_GRACE_S` (600 s) | `BLOCKED reboot gate=grace` |
+| tractor | `ROLE=tractor` and `TRACTOR_REBOOT_ENABLED` is not 1. Never overridden. | `BLOCKED reboot gate=tractor_reboot_disabled`, also `reboot_blocked=` in `status` |
+| HELD | `$STATE/held` exists (unless the OTA override below applies) | `HELD reboot suppressed` (plus a `HELD:` line every pass) |
+| cap | `consecutive_reboots` ≥ cap → writes `held` (unless the OTA override applies) | `HELD entering hold` |
+| armed | `/etc/lifetrac/supervisor.armed` is absent | `WOULD reboot` |
+
+**ROLE defaults to tractor** (2026-10-17 review; the plan said "default
+base"). Only an explicit `ROLE=base` in a config that loads cleanly makes a
+node a base. A missing config, a file without a `ROLE` line (or with
+lower-case `role=`), an invalid value, or a rejected file all read as
+tractor, so a typo cannot turn a tractor's reboot rungs on. The whole config
+file is rejected (all defaults, `ROLE=tractor`, logged with the shell's own
+message) when any line writes to stderr, for example `ROLE = tractor` with
+spaces, a UTF-8 byte-order mark, or an unquoted `CONTAINERS=a b` anywhere in
+the file. Before this, `.` only checked the last line, so such a line was
+skipped silently.
+
+The cap is `REBOOT_MAX_CONSECUTIVE` (3). While `fw_printenv -n
+upgrade_available` prints 1 (an OTA trial boot) it becomes
+`max(REBOOT_MAX_CONSECUTIVE, bootlimit + 1)`. That alone did not stop a
+counter carried over from before the update, or a `held` file left from
+before it, from blocking the rollback. So while `fw_printenv -n bootcount`
+is ≤ `bootlimit` (rollback not due yet), neither HELD nor the cap stops a
+reboot (`PROBATION overrides ...`). u-boot bounds that loop: its
+`rollback_setup` clears `upgrade_available`. In case the env copy is stale
+(images that keep the flag in RPMB), the override stops when bootcount did
+not rise after the supervisor's own probation reboot in the previous boot
+(`$STATE/probation_reboot`). The counter goes back to 0 after
+`HEALTHY_RESET_S` (1800 s) of continuous health in one boot; HELD stays
+until a person runs `clear-hold`.
+
+The reboot itself: persist the counter, write `$STATE/last_action` (tmp file,
+`sync`, rename, `sync`), then `timeout 30 systemctl reboot`. If that fails,
+it writes `s`, `u`, `b` to `/proc/sysrq-trigger` (three writes,
+`SYSRQ_SETTLE_S` apart), then tries `systemctl reboot -ff`. Never sysrq `c`.
+If `systemctl reboot` was accepted but the supervisor is still alive
+`FORCE_REBOOT_AFTER_S` (180 s) later, the same forced path runs only when
+the board is still armed, not HELD, past the tractor gate, a node fault is
+still present, and the request is not stale (older than
+`FORCE_REBOOT_AFTER_S + 2 × CHECK_INTERVAL_S`). Otherwise the pending marker
+is dropped (`BLOCKED forced reboot gate=...`, `PENDING marker stale`, or
+`not forcing`) and the normal checks resume.
+
+### Why it is shaped this way
+
+- **POSIX sh only.** The tractor's LmP host Python has no `json`, `select`,
+  `socket` or `subprocess`. Every external command runs under `timeout`, so a
+  wedged dockerd cannot hang the loop. Not bounded: file writes, renames and
+  `sync` on wedged storage. A process in uninterruptible I/O cannot be killed
+  by `timeout` or by the unit watchdog (VERIFY on the bench).
+- **Uptime, never wall-clock time.** No battery-backed RTC on the tractor;
+  the base clock steps at boot. Rate limits, grace and staleness all use
+  `/proc/uptime` inside one `boot_id`.
+- **Disarmed by default (bench rule).** No supervisor-initiated restart or
+  reboot on a bench board without an explicit GO. Disarmed, every check runs
+  and the actions it would take are logged as `WOULD ...`; the dry run counts
+  its would-be restarts separately, so arming mid-boot starts from a full
+  budget.
+- **Tractor reboots off.** Any X8 reboot resets the H747 (reflashed by
+  `stm32h7-program.service` at every tractor boot), which in the production
+  design trips the Opta's 200 ms watchdog, drops the PSR and kills the engine
+  behind a latch that needs a person at the machine. TODO.md PWR-8, PWR-9 and
+  PWR-11 gate `TRACTOR_REBOOT_ENABLED=1`. Because the role is not always
+  known for sure, an unknown role counts as tractor (see above).
+- **Empty allowlist.** Restarting `web_ui` republishes retained radio
+  settings (a restart once caused a live on-air profile switch, TODO.md
+  RS-0.6); restarting a radio daemon sends the L072 a `RESET_REQ`. mosquitto
+  is the only safe starting entry.
+- **Never-do list** (header of the script): no GPIOs (gpio10, gpio163), no
+  openocd, no `x8h7_*` module loads/unloads, no restart of
+  `stm32h7-program.service` or `docker.service`, nothing on `/dev/ttymxc3`, no
+  L072 flash / unprotect / AN3155 tools, nothing outside the allowlist, no
+  sysrq `c`. The SIL test checks the script's code lines for these.
+
+### Commands
+
+```sh
+lifetrac-supervisor.sh run          # the service loop
+lifetrac-supervisor.sh once         # one pass; acts like `run` when armed
+lifetrac-supervisor.sh status       # print the state files; changes nothing
+lifetrac-supervisor.sh clear-hold   # remove held, zero consecutive_reboots
+```
+
+Do not run `once` by hand on an armed board while the service is active:
+both share the state directory.
+
+### State (`/var/lib/lifetrac/supervisor`)
+
+| File | Content |
+|---|---|
+| `status` | key=value snapshot of the last pass: armed, held, faults, decision, `reboot_blocked`. |
+| `supervisor.log` (+ `.1`) | `boot=<8 chars of boot_id> up=<uptime> <event>`, one line per event; rotated past 256 KiB. The same lines go to the journal. |
+| `last_action` | Written before every reboot action: `action`, `reason`, `boot_id`, `uptime_s`, `consecutive`, `role`, `detail`. |
+| `last_reset_reason` | Set once per boot: `supervisor:<action>:<reason>` if the previous boot ended in a supervisor reboot, else `external_or_unknown`. No telemetry route yet; a container can read this file. |
+| `boot_id` | Boot id of the last run, for the classification above. |
+| `consecutive_reboots`, `held` | Boot-loop guard. |
+| `probation_reboot` | Boot id and u-boot `bootcount` at the last reboot issued under the OTA override; read in the next boot. |
+| `per_boot/` | Streaks, restart counts, heartbeat tracking, previous boot id, pending reboot. Wiped when the boot id changes. |
+
+### Manual install (no script does this yet)
+
+As root on the X8 (`/opt` is `/var/rootdirs/opt` on LmP and survives OSTree
+updates):
+
+```sh
+mkdir -p /opt/lifetrac/x8_recovery /etc/lifetrac
+cp lifetrac-supervisor.sh /opt/lifetrac/x8_recovery/ && chmod 755 /opt/lifetrac/x8_recovery/lifetrac-supervisor.sh
+cp supervisor.conf.example /etc/lifetrac/supervisor.conf      # ships ROLE=tractor; base: set ROLE=base
+cp lifetrac-supervisor.service /etc/systemd/system/
+systemctl daemon-reload && systemctl enable --now lifetrac-supervisor.service
+journalctl -u lifetrac-supervisor -f                           # watch the WOULD lines
+```
+
+`supervisor.conf.example` is not in the repo's `.gitattributes` LF list, so a
+Windows checkout may copy it with CRLF; the supervisor strips CR from each
+line before it runs the config, so such a copy still loads.
+
+Arming is a separate, deliberate step: `touch /etc/lifetrac/supervisor.armed`
+(not on a bench board without a GO; reboots additionally need `ROLE=base`,
+or on a tractor `TRACTOR_REBOOT_ENABLED=1`). Remove the file to disarm; the
+next pass logs the change.
+
+The unit orders itself `After=docker.service` with no `Wants=` or
+`Requires=`: starting or restarting the supervisor never starts a stopped
+`docker.service` (which would start every container with a restart policy,
+radio daemons included), and stopping docker never stops the supervisor.
+LmP's `multi-user.target` already starts docker at boot.
+
+### Open items
+
+- **VERIFY on the bench (PWR-1):** that a plain reboot on the i.MX8MM asserts
+  `WDOG_B` (PMIC cycle), which is why there is no sysrq `c` rung; and which
+  copy of `upgrade_available` and `bootcount` LmP uses on these boards
+  (`fw_printenv` u-boot env vs `fiovb_printenv` RPMB; the base bench env
+  shows both at 0, `bootlimit=5`, no `fiovb_rpmb`).
+- **Decided 2026-10-17 after review:** `ROLE` defaults to tractor, not
+  base, so a missing or broken config can never turn tractor reboots on; and
+  the unit uses `After=docker.service` alone (see above).
+- An install step in provisioning (an `install_supervisor` script or part of
+  X8OS-4), merging with OTA_STRATEGY.md's `lifetrac-health`, and publishing
+  `last_reset_reason` in telemetry.
+- The L3 rungs in the plan that touch the L072 or H7 (NRST, openocd) are left
+  out on purpose: they are on the never-do list above.

@@ -230,7 +230,7 @@ Guards:
 | Guard | Rule |
 |---|---|
 | Arming | Acts only if `/etc/lifetrac/supervisor.armed` exists; otherwise logs `WOULD …` and does nothing. Bench boards never get the file without a GO. |
-| Tractor | Reboot rungs off unless `TRACTOR_REBOOT_ENABLED=1` (§4: engine stop, flash wear, nonces). |
+| Tractor | Reboot rungs off unless `TRACTOR_REBOOT_ENABLED=1` (§4: engine stop, flash wear, nonces). `ROLE` defaults to tractor: only an explicit `ROLE=base` in a config that loads cleanly allows base reboots, so a missing or broken config never turns tractor reboots on. |
 | Grace | No reboot before 600 s uptime. |
 | Boot loop | Consecutive supervisor reboots persisted; at the cap (default 3) it enters HELD and stops rebooting until `clear-hold`. The count resets after 30 min of continuous health. |
 | Clock | No wall clock anywhere (no RTC; the tractor clock is not wall time): uptime and `boot_id` only. Heartbeat staleness = mtime unchanged for N seconds of uptime. |

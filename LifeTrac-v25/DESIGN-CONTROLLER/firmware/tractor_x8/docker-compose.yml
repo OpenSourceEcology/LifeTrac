@@ -1,3 +1,23 @@
+# LifeTrac v25 tractor X8 production compose stack: camera + broker.
+# README-DEPLOY.md step 2 unpacks this directory into
+# /opt/lifetrac/compose-apps/lifetrac-camera; lifetrac-camera.service
+# (x8_lora_bootloader_helper/lifetrac-camera.service) runs `docker compose
+# up` on this file whenever it exists there, and only idles when it is
+# missing.
+#
+# DEPLOY CAUTION (RS-5.13, 2026-10-17): on the bench tractor, unpacking this
+# directory is what arms the camera, not README-DEPLOY step 3's "production
+# only" restart. udev starts lifetrac-camera.service at every boot there,
+# although the unit reads "disabled" (x8_lora_bootloader_helper/bench_tools/
+# BENCH_BOARDS.md, 2026-10-10), so the next reboot of any kind (a watchdog
+# or lifetrac-supervisor reboot included, PWR-3/PWR-4) starts this stack.
+# camera_service opens LIFETRAC_M7_UART=/dev/ttymxc3, which on the bench is
+# the L072 radio UART, starts its back-channel reader on it before connect(),
+# and writes IPC frames to it once connected. With ./mosquitto.conf the
+# broker accepts that connection (the old image-default config probably
+# refused it: inferred, see the note on the config bind below). RS-5.13 gates
+# installing this stack on a bench tractor. README-DEPLOY step 2 does not
+# carry this caution yet (open item).
 version: '3.8'
 services:
   camera:
@@ -33,8 +53,62 @@ services:
     # No ports exposed to LAN; internal only
     volumes:
       - mosquitto_data:/mosquitto/data
-      - mosquitto_config:/mosquitto/config
+      # 2026-10-17 (PWR-3): the repo's broker config, bound read-only. Until
+      # now a named volume `mosquitto_config` sat on /mosquitto/config. Docker
+      # seeds an empty named volume from the image and nothing in the repo
+      # ever put a config in it, so a fresh install runs the
+      # eclipse-mosquitto:2 default: no listener line, which mosquitto 2.x
+      # runs in local-only mode (loopback only), refusing the camera's
+      # mqtt://mosquitto:1883 (the video-test v2 compose notes the same
+      # failure). INFERRED from the image default, not seen on the bench: the
+      # bench tractor's copy of that volume was never captured, and the
+      # 2026-07-25 tractor-camera crash inside _build_frame, which runs only
+      # after connect() (bench-evidence/RS_firmware_patch_flash_2026-07-25/
+      # NOTES.md), suggests its broker took the camera anyway, perhaps through
+      # an unrecorded hand edit. VERIFY before citing the old behaviour.
+      # The volume is dropped, not kept beside this bind: a file bind inside a
+      # directory that is itself a volume mount only wins because Docker
+      # mounts the shorter path first, and the stale default would still sit
+      # underneath. Boards that ran the old file keep an unused
+      # `<project>_mosquitto_config` volume: on the bench tractor that is
+      # `lifetrac-camera_mosquitto_config` (bench-evidence/
+      # board_state_2026-10-12_unit_retirement/tractor/
+      # 13_disarm_and_remove_containers.txt). It is a named volume, not one
+      # of the anonymous volumes TODO.md RS-5.14 counts, and has no clean-up
+      # item of its own yet; remove it only with the operator's OK.
+      # README-DEPLOY.md ships the whole tractor_x8 directory, so
+      # ./mosquitto.conf lands next to this file. Read the DEPLOY CAUTION at
+      # the top of this file before installing it on a bench tractor: the
+      # camera opened /dev/ttymxc3 under the old compose too, so this config
+      # is not what keeps it off the radio UART.
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    # Status only (TODO.md PWR-3): Docker never restarts an "unhealthy"
+    # container; lifetrac-supervisor (firmware/x8_recovery/, L3) acts on it,
+    # and only for allowlisted containers. Keep tractor-mosquitto OFF that
+    # allowlist for now: camera_service subscribes once after connect(), with
+    # a clean session and no on_connect, so after a broker restart paho
+    # reconnects without the camera's subscriptions (keyframe requests,
+    # link_budget, encode_mode_override) and nothing notices.
+    # No start_interval: it needs Docker 25.0; the tractor runs 20.10.14.
+    # Same exec-form probe as the base broker, no shell: mosquitto_sub reads
+    # the retained $SYS/broker/version from host `mosquitto`, the name the
+    # camera uses. Docker's embedded DNS resolves that alias (seen on the
+    # board: bench-evidence/board_state_2026-10-10/tractor/
+    # 61_inspect_tractor-mosquitto.json) to this container's network
+    # address, never 127.0.0.1, so it exercises the listener the camera uses
+    # and fails on a loopback-only broker. `$$` is compose's escape for one
+    # `$`. Docker counts any non-zero exit as a failed probe.
+    # VERIFY (PWR-3): not yet run on a board; `docker inspect -f
+    # '{{json .State.Health}}' tractor-mosquitto` must read healthy before
+    # anything relies on it.
+    healthcheck:
+      test: ["CMD", "mosquitto_sub", "-h", "mosquitto", "-p", "1883",
+             "-i", "lifetrac-healthcheck", "-t", "$$SYS/broker/version",
+             "-C", "1", "-W", "5"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
 
 volumes:
   mosquitto_data:
-  mosquitto_config:

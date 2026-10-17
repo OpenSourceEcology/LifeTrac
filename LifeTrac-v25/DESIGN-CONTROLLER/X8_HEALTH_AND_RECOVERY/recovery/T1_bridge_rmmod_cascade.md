@@ -6,15 +6,23 @@
 /sys/kernel/x8h7_firmware/version` blocks, `m4-proxy` shows as failed, or you
 need to flip H7 firmware without a physical reset.
 
-**Side effect:** Triggers the i.MX2+ HW watchdog (60 s) **auto-reboot** of the
-X8. The reboot itself is the recovery; modules come back fresh on the other
-side.
+**Side effect:** Triggers the i.MX2+ HW watchdog (60 s as u-boot arms it; with
+the [`firmware/x8_recovery`](../../firmware/x8_recovery/install_watchdog.sh) L2
+drop-in armed, 30 s if the wedge also stops PID 1's petting, else maybe no
+reboot at all. Inferred, VERIFY under PWR-1) **auto-reboot** of the X8. The reboot itself
+is the recovery; modules come back fresh on the other side.
 
 > **Corrections 2026-09-12 (flash session, see FLASH_RUNBOOK.md):** the
 > watchdog is armed by u-boot on both boards and DOES honour magic close —
 > write `'V'` before closing `/dev/watchdog0`; closing without it leaves the
 > dog active with no petter and reboots the board 60 s later (tractor, kernel
 > 5.10.93). A timeout asserts WDOG_B into the PMIC, so WRSR always reads POR.
+> (2026-10-17, inferred; L2 is armed on no board yet: once PID 1 has armed
+> the L2 drop-in -- at the next `daemon-reload`, daemon-reexec or boot after
+> install, when `systemctl show -p RuntimeWatchdogUSec` stops reading `0` --
+> it holds the single-open device at 30 s, so a second open gets `EBUSY` and
+> never reaches the dog; VERIFY under PWR-1. Until then a close without `'V'`
+> still reboots the board 60 s later.)
 > On the base (kernel 6.1.24) re-inserting `x8h7_drv.ko` after an openocd
 > session OOPSes in `spi_probe → of_irq_get`; the pipeline's
 > `REVIVE_MODE=reboot` (openocd `reset run`, magic-close, `systemctl reboot`)

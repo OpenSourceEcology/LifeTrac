@@ -1,0 +1,108 @@
+# supervisor.conf.example -- settings for lifetrac-supervisor.sh (L3,
+# TODO.md PWR-4). Copy to /etc/lifetrac/supervisor.conf and edit; restart
+# lifetrac-supervisor.service afterwards (the config is read at start).
+#
+# Format: plain KEY=value lines, no spaces around "=", multi-word values in
+# double quotes. The file is run by /bin/sh in a throw-away subshell (CR line
+# ends are stripped first). The WHOLE file is rejected -- every key takes its
+# default, which for ROLE is tractor -- and "CONFIG ... failed to load" is
+# logged with the shell's own message, when any line writes to stderr or the
+# file fails to parse, calls `exit`, or its last command returns non-zero.
+# Lines that do that: `ROLE = tractor` (spaces), a UTF-8 byte-order mark
+# from a Windows editor, an unquoted CONTAINERS=a b (each runs as a command
+# that is "not found"). A single bad value (not a whole number, outside its
+# range, not 0/1) falls back to that key's default and is logged. An unknown
+# key (e.g. lower-case role=) is logged and ignored.
+# With no file at all, every key takes the default shown here.
+#
+# Arming is NOT a setting here. The supervisor restarts and reboots nothing
+# unless /etc/lifetrac/supervisor.armed exists; without it every action is
+# logged as "WOULD ...". Bench boards stay disarmed unless there is an
+# explicit GO for supervisor-initiated restarts and reboots.
+#
+# All times are seconds of UPTIME, never wall-clock time (the tractor has no
+# battery-backed RTC; the base clock steps when it syncs at boot).
+
+# Node role: base | tractor. With ROLE=tractor every reboot rung is OFF unless
+# TRACTOR_REBOOT_ENABLED=1: any X8 reboot resets the H747 (reflashed by
+# stm32h7-program.service at every tractor boot), which in the production
+# design trips the Opta's 200 ms watchdog, drops the PSR and kills the engine
+# behind a latch that needs a person at the machine.
+# ROLE defaults to tractor. Only an explicit ROLE=base in a file that loads
+# cleanly makes a node a base; a missing file, a missing or misspelt ROLE
+# line, an invalid value or a rejected file (see Format above) all read as
+# tractor, so a typo cannot turn tractor reboots on (2026-10-17 review; the
+# plan said "default base"). This example therefore ships ROLE=tractor:
+# CHANGE IT TO ROLE=base ON THE BASE STATION, or the base never reboots
+# itself (its status file shows reboot_blocked=tractor_reboot_disabled).
+ROLE=tractor
+
+# Leave at 0 on a tractor until TODO.md PWR-8, PWR-9 and PWR-11 are done.
+TRACTOR_REBOOT_ENABLED=0
+
+# Seconds between passes (1..120: the unit's WatchdogSec=300 has to cover
+# one sleep plus one pass).
+CHECK_INTERVAL_S=30
+
+# Consecutive failing passes before acting, for a container restart and for
+# the reboot rung alike (min 1).
+FAIL_THRESHOLD=3
+
+# Container allowlist: space-separated docker CONTAINER names (not compose
+# service names; `docker ps --format '{{.Names}}'` lists them, e.g. the base
+# compose project names its broker design-controller-mosquitto-1, see
+# bench-evidence/board_state_2026-10-04/base/60_docker.txt). The supervisor
+# inspects and restarts ONLY what is listed here, and acts on the compose
+# healthcheck status (docker itself never restarts an "unhealthy" container).
+# Duplicates are ignored. Names made of hex digits only are refused (docker
+# would resolve an absent one as another container's ID prefix), and a
+# container whose inspected name is not exactly this one is never restarted.
+#
+# EMPTY BY DEFAULT ON PURPOSE. Restarting a LifeTrac container is not free:
+#   - web_ui: restarting it republishes the retained radio settings at
+#     startup; a web_ui restart once caused a live on-air radio profile switch
+#     (TODO.md RS-0.6, retained-pin incident class). Re-check that path before
+#     listing it.
+#   - radio daemons (lora_bridge, image_tx / image_rx): each sends the L072 a
+#     HOST_TYPE_RESET_REQ at link open (SETTINGS_REFERENCE.md), so a restart
+#     resets the radio mid-session. Do not list them until they have a
+#     worker-loop heartbeat (RS-1.2) and a restart has been bench-checked.
+# mosquitto is the only safe example to start with:
+#CONTAINERS="design-controller-mosquitto-1"
+CONTAINERS=""
+
+# docker restarts allowed per container per boot; after that an unhealthy
+# container is a node-level fault and goes to the reboot rung (min 0).
+CONTAINER_RESTART_MAX=3
+
+# Check the docker daemon with `docker info` (0 or 1). Failing
+# FAIL_THRESHOLD passes in a row is a node-level fault.
+CHECK_DOCKER=1
+
+# Heartbeat files, space-separated /absolute/path:max_age_s. Stale when the
+# file's mtime value has not changed for more than max_age_s seconds of
+# uptime (a missing file: since the supervisor started watching it this
+# boot). Stale = node-level fault. No LifeTrac service writes one yet
+# (RS-1.2); example only:
+#HEARTBEATS="/var/lib/lifetrac/heartbeat/lora_bridge:120"
+HEARTBEATS=""
+
+# Reboot rung guards.
+# No supervisor reboot before this much uptime (min 0).
+REBOOT_GRACE_S=600
+# Supervisor reboots in a row (across boots) before HELD; HELD stops further
+# reboots until `lifetrac-supervisor.sh clear-hold` (min 0; 0 means the
+# reboot rung always goes straight to HELD). During an OTA trial boot (u-boot
+# upgrade_available=1) the cap is raised to bootlimit+1, and while u-boot's
+# bootcount <= bootlimit neither HELD nor the cap stops a reboot, so the
+# rollback can fire (u-boot's own bootlimit bounds that loop).
+REBOOT_MAX_CONSECUTIVE=3
+# Continuous healthy uptime in one boot that resets the counter to 0 (min 0).
+HEALTHY_RESET_S=1800
+# Still alive this long after `systemctl reboot` was accepted -> forced path
+# (sysrq s,u,b, then `systemctl reboot -ff`), but only if the node still has a
+# fault and the gates still pass (armed, not HELD, tractor gate). Matches the
+# 3 min reboot.target JobTimeoutSec drop-in (min 1).
+FORCE_REBOOT_AFTER_S=180
+# Pause between the sysrq s, u and b writes (0..10).
+SYSRQ_SETTLE_S=3

@@ -166,7 +166,22 @@ default.
   `/tmp/lifetrac_strict`, then:
   `echo fio | sudo -S -p '' docker run --rm --privileged -v /dev/mem:/dev/mem -v /tmp/lifetrac_strict:/work --entrypoint python3 lifetrac-v25:latest /work/wdog_regs.py`
   (on the tractor use the `arduino-ootb-python-devel:738bc44` image).
-  Expected: `WCR=0x773d WDE=1 WT=119 (60.0 s)`.
+  Expected: `WCR=0x773d WDE=1 WT=119 (60.0 s)` (u-boot's value; see the next
+  bullet if the L2 drop-in is armed).
+- **Once [`firmware/x8_recovery`](../x8_recovery/install_watchdog.sh)'s L2
+  drop-in is armed** (2026-10-17, not yet on either bench board). Copying the
+  file is not enough: PID 1 arms it at the next `systemctl daemon-reload`,
+  daemon-reexec or boot, and `systemctl show -p RuntimeWatchdogUSec` then
+  reads `30s`, not `0`. From then on systemd owns the dog, so the 60 s above
+  becomes 30 s at runtime and `WCR` reads about `0x3b3d` (`WT=59`; inferred,
+  not yet read). `wdt_pet.sh start` sees it and logs `systemd owns
+  /dev/watchdog0 ...; relying on it, no petter started` (exit 0, no pidfile, a
+  `RELY` line in `wdt_pet.log`; `stop` then says `not running`). While systemd
+  holds the single-open device, the close-without-`'V'` trick above gets
+  `EBUSY` at the open and never reaches the dog (inferred from the kernel
+  watchdog core; VERIFY under PWR-1). Before it is armed the trick still
+  reboots the board 60 s later, and during a daemon-reexec PID 1 briefly
+  closes the device, so an open then succeeds.
 
 ## 4. After the reboot
 

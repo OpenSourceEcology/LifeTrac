@@ -1,0 +1,59 @@
+# lifetrac-supervisor.service -- L3 host health supervisor (both X8 nodes).
+# Part of L3 in X8_HEALTH_AND_RECOVERY/REBOOT_AND_POWER_CYCLE.md (TODO.md PWR-4).
+#
+# NOT INSTALLED BY ANY SCRIPT YET (2026-10-17), and installed on neither bench
+# board. Manual install, as root on the X8:
+#   mkdir -p /opt/lifetrac/x8_recovery /etc/lifetrac
+#   cp lifetrac-supervisor.sh /opt/lifetrac/x8_recovery/
+#   chmod 755 /opt/lifetrac/x8_recovery/lifetrac-supervisor.sh
+#   cp supervisor.conf.example /etc/lifetrac/supervisor.conf
+#       # it ships ROLE=tractor: set ROLE=base on the base station
+#   cp lifetrac-supervisor.service /etc/systemd/system/
+#   systemctl daemon-reload
+#   systemctl enable --now lifetrac-supervisor.service
+# (/opt is /var/rootdirs/opt on LmP, so it survives OSTree updates.)
+#
+# Installing it does NOT arm it. Arming is the separate file
+# /etc/lifetrac/supervisor.armed; until it exists the supervisor only logs
+# "WOULD <action>" lines. Bench boards: do not create it without an explicit
+# GO. Reboots also need an explicit ROLE=base in a config that loads cleanly,
+# or, on a tractor, TRACTOR_REBOOT_ENABLED=1: a missing config, a missing or
+# unparseable ROLE line, or a rejected file all count as ROLE=tractor.
+#
+# Why these settings:
+#   - Host service, not a container, so it keeps working when Docker does not.
+#   - After=docker.service only, no Wants= or Requires= (decided
+#     2026-10-17 after review). Requires= would stop the supervisor when
+#     docker stops, and docker being down is one of the faults it watches.
+#     Wants= would start a stopped docker.service, and every container with
+#     a restart policy (radio daemons open /dev/ttymxc3 and send the L072 a
+#     RESET_REQ), on every start of this unit, crash and watchdog restarts
+#     included. LmP's multi-user.target already wants docker.service at
+#     boot, and After= orders the first pass behind its start.
+#   - WatchdogSec=300 + NotifyAccess=all: the script sends WATCHDOG=1 through
+#     a child `systemd-notify` after every pass (and after each container
+#     restart, and before the reboot rung), so a supervisor stuck for 5 min
+#     is killed and restarted. The commands in a pass are bounded by their
+#     timeouts (docker info 20 s, inspect 20 s and restart 60 s per
+#     allowlisted container; the reboot rung ~190 s after its own ping); with
+#     more than three allowlisted containers raise WatchdogSec. Not bounded:
+#     file writes, renames and sync on wedged storage (a process in
+#     uninterruptible I/O cannot be killed by timeout or by this watchdog;
+#     VERIFY on the bench).
+#   - Restart=on-failure, RestartSec=10: a crash or watchdog kill restarts it;
+#     its state (streaks, restart counts, reboot counter) is on disk in
+#     /var/lib/lifetrac/supervisor, so a restart loses nothing.
+[Unit]
+Description=LifeTrac X8 host health supervisor (L3; disarmed unless /etc/lifetrac/supervisor.armed)
+After=docker.service
+
+[Service]
+Type=simple
+ExecStart=/opt/lifetrac/x8_recovery/lifetrac-supervisor.sh run
+Restart=on-failure
+RestartSec=10
+WatchdogSec=300
+NotifyAccess=all
+
+[Install]
+WantedBy=multi-user.target
