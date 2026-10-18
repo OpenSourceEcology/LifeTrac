@@ -5,7 +5,9 @@ Host-side pieces of the reboot / power-cycle plan in
 (TODO.md **PWR-2** and **PWR-4**). Targets: Portenta X8 on a Max Carrier,
 Arduino LmP Linux, systemd 250, Docker 20.10 (tractor) / 24.0 (base).
 
-**Status (2026-10-17): built, installed nowhere, disarmed.** Nothing here has
+**Status (2026-10-18): built, installed nowhere, disarmed.** The tractor
+reboots itself only when idle (D-PWR1); that gate is built and blocks every
+tractor reboot until the H747 side exists (PWR-13). Nothing here has
 run on a bench board. Valve safety stays with the M4 and Opta 200 ms
 watchdogs; nothing in this folder may gate or wait on them.
 
@@ -15,7 +17,7 @@ watchdogs; nothing in this folder may gate or wait on them.
 |---|---|---|
 | `systemd/system.conf.d/90-lifetrac-watchdog.conf` | L2 | systemd drop-in: PID 1 owns the i.MX hardware watchdog (`RuntimeWatchdogSec`, `RebootWatchdogSec`). |
 | `systemd/reboot.target.d/90-lifetrac-timeout.conf` | L2 | systemd drop-in: bounds a hung `systemctl reboot` (`JobTimeoutSec`, then `reboot-force`). |
-| `install_watchdog.sh` | L2 | Installs, removes or checks the two drop-ins above, with a role gate (base / bench / tractor). See its header. |
+| `install_watchdog.sh` | L2 | Installs, removes or checks the two drop-ins above, with a role gate (base / bench / tractor; the tractor does not get L2 under D-PWR1). See its header. |
 | `lifetrac-supervisor.sh` | L3 | Host health supervisor: checks, allowlisted container restarts, guarded reboot rung. POSIX sh. |
 | `lifetrac-supervisor.service` | L3 | systemd unit for the supervisor (`run` loop, `WatchdogSec=300`). Not installed by any script yet. |
 | `supervisor.conf.example` | L3 | Annotated config; copy to `/etc/lifetrac/supervisor.conf`. Ships with an empty container allowlist. |
@@ -53,7 +55,9 @@ SIL tests, run from `base_station/` with `python -m pytest tests -q`:
 | tractor | `ROLE=tractor` and `TRACTOR_REBOOT_ENABLED` is not 1. Never overridden. | `BLOCKED reboot gate=tractor_reboot_disabled`, also `reboot_blocked=` in `status` |
 | HELD | `$STATE/held` exists (unless the OTA override below applies) | `HELD reboot suppressed` (plus a `HELD:` line every pass) |
 | cap | `consecutive_reboots` ≥ cap → writes `held` (unless the OTA override applies) | `HELD entering hold` |
+| idle | `ROLE=tractor` and the H747 does not report a live `idle` (D-PWR1, below). Read-only, so it runs disarmed too. Never overridden. | `BLOCKED reboot gate=tractor_not_idle`, `tractor_idle=` in `status` |
 | armed | `/etc/lifetrac/supervisor.armed` is absent | `WOULD reboot` |
+| lock | `ROLE=tractor` and the H747 does not confirm a motion hold for this reboot within `TRACTOR_IDLE_WAIT_S` polls; the request is withdrawn | `BLOCKED reboot gate=tractor_lock` |
 
 **ROLE defaults to tractor** (2026-10-17 review). Only an explicit
 `ROLE=base` in a config that loads cleanly makes a node a base. A missing
@@ -114,9 +118,39 @@ the board then stays up in that boot.
 - **Tractor reboots off.** Any X8 reboot resets the H747 (reflashed by
   `stm32h7-program.service` at every tractor boot), which in the production
   design trips the Opta's 200 ms watchdog, drops the PSR and kills the engine
-  behind a latch that needs a person at the machine. TODO.md PWR-8, PWR-9 and
-  PWR-11 gate `TRACTOR_REBOOT_ENABLED=1`. Because the role is not always
-  known for sure, an unknown role counts as tractor (see above).
+  behind a latch that needs a person at the machine. TODO.md PWR-8, PWR-9,
+  PWR-11 and PWR-13 gate `TRACTOR_REBOOT_ENABLED=1`. Because the role is not
+  always known for sure, an unknown role counts as tractor (see above).
+- **Tractor reboots only when idle** (Dorkmo, 2026-10-18,
+  [DECISIONS.md D-PWR1](../../DECISIONS.md#d-pwr1--tractor-automatic-reboots-idle-only)).
+  The H747 decides what idle is (engine stopped, every valve output off) and
+  must hold motion off until the reset, because an orderly shutdown can take
+  minutes. The two talk through two tmpfs files and a link service on the
+  X8 that does not exist yet (TODO.md PWR-13), so today every tractor reboot
+  is blocked:
+  - `/run/lifetrac/tractor_idle`, written by the link service at least once
+    a second (tmp + rename), first line `busy <seq>`, `idle <seq>` or
+    `locked <seq> <id>`. `<seq>` (1-32 letters or digits) comes from the
+    H747's own status frames and changes at least once a second; a file
+    whose `<seq>` does not change while the supervisor watches is not live
+    and never reads as idle.
+  - `/run/lifetrac/tractor_reboot_request`, written only by the supervisor:
+    first line `<id>` (`<boot id prefix>-<uptime>`). The link service
+    mirrors it to the H747, which latches the hold when it sees a request
+    while idle and releases it only when it resets or the link reports no
+    request file. A link service stopped by the shutdown leaves the hold in
+    place.
+  The rung waits for a live `idle`, writes the request, waits for a live
+  `locked <seq> <id>` (`TRACTOR_IDLE_WAIT_S` polls of one second each, 10
+  by default, 2..15), and only then persists its records and calls
+  `systemctl reboot`. Every path where the reboot does not happen (refused,
+  blocked, abandoned, a forced path that returns) deletes the request, and a
+  request left from an earlier run with no pending reboot is deleted at
+  start. The forced path on a tractor runs only while the link still shows
+  the hold, or when the link is no longer live (stopped by the shutdown);
+  never when the request is gone or the live link shows anything else.
+  No OTA probation override. The systemd-owned hardware watchdog (L2) is not
+  installed on the tractor, because a watchdog reset cannot wait for idle.
 - **Empty allowlist; no LifeTrac container is safe on it yet** (2026-10-17
   review). Restarting a broker silently drops the subscriptions of clients
   that subscribe once after `connect()`, with a clean session and no

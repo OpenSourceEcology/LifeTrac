@@ -41,8 +41,17 @@
 # itself (its status file shows reboot_blocked=tractor_reboot_disabled).
 ROLE=tractor
 
-# Leave at 0 on a tractor until TODO.md PWR-8, PWR-9 and PWR-11 are done.
+# Leave at 0 on a tractor until TODO.md PWR-8, PWR-9, PWR-11 and PWR-13 are
+# done. Even at 1 a tractor reboots only while idle (DECISIONS.md D-PWR1):
+# the H747 must report a live "idle" in /run/lifetrac/tractor_idle and then
+# confirm a motion hold for the reboot; without the H747 link service
+# (PWR-13) every tractor reboot is blocked (reboot_blocked=tractor_not_idle).
 TRACTOR_REBOOT_ENABLED=0
+
+# Tractor only: one-second polls of the H747 idle file, for the idle report
+# and again for the motion-hold confirmation (2..15; up to two waits per
+# reboot attempt, and one more before a forced reboot).
+TRACTOR_IDLE_WAIT_S=10
 
 # Seconds between passes (1..120: the unit's WatchdogSec=300 has to cover
 # one sleep plus one pass).

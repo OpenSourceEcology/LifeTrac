@@ -3955,7 +3955,10 @@ Design, hardware facts and the five-layer plan:
 The built pieces live in [firmware/x8_recovery/](firmware/x8_recovery/README.md),
 installed nowhere and disarmed. Valve safety stays with the M4/Opta 200 ms
 watchdogs; none of this may gate it. **On the tractor every module reset is
-an engine stop**, so tractor arming waits on PWR-8, PWR-9 and PWR-11.
+an engine stop**, so tractor arming waits on PWR-8, PWR-9 and PWR-11, and
+the tractor reboots itself only when idle (Dorkmo, 2026-10-18,
+[DECISIONS.md D-PWR1](DECISIONS.md#d-pwr1--tractor-automatic-reboots-idle-only)),
+which also needs PWR-13.
 
 - [ ] **PWR-1 Bench reset-reach checks** — the plan's §6 list, each with
   Dorkmo's OK and the bench power-up procedure (`power_up_guard.sh`): does
@@ -3975,8 +3978,8 @@ an engine stop**, so tractor arming waits on PWR-8, PWR-9 and PWR-11.
   reporting a false start failure. Remaining: install on the base under the
   bench opt-in and verify per PWR-1; production arming of the base only after
   PWR-1's shutdown-timing and staged-OTA reboot checks; then
-  `watchdog.open_timeout=` (X8OS-4) and a `HandlePowerKey` decision. Tractor
-  waits on PWR-8, PWR-9 and PWR-11.
+  `watchdog.open_timeout=` (X8OS-4) and a `HandlePowerKey` decision. Not on
+  the tractor (D-PWR1: a watchdog reset cannot wait for idle).
 - [ ] **PWR-3 Container health status (L1)** — built: compose healthchecks on
   mosquitto (base, tractor) and web_ui (base), and a tractor
   `mosquitto.conf` with a non-loopback listener. Remaining: radio daemons
@@ -3989,9 +3992,11 @@ an engine stop**, so tractor arming waits on PWR-8, PWR-9 and PWR-11.
   container restart → `systemctl reboot` → sysrq `s`,`u`,`b`; uptime-based
   boot-loop cap with HELD state, OTA probation, reset-reason record, tractor
   reboots off. Remaining: install path in provisioning, merge with
-  OTA_STRATEGY's `lifetrac-health`, publish the reset reason, the tractor
-  reboot decision, and PWR-7 before arming any production node (arming arms
-  the forced-reboot rung, which has no switch of its own).
+  OTA_STRATEGY's `lifetrac-health`, publish the reset reason, and PWR-7
+  before arming any production node (arming arms the forced-reboot rung,
+  which has no switch of its own). Tractor reboot decision made (D-PWR1):
+  the supervisor's idle gate and H747 motion-hold handshake are built and
+  SIL-tested; they block every tractor reboot until PWR-13 exists.
 - [ ] **PWR-5 Independent hard power cycle (L4)** — decide where it lives
   (recommended: standalone node-watchdog board; alternative: Opta R4 or
   D1608S channel 7) against the plan's seven requirements: trigger from a
@@ -4031,6 +4036,23 @@ an engine stop**, so tractor arming waits on PWR-8, PWR-9 and PWR-11.
   assume the node comes back; the self-holding relay drops whenever the H747
   resets and must survive it; the 18650 reaches +5V only in BQ24195 boost
   mode.
+- [ ] **PWR-13 Tractor idle signal and motion hold (D-PWR1)** — the other end
+  of the supervisor's idle gate (contract in the header of
+  `firmware/x8_recovery/lifetrac-supervisor.sh` and the plan's L3 guards):
+  a link service on the tractor X8, part of the Linux↔H747 link X8OS-3
+  picks, writes `/run/lifetrac/tractor_idle` (`busy|idle <seq>`, or
+  `locked <seq> <id>`) at least once a second from the H747's own status
+  frames, and mirrors `/run/lifetrac/tractor_reboot_request` to the H747.
+  M7 firmware: decide what "engine stopped" reads from (only the Opta's
+  ignition sense I1 / `safety_state` `IGNITION_OFF` is wired today); report
+  idle only with every valve output off for a settling time; on a request
+  while idle, latch a motion hold that refuses every motion command until
+  the H747 resets or the link reports no request (no timeout: a stopped
+  tractor that waits for a person is the safe side), and show the operator
+  that the X8 is rebooting. Also turn off LmP's `docker.service`
+  `FailureAction=reboot` on the tractor (drop-in, after checking the unit on
+  the bench), since it reboots without waiting for idle; the supervisor
+  covers that fault with an idle-gated reboot. Gates tractor arming.
 
 ---
 

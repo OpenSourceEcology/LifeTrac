@@ -9,7 +9,13 @@ disarmed by default**: [`firmware/x8_recovery/`](../firmware/x8_recovery/README.
 compose healthchecks. The hardware layer (L4) and remote restart (L5) are
 design only. Nothing here has been run on a board. **VERIFY** marks claims
 inferred from datasheets, schematics or source code that need a bench check
-(collected in §6 / TODO PWR-1). Tracked as TODO.md **PWR-1..PWR-12**.
+(collected in §6 / TODO PWR-1). Tracked as TODO.md **PWR-1..PWR-13**.
+
+**Decided 2026-10-18 (Dorkmo, [DECISIONS.md D-PWR1](../DECISIONS.md#d-pwr1--tractor-automatic-reboots-idle-only)):
+the tractor reboots itself only when idle**, meaning the engine is stopped,
+every valve output is off, and the H747 is holding motion off until the
+reset. The supervisor enforces this (L3 guards below); the H747 side is
+TODO PWR-13.
 
 Question this answers: *how can we reboot or power-cycle the Portenta X8 and
 the Max Carrier, which of those do we already use, and how do we build them
@@ -42,7 +48,8 @@ Companions: [recovery/SOFT_RESET_INDEX.md](recovery/SOFT_RESET_INDEX.md),
    Opta trips at 200 ms, the PSR drops, the engine stops, and the latch needs
    a person at the machine. Automatic recovery restores comms and telemetry,
    **never motion**. That is why tractor reboots are off by default in
-   everything built here.
+   everything built here, and when turned on they happen only while the
+   tractor is idle (D-PWR1).
 4. **The carrier cannot be power-cycled by anything on the carrier.** The
    only full cold cycle is cutting the 12 V input (and the 18650, and the X8
    USB-C). That needs an external, independently time-limited switch (L4),
@@ -113,7 +120,7 @@ Hardware facts behind the table:
 |---|---|---|---|
 | Containers | `restart: unless-stopped` | [`docker-compose.yml`](../docker-compose.yml), [`firmware/tractor_x8/docker-compose.yml`](../firmware/tractor_x8/docker-compose.yml) | Declared, but no production stack runs on either board: the base runs only the bench broker; `lifetrac-base.service` is retired and not installable (RS-5.11); the tractor camera app starts only through the udev unit and is stopped at every bench power-up. |
 | systemd units | `Restart=on-failure` | `firmware/x8_lora_bootloader_helper/lifetrac-camera.service` (tractor, udev-started `docker compose up` wrapper), `bench_tools/units/disable-wifi.service` | The only LifeTrac units installed. `firmware/tractor_x8/systemd/*.service` are OBSOLETE and installed nowhere (RS-5.16). No `WatchdogSec=` anywhere. |
-| LmP auto-reboot | `docker.service` `FailureAction=reboot` (tractor) / `StartLimitAction=reboot` (base) after 3 failed starts in 60 s; `aktualizr-lite` `StartLimitAction=reboot` (inactive: no `sota.toml`) | LmP image | Live. Restarting `docker.service` in a loop can reboot the board; the supervisor never does it. |
+| LmP auto-reboot | `docker.service` `FailureAction=reboot` (tractor) / `StartLimitAction=reboot` (base) after 3 failed starts in 60 s; `aktualizr-lite` `StartLimitAction=reboot` (inactive: no `sota.toml`) | LmP image | Live. Restarting `docker.service` in a loop can reboot the board; the supervisor never does it. On the tractor this reboot does not wait for idle, so D-PWR1 turns it off there (PWR-13). |
 | OTA rollback | u-boot `bootcount` / `bootlimit=5`, `upgrade_available` in `/mnt/boot/uboot.env` (FAT, single copy) | LmP image | Every reboot, WDOG bite or power cut during a trial boot counts toward rollback. |
 | Linux reboot | `systemctl reboot` | flash pipeline `REVIVE_MODE=reboot` | Bench; boards back in 12–24 s. |
 | i.MX watchdog | u-boot arms WDOG1, kernel keepalive pets; `wdt_pet.sh` holds it during L072 flashes and hands it back with magic close `'V'` | `firmware/x8_lora_bootloader_helper/wdt_pet.sh` | Bench. Closing without `'V'` power-cycles the board 60 s later (tractor, 2026-09-12). |
@@ -132,7 +139,9 @@ Hardware facts behind the table:
   authoritative ones and must survive every rung**; the M7 must read the
   Opta `safety_state` at boot and stay latched if it is not `NORMAL`
   (PWR-11). Recovery restores comms and telemetry, not motion. The base node
-  has no such effect.
+  has no such effect. Since D-PWR1 an automatic tractor reboot also needs
+  the tractor idle and the H747 holding motion off, so it never lands
+  mid-work.
 - **Reboot loops wear the valve controller's flash.** On the tractor every
   boot erases and reprograms H747 bank 1 (~13 s). Any automatic reboot path
   on the tractor waits on PWR-8 (program only on mismatch, or X8OS-3).
@@ -205,8 +214,14 @@ override the valve watchdogs.
   bench board); production arming after the PWR-1 shutdown-timing and
   staged-OTA reboot checks, because the 3 min `reboot.target` bound can cut
   `ostree-finalize-staged` short (the installer prints this for
-  `--role base`); tractor refuses without an explicit prerequisites flag
-  (PWR-8, PWR-9, PWR-11, operator decision); bench needs an explicit opt-in,
+  `--role base`); tractor: **not installed** (D-PWR1: a watchdog reset
+  cannot wait for idle, so it could stop the engine mid-work). The installer
+  still refuses `--role tractor` without an explicit prerequisites flag
+  (PWR-8, PWR-9, PWR-11), kept only for a revisited decision. The tractor
+  keeps what it has today: u-boot arms WDOG1 and the kernel pets it, so only
+  a kernel hang resets it, and its shutdowns keep upstream's 30 min
+  `reboot.target` bound (the supervisor's forced path covers its own
+  reboots, under the H747's motion hold). Bench needs an explicit opt-in,
   is refused on a board without the bench marker, and is only for the PWR-1
   checks.
 - Coexistence: once systemd owns `/dev/watchdog0`, `wdt_pet.sh start` sees
@@ -255,6 +270,7 @@ Guards:
 |---|---|
 | Arming | Acts only if `/etc/lifetrac/supervisor.armed` exists; otherwise logs `WOULD …` and does nothing. Bench boards never get the file without a GO. |
 | Tractor | Reboot rungs off unless `TRACTOR_REBOOT_ENABLED=1` (§4: engine stop, flash wear, nonces). `ROLE` defaults to tractor: only an explicit `ROLE=base` in a config that loads cleanly allows base reboots, so a missing or broken config never turns tractor reboots on. |
+| Tractor idle (D-PWR1) | Even with `TRACTOR_REBOOT_ENABLED=1`, a tractor reboots only after the H747 reports a live `idle` (engine stopped, every valve output off) through `/run/lifetrac/tractor_idle`, the supervisor writes a reboot request, and the H747 answers `locked <seq> <id>`: it holds motion off for that request until it resets or the request is withdrawn, so an orderly shutdown that takes minutes cannot end with the tractor moving. Liveness = the H747's `<seq>` token changes while the supervisor watches. Not idle, no answer within `TRACTOR_IDLE_WAIT_S` polls, or any path where the reboot does not happen: the request is withdrawn and the reboot blocked (`reboot_blocked=tractor_not_idle` / `tractor_lock`); the next pass with the fault asks again. The forced path runs only while the hold stands (or the link service was stopped by the shutdown, which leaves the hold in place). Never overridden, OTA probation included. No link service exists yet, so this blocks every tractor reboot until PWR-13. |
 | Grace | No reboot before 600 s uptime. |
 | Boot loop | Consecutive supervisor reboots persisted; at the cap (default 3) it enters HELD and stops rebooting until `clear-hold`, except during an OTA trial boot (next row). The count resets after 30 min of continuous health. |
 | Clock | No wall clock anywhere (no RTC; the tractor clock is not wall time): uptime and `boot_id` only. Heartbeat staleness = mtime unchanged for N seconds of uptime. |
@@ -272,7 +288,7 @@ heartbeat file, never from a second opener of `/dev/ttymxc3` or from
 Open items: install path in provisioning; merging with OTA_STRATEGY's
 `lifetrac-health` as its probation mode (one service, one set of checks);
 publishing the reset reason (base: local broker; tractor: through the H747
-once X8OS-3 lands); the tractor reboot decision.
+once X8OS-3 lands); the H747 side of the tractor idle gate (PWR-13).
 
 ### L4 — Independent hard power cycle (design only)
 

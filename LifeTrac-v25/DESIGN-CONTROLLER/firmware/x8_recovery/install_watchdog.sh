@@ -66,9 +66,12 @@
 #            /dev/ttymxc3 (the L072 UART); on the bench tractor it also
 #            reflashes H747 bank 1 and resets the H747 (BENCH_BOARDS.md).
 #            It arms at PID 1's next reload, whoever causes it (see above).
-#   tractor  refused unless --i-accept-tractor-prereqs: every reboot, watchdog
-#            power cycles included, reflashes and resets the H747 until the
-#            TODO.md PWR prerequisites land (PWR-8: no per-boot bank-1 erase by
+#   tractor  not installed (DECISIONS.md D-PWR1, 2026-10-18: the tractor
+#            reboots itself only when idle, and a watchdog reset cannot wait
+#            for idle). Refused unless --i-accept-tractor-prereqs, kept only
+#            for a revisited decision: every reboot, watchdog power cycles
+#            included, reflashes and resets the H747 until the TODO.md PWR
+#            prerequisites land (PWR-8: no per-boot bank-1 erase by
 #            stm32h7-program, X8OS-3; PWR-9: H747 nonce RNG, H7-13; PWR-11:
 #            what the Opta's engine-kill latch does after an H747 reset is
 #            settled).
@@ -162,8 +165,10 @@ EOF
 
 tractor_refusal() {
   cat <<'EOF'
-TRACTOR: refused. Every reboot, a watchdog power cycle included, runs
-stm32h7-program.service, which erases and reflashes H747 bank 1 and resets the H747.
+TRACTOR: refused. Under DECISIONS.md D-PWR1 (2026-10-18) the tractor reboots itself
+only when idle, and a watchdog reset cannot wait for idle, so L2 is not installed on
+the tractor. The flag below is only for a revisited decision. Also: every reboot, a
+watchdog power cycle included, runs stm32h7-program.service, which erases and reflashes H747 bank 1 and resets the H747.
 In production that trips the engine-kill latch through the Opta, and each reset
 restarts the H747's nonce state. Arm the tractor only after the TODO.md PWR
 prerequisites land: PWR-8, no per-boot bank-1 erase by stm32h7-program (X8OS-3);
