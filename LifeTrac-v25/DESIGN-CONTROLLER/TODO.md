@@ -2789,9 +2789,70 @@ conflicts. Every leg needs GO; radios stay parked between legs.
   on new fw, OR an RFCO_SUMMARY capture showing the originator now logs
   consider_remote=LOCKED_OUT on received commands (feed-independent proof).
   The reverse-delivery half below still stands.**
-- [ ] **RS-12.15 (reverse-delivery half) — the tractor's RX does not follow
+- [~] **RS-12.15 (reverse-delivery half) — the tractor's RX does not follow
   the slot clock between trains (opened 2026-09-12 from RS-12.12/14 data).**
+  **FIX CODED 2026-10-14 (de2ae16 + f9cc98b; review fixes 65963c1, 1b45cfa),
+  SIL green, bench images built 2026-10-14. NOT flashed (needs the GO).** On v2 the
+  self-anchored TX clock survives demotion, but `sx1276_rx_slot_follow` still
+  ran only while LOCKED, so between trains the tractor listened on its last TX
+  channel or the scan walker's (v2 legs R/T/U: 19/72, 2/43, 7/49 commands
+  heard). Fix: follow =
+  (LOCKED && adopted) || originator authority. While streaming (>= 8 own TX
+  each < 1 s apart) the tractor's own clock drives its receiver in any scan
+  state and the walker leaves the synth alone. Followers are unchanged (they
+  never hold authority). The rule reads a fresh ms clock. LOCKED on the own
+  grid without authority (the RS-13 decay window) no longer follows. The final
+  scan FAIL still commits FAILED and sends its fault, but it no longer parks
+  the receiver under authority (the follower would re-arm only at the next
+  slot boundary). A walker step skipped under authority still starts a fresh
+  window for the FAIL sub-byte's IRQ and CRC flags.
+  `check-rx-reverse-delivery` (10 SIL sequences, real sx1276_rx.c/tx.c): 17/59
+  -> 59/59 between trains, 15/28 -> 28/28 (leg H shape), 159/182 -> 182/182
+  (leg I shape), 10/33 -> 33/33 in scan FAILED, 0/1 -> 1/1 with a command on
+  air at the final FAIL; FAIL sub-bytes after a CRC error match main's; the
+  follower's radio calls are identical to pre-fix; the remaining misses are
+  half-duplex collisions.
+  Limit: authority only, so at 1 fps, or ~3.5 s after a >= 1 s stall, it is
+  the old behaviour.
+  **BENCH (no radio) — DONE 2026-10-14:** bench `e083ae46a64686031b39866eca42e094`,
+  production `148de24e1f9acce417c46c2c69a5be6b` (24 972 B each, same after a clean rebuild; the
+  toolchain re-made 0c1bb0a9 / 589c1203 on main first); README, `l072-bench-md5.yml`, `build/firmware.bin`.
+  **ON-AIR (needs GO):** flash BOTH L072s with the bench image (Verify OK,
+  radio_state 4); profile 1, 300 s legs, STATS pre/post on both nodes.
+  (V) camera A/B vs legs T/U: -TxFeed camera -RegProfile 1 -DurationS 300
+      -KfRequestDisable 0 + keyframe injector 15 s x 20, moving scene, aim verified.
+  (W) synth A/B vs leg R: dual injector 2 fps / 3000 B.
+  (X) FAILED: synth 2 fps, command plane silent >= 150 s (KF requests off, no
+      injector) until the tractor emits the final RX_SCAN_FAILED fault, then the
+      injector for 120 s (if base background traffic keeps LOCKing it, FAILED is
+      unreachable: record that).
+  PASS: tractor radio_rx_ok / base radio_tx_ok >= 60 % on V, W and post-FAILED X
+  (v2: 26 / 4.7 / 14 %; SIL 81-95 % on an ideal channel); tractor
+  clk_demotion_reset = 0, tx_first_anchor = 1, fhss_dec_snapped = 0,
+  fhss_dec_rej_epoch_drift = 0; base tx_stream_streak_max < 8; 0 base
+  lock-loss gaps > 3 s, max frag gap <= 1 s, fragment loss not worse than leg U
+  (10.5 %) / leg R. Tractor clk_demotion_reset > 0 or tx_first_anchor > 1 means
+  it adopted an echo (apparent lead or decay window): stop.
+  Open for the design owner: closing the decay window (a grid-policy change
+  that touches the F6 recovery tier; the 1 fps gap is the same question); a
+  lead tolerance in the originator's leading-grid test if validation shows the
+  tractor adopting (the SIL margin is ~0.5 ms); whether self-follow should also
+  run in scan FAILED, as it does now (if not, the final FAIL's park comes back
+  with it); and the half-duplex collisions that remain (D-VS9's reserved
+  control slot).
   **SHARPENED 2026-09-12 (RS-12.14 gate leg J): the dominant mechanism is FHSS
+  CLOCK AUTHORITY, not reverse delivery. Every follower lock loss in the three
+  profile-1 legs starts 1–2 s after a base command the TRACTOR RECEIVED (H: 1
+  received, 0 losses; I: 49, four up to 64 s; J: 15, four up to 29 s; unheard
+  sends cause nothing). Reading: the tractor (anchor) re-anchors its clock
+  from the base's command headers — the base's lagged follower copy (F6
+  2026-07-30: a self-anchored grid has no authority to refuse a remote one) —
+  its TX slots shift, the base's follower is a slot off within LOCK_LOSS_MS
+  (2 s) and re-acquires in 20–30 s. FIX (firmware, next flash): the streaming
+  node must not re-anchor from a follower's headers (mark follower-originated
+  frames non-anchoring, or let the anchor refuse remote grids while it
+  streams). Interim: profile-1 field operation with
+  LIFETRAC_KF_REQUEST_DISABLE=1. The reverse-delivery half below stands.**
   Base→tractor command delivery on profile 1 was 1/17 (leg H, healthy link)
   and 49/281 (leg I) vs 56/58 on profile 2. The base DOES hop its command TX
   with the tractor's grid (277 distinct hop/channel pairs in 281 sends), so
@@ -2806,18 +2867,6 @@ conflicts. Every leg needs GO; radios stay parked between legs.
   event / lengthen LOCK_LOSS for the anchor). Until then every keyframe
   request on profile 1 costs several retries, which is what RS-12.14 bounds.
 - [ ] **RS-12.14 — keyframe self-heal storm destroys the FHSS follower
-  CLOCK AUTHORITY, not reverse delivery. Every follower lock loss in the three
-  profile-1 legs starts 1–2 s after a base command the TRACTOR RECEIVED (H: 1
-  received, 0 losses; I: 49, four up to 64 s; J: 15, four up to 29 s; unheard
-  sends cause nothing). Reading: the tractor (anchor) re-anchors its clock
-  from the base's command headers — the base's lagged follower copy (F6
-  2026-07-30: a self-anchored grid has no authority to refuse a remote one) —
-  its TX slots shift, the base's follower is a slot off within LOCK_LOSS_MS
-  (2 s) and re-acquires in 20–30 s. FIX (firmware, next flash): the streaming
-  node must not re-anchor from a follower's headers (mark follower-originated
-  frames non-anchoring, or let the anchor refuse remote grids while it
-  streams). Interim: profile-1 field operation with
-  LIFETRAC_KF_REQUEST_DISABLE=1. The reverse-delivery half below stands.**
   (opened 2026-09-12, from RS-12.12 leg I).** With keyframe requests enabled
   on profile 1, a few early misses trigger self-heal requests; each is a base
   TX that skips the follower under tx-busy (RS-4.14); the follower loses lock
@@ -3894,6 +3943,94 @@ in Debian containers, and no effect on the H747). Rationale, current state and
   `gasket`/`apex` driver (base), a full host Python (`termios`), and drop
   unused services (aktualizr-lite, compose-apps units) measured against
   X8OS-2. Keeps OSTree rollback and the uuu recovery path.
+
+### Reboot and power cycle (PWR)
+
+From the 2026-10-17 research and its adversarial review: the X8 already has
+a 60 s hardware watchdog that power-cycles the module through the PMIC, and a
+plain reboot probably does too, but nothing in userspace owns the watchdog
+and no part of the system can cut the carrier's power without a person.
+Design, hardware facts and the five-layer plan:
+[X8_HEALTH_AND_RECOVERY/REBOOT_AND_POWER_CYCLE.md](X8_HEALTH_AND_RECOVERY/REBOOT_AND_POWER_CYCLE.md).
+The built pieces live in [firmware/x8_recovery/](firmware/x8_recovery/README.md),
+installed nowhere and disarmed. Valve safety stays with the M4/Opta 200 ms
+watchdogs; none of this may gate it. **On the tractor every module reset is
+an engine stop**, so tractor arming waits on PWR-8, PWR-9 and PWR-11.
+
+- [ ] **PWR-1 Bench reset-reach checks** — the plan's §6 list, each with
+  Dorkmo's OK and the bench power-up procedure (`power_up_guard.sh`): does
+  `systemctl reboot` go through `WDOG_B` (`wdog_regs.py`, both boards); does a
+  reboot or WDOG1 bite reset the L072 (`RFCO_SUMMARY` uptime); L2 installed
+  on one board with the bench opt-in; with it installed, time a normal
+  `systemctl reboot` on each board against `reboot.target`'s 3 min bound and
+  do one reboot with a staged OTA deployment (gates production arming of L2
+  on the base, PWR-2); PB1/PB2/J1-73 from the DT first; 18650 behaviour
+  (BQ24195 REG01 first); `poweroff`/`halt` vs the 128 s re-arm; whether a
+  module-only reset clears the camera USB wedge. No RF transmit.
+  Start with the new read-only `capture_board_state.sh` captures.
+- [ ] **PWR-2 systemd owns the hardware watchdog (L2)** — built:
+  `x8_recovery/systemd/` drop-ins (`RuntimeWatchdogSec=30s`,
+  `RebootWatchdogSec=2min`, `reboot.target` `JobTimeoutSec=3min`),
+  `install_watchdog.sh`, and `wdt_pet.sh` now relies on systemd instead of
+  reporting a false start failure. Remaining: install on the base under the
+  bench opt-in and verify per PWR-1; production arming of the base only after
+  PWR-1's shutdown-timing and staged-OTA reboot checks; then
+  `watchdog.open_timeout=` (X8OS-4) and a `HandlePowerKey` decision. Tractor
+  waits on PWR-8, PWR-9 and PWR-11.
+- [ ] **PWR-3 Container health status (L1)** — built: compose healthchecks on
+  mosquitto (base, tractor) and web_ui (base), and a tractor
+  `mosquitto.conf` with a non-loopback listener. Remaining: radio daemons
+  after RS-1.2 gives them a worker-loop heartbeat; a deploy path (RS-5.11,
+  tractor compose install); `lora_bridge`, `audit_tail` and `camera_service`
+  resubscribe in `on_connect` (or are retired) before either broker goes on
+  the supervisor's allowlist: today a broker restart leaves them connected
+  with no subscriptions (base E-stop forwarding and audit trail stop).
+- [ ] **PWR-4 `lifetrac-supervisor` (L3)** — built and disarmed: allowlisted
+  container restart → `systemctl reboot` → sysrq `s`,`u`,`b`; uptime-based
+  boot-loop cap with HELD state, OTA probation, reset-reason record, tractor
+  reboots off. Remaining: install path in provisioning, merge with
+  OTA_STRATEGY's `lifetrac-health`, publish the reset reason, the tractor
+  reboot decision, and PWR-7 before arming any production node (arming arms
+  the forced-reboot rung, which has no switch of its own).
+- [ ] **PWR-5 Independent hard power cycle (L4)** — decide where it lives
+  (recommended: standalone node-watchdog board; alternative: Opta R4 or
+  D1608S channel 7) against the plan's seven requirements: trigger from a
+  Linux-originated heartbeat plus a boot-complete timeout, hardware-bounded
+  off pulse, NC low-level-rated contact, 18650 handling, ignition and
+  maintenance inhibits, give-up state machine, key-off hold.
+- [ ] **PWR-6 Remote restart and base/bench power control (L5)** — tractor
+  restart inside the GCM envelope, bound to a per-boot challenge, rate limit
+  shared with L3, H747 checks at execution (after RS-8; add to
+  CYBERSECURITY_CASE.md §4.4). Base and bench: NC DC relay between the UPS
+  or bench supply and the carrier jack, inline USB VBUS switch on a direct
+  Toughbook port, `boot_id` check in leg launchers.
+- [ ] **PWR-7 Crash-only storage** — every rung that can land mid-write (WDOG
+  bite, forced reboot, L4 cut): survey writers on `/var`, the container
+  volumes and `/mnt/boot` (FAT, single u-boot env copy, already "not properly
+  unmounted" on the tractor). Gates production arming of the forced-reboot
+  rung and of L4.
+- [ ] **PWR-8 No H747 erase on every tractor boot** — `stm32h7-program`
+  erases and reprograms bank 1 at each boot (~13 s); program only on
+  mismatch, or settle it under X8OS-3. Gates any automatic tractor reboot.
+- [ ] **PWR-9 H747 nonce RNG** — seed the GCM nonce's random bytes from the
+  STM32H7 hardware RNG instead of a once-seeded xorshift; more reboots raise
+  the (key, nonce) collision odds. Gates tractor arming.
+- [ ] **PWR-10 L072 TX hold-off after reset** — a reset wipes the RAM-only
+  FCC dwell accountant; hold TX for one dwell window after any reset
+  (including the planned IWDG, RS-4.10). L072 firmware, SIL only.
+- [ ] **PWR-11 Opta latch semantics** — the draft Opta latches
+  `WATCHDOG_TRIPPED` until it is power-cycled, which contradicts
+  TRACTOR_NODE.md ("re-enables after ≥10 advances", around line 184); pick
+  one and fix the doc. TRACTOR_NODE.md and HARDWARE_BOM.md also say "4 spare"
+  D1608S SSRs; only channel 7 is free. The M7 must read the Opta
+  `safety_state` at boot and stay latched unless it is `NORMAL` (its own
+  E-stop latch is in RAM).
+- [ ] **PWR-12 POWER_MANAGEMENT corrections** — neither `halt` nor
+  `poweroff` is a final state (the base came back ~4.5 min after `poweroff`;
+  `imx2_wdt` re-arms to 128 s), so POWER_MANAGEMENT's release timing must
+  assume the node comes back; the self-holding relay drops whenever the H747
+  resets and must survive it; the 18650 reaches +5V only in BQ24195 boost
+  mode.
 
 ---
 

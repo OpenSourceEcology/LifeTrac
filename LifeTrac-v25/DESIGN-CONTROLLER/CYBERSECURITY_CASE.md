@@ -72,6 +72,23 @@ implicitly trust anything on the broker; the broker is bound to
 |--------|------------|
 | Forge "telemetry healthy" to hide a stuck valve | Telemetry is also AES-GCM-protected; an attacker without the key cannot mint a frame the operator's UI will accept |
 
+### 4.4 Recovery and restart surfaces
+
+Added 2026-10-17 with
+[X8_HEALTH_AND_RECOVERY/REBOOT_AND_POWER_CYCLE.md](X8_HEALTH_AND_RECOVERY/REBOOT_AND_POWER_CYCLE.md)
+(TODO PWR-4..PWR-6). On the tractor every X8 reset also resets the H747,
+trips the Opta and stops the engine with a latch that needs a person at the
+machine, so **anything that can restart the tractor is a denial-of-service
+lever** and needs the same care as a control command.
+
+| Surface | State | Threat | Mitigation / requirement |
+|---------|-------|--------|--------------------------|
+| Remote "restart tractor" (L5) | Not built | Forged or replayed restart stops the engine (D); a replay after the tractor reboots is accepted because the replay window is RAM-only and unprimed at boot (T) | Inside the GCM envelope, never a plaintext opcode; bound to a fresh per-boot challenge published in authenticated telemetry; persistent rate limit shared with the supervisor; the H747 checks at execution that valves are neutral, no E-stop is latched and no handheld is the active source; the UI says motion needs a reset at the machine |
+| Opta power-request register (L4 alternative) | Not built | Any Modbus master write can cut the node's power (D, E) | Latch-exempt register with magic + nonce, the Opta's own timer outside `all_coils_off()`, hardware-bounded off pulse, ignition and maintenance inhibits |
+| `lifetrac-supervisor` (L3) | Built, disarmed, installed nowhere | Runs as root and sources its config file, so whoever can write that file runs code as root (E); spoofed or stale heartbeat files can trigger restarts (D) | Config and armed file root-owned in `/etc/lifetrac/`, never bind-mounted into a container; each heartbeat file in a directory only its own service can write; restarts limited to an allowlist, reboots bounded by the boot-loop cap and HELD state, except during an OTA trial boot, when u-boot's `bootlimit` bounds them instead (the trial-boot override passes the cap and HELD until the rollback is due); tractor reboots off by default |
+| Network- or USB-controlled supply relay (base, bench) | Not built | Anyone who can reach the relay can cut node power (D) | Relay on the bench host's USB or an isolated management network, never the operator LAN; normally-closed contact so a failed controller leaves power on |
+| Physical PB1 power button | Present | A short press is a clean poweroff (systemd-logind default `HandlePowerKey=poweroff`; inferred, VERIFY under PWR-1) | Physical access is outside SL-1; the `HandlePowerKey` setting is a PWR-2 decision |
+
 ## 5. Key management (SL-1 scope)
 
 - **Single fleet key**, generated on the install bench by `tools/keygen.py`

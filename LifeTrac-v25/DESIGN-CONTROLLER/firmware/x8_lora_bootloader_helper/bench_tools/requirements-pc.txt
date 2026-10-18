@@ -10,8 +10,12 @@
 # file; the boards' paho copy is the tracked repo-root _paho_pull/paho/.
 #
 # Versions are the ones installed on the bench PC that flew RS-12/RS-13
-# (Python 3.14.4, checked 2026-10-10). numpy/opencv match
-# base_station/requirements-dev.txt. numpy 2.4 needs Python >= 3.11.
+# (Python 3.14.4, checked 2026-10-10), except Pillow and cryptography: raised
+# on 2026-10-17 to the versions base_station/requirements.lock.txt pins for
+# the flown base image, which close the Dependabot alerts on this file
+# (installed on the bench PC the same day; base_station suite 1616 passed).
+# numpy/opencv match base_station/requirements-dev.txt. numpy 2.4 needs
+# Python >= 3.11.
 # To run the base-station SIL suite, install base_station/requirements-dev.txt
 # instead (it is a superset for that purpose).
 #
@@ -36,11 +40,11 @@ opencv-python-headless==4.14.0.94
 
 # camera_service (publish_synthetic_frames.py -TxFeed host) and
 # base_station/image_pipeline codec_decode / fallback_render.
-Pillow==12.2.0
+Pillow==12.3.0
 
 # base_station/lora_proto.py AES-GCM (imported lazily; needed by anything that
 # builds or opens encrypted frames on the PC).
-cryptography==48.0.0
+cryptography==50.0.1
 
 # Not needed for the radio bench: pyserial (tools/provision.py,
 # tools/pair_handheld.py -- handheld/USB provisioning) and pymodbus

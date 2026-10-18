@@ -5,6 +5,21 @@ implementation yet. Origin: bench discussion during the RS-12.9 radio session.
 Companion to [TRACTOR_NODE.md](TRACTOR_NODE.md) (hardware + Modbus map) and
 [BASE_STATION.md](BASE_STATION.md).
 
+> **2026-10-17 review note** (from
+> [REBOOT_AND_POWER_CYCLE.md](X8_HEALTH_AND_RECOVERY/REBOOT_AND_POWER_CYCLE.md),
+> tracked as TODO PWR-12; the text below is not yet updated):
+> - A halted X8 is not a final state. A halted kernel stops petting WDOG1 and
+>   `imx2_wdt` re-arms it to 128 s at shutdown, so a halt probably ends in a
+>   PMIC reset (inferred); the base booted again ~4.5 min after `poweroff`.
+>   The release timing below must assume the node can come back up.
+> - The self-holding relay is held by an H747 output, and every X8 reset
+>   (reboot, watchdog bite) also resets the H747. The hold must survive that
+>   (an Opta OR leg or a hardware hold timer), or a reboot with the key off
+>   drops the power mid-boot.
+> - The 18650 reaches the carrier's +5V (and so the X8) only when the
+>   BQ24195 is in boost/OTG mode; its reset default is charge mode. VERIFY
+>   before relying on it to bridge the shutdown sequence.
+
 ## Requirements
 
 - In production the tractor may run for a day, then sit **completely powered off for

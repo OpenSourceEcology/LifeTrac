@@ -8,6 +8,8 @@ on:
       - 'LifeTrac-v25/DESIGN-CONTROLLER/tools/**'
       - 'LifeTrac-v25/DESIGN-CONTROLLER/arduino_libraries.txt'
       - 'LifeTrac-v25/DESIGN-CONTROLLER/ARDUINO_CI.md'
+      - 'LifeTrac-v25/DESIGN-CONTROLLER/*compose*.y*ml'
+      - 'LifeTrac-v25/DESIGN-CONTROLLER/Dockerfile*'
       - '.github/workflows/arduino-ci.yml'
   pull_request:
     paths:
@@ -16,6 +18,8 @@ on:
       - 'LifeTrac-v25/DESIGN-CONTROLLER/tools/**'
       - 'LifeTrac-v25/DESIGN-CONTROLLER/arduino_libraries.txt'
       - 'LifeTrac-v25/DESIGN-CONTROLLER/ARDUINO_CI.md'
+      - 'LifeTrac-v25/DESIGN-CONTROLLER/*compose*.y*ml'
+      - 'LifeTrac-v25/DESIGN-CONTROLLER/Dockerfile*'
       - '.github/workflows/arduino-ci.yml'
   workflow_dispatch:
 
@@ -64,6 +68,26 @@ jobs:
         # collects and runs with no exclusions.
         run: |
           python -m pytest tests -q
+
+  x8-recovery-shell-lint:
+    runs-on: ubuntu-24.04
+    name: X8 recovery shell scripts
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2026-10-17 (PWR-2/PWR-4): the supervisor and watchdog installer run on
+      # the X8 host, whose stripped Python rules out anything but POSIX sh, and
+      # a syntax slip there only shows up on a board. shellcheck and dash ship
+      # with the ubuntu image, so this needs no install step.
+      - name: shellcheck and dash -n
+        working-directory: LifeTrac-v25/DESIGN-CONTROLLER/firmware
+        run: |
+          shellcheck --version
+          shellcheck -s sh x8_recovery/*.sh
+          for f in x8_recovery/*.sh; do dash -n "$f"; done
+          shellcheck x8_lora_bootloader_helper/wdt_pet.sh
+          bash -n x8_lora_bootloader_helper/wdt_pet.sh
 
   firmware-compile-plan:
     runs-on: ubuntu-latest

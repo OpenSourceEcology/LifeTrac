@@ -22,7 +22,10 @@ IMAGE=${1:-$TOOLDIR/hello.bin}
 LOG=$TOOLDIR/pipeline.log
 : > "$LOG"
 
-echo "=== T-1 $(date) wdt_pet start (HW WDT is 60s; flashes >60s reboot otherwise) ===" | tee -a "$LOG"
+# HW WDT: u-boot arms 60 s. With firmware/x8_recovery's L2 drop-in armed,
+# systemd owns /dev/watchdog0 at 30 s and pets it itself: wdt_pet start then
+# prints "relying on it" and starts nothing, and the stops below say "not running".
+echo "=== T-1 $(date) wdt_pet start (HW WDT is 60s, or 30s owned by systemd with the L2 drop-in) ===" | tee -a "$LOG"
 bash $TOOLDIR/wdt_pet.sh start 2>&1 | tee -a "$LOG"
 
 echo "=== T0 $(date) prep_bridge ===" | tee -a "$LOG"

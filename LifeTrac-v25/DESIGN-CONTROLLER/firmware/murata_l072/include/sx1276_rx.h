@@ -141,8 +141,15 @@ void sx1276_rx_scan_tick(uint32_t now_ms);
  * along the shared schedule — independent of decode success — so one
  * air loss costs one packet instead of a re-acquisition. Call once per
  * main-loop pass after sx1276_rx_scan_tick(). No-op while the clock is
- * unanchored, while not LOCKED, while a TX is keyed, and in unrouted
- * builds.
+ * unanchored, while the follow rule below says no, while a TX is keyed,
+ * and in unrouted builds.
+ *
+ * RS-12.15 reverse delivery (2026-10-14): the follow rule is
+ * sx1276_rx_grid_follow() -- LOCKED on an ADOPTED grid (the follower, as
+ * before), or the node's OWN clock while it holds originator authority,
+ * in ANY scan state (a streaming tractor is rarely LOCKED, and the base
+ * hops every command onto the tractor's own grid). While the own clock
+ * drives the receiver the scan walker does not retune it.
  */
 void sx1276_rx_slot_follow(uint32_t now_ms);
 
