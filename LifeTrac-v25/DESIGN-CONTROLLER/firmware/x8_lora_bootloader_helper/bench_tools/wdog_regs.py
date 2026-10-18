@@ -13,6 +13,9 @@
 #   WCR=0x773d -> WDE=1 WT=119 (60.0 s), WDT=1. WRSR reads POR even after a
 #   watchdog reset, because WDOG_B power-cycles the board through the PMIC --
 #   so WRSR cannot tell a watchdog reboot from a power-on.
+#   With firmware/x8_recovery's L2 drop-in installed (RuntimeWatchdogSec=30s,
+#   2026-10-17) systemd re-times it at runtime: expect about WCR=0x3b3d ->
+#   WT=59 (30.0 s) after boot -- inferred, not yet read on a board.
 #
 # Where it runs: ON THE BOARD, inside a docker image, because the LmP host
 # python has no `mmap` module and the image has no `devmem`/sysfs watchdog
