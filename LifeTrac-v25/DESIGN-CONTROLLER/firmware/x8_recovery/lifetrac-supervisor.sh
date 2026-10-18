@@ -1530,7 +1530,14 @@ force_reboot() {  # REASON WHY
       resume_stop
     fi
     sysrq_settle
-    sysrq_write b
+    if sysrq_write b; then
+      :
+    elif [ "$ROLE" = tractor ] && [ "$_fr_u" != 1 ] && [ "$_fr_was" != 1 ]; then
+      # Nothing was sent (u and b both failed): drop the record, so a kill
+      # in the sync below leaves none (2026-10-18 review); force_mark writes
+      # it again right before the last look ahead of `reboot -ff`.
+      clear_reset_issued
+    fi
     if [ "$_fr_u" = 1 ]; then
       log "SYSRQ wrote 'u' (logged after b)"
     else
@@ -1797,8 +1804,8 @@ usage() {
 on_stop() {
   trap - "$1"
   # Stopped after writing its own reset record but before sending the reset
-  # (the record syncs, the sysrq s settle, the last looks): nothing is
-  # coming, so the record goes and the request with it.
+  # (the last look ahead of the reset, and after a failed sysrq u the settle
+  # and b): nothing is coming, so the record goes and the request with it.
   if [ "$RESET_PROV" = 1 ]; then
     clear_reset_issued
   fi

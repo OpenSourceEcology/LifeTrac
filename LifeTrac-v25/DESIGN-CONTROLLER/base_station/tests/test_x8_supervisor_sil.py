@@ -2237,20 +2237,43 @@ class X8SUP_B_Supervisor(unittest.TestCase):
     def test_tractor_forced_path_records_its_reset_before_sending_it(self) -> None:
         # After a `systemctl reboot` that failed outright, the forced path
         # writes its own record right before its last look, so it stands
-        # when u, b and `reboot -ff` are sent, with or without sysrq.
-        for sysrq in (True, False):
+        # when u, b and `reboot -ff` are sent: with sysrq, without, and when
+        # the sysrq writes fail (the record is dropped after b and written
+        # again before `reboot -ff`), and when only b fails (u was written,
+        # so the record stays).
+        def fail_b_after_u() -> None:
+            deadline = time.monotonic() + 20
+            while time.monotonic() < deadline:
+                if self.sysrq.is_file() and self.sysrq_text() == "su":
+                    self.sysrq.unlink()
+                    self.sysrq.mkdir()
+                    return
+                time.sleep(0.005)
+
+        for sysrq in ("ok", "missing", "unwritable", "b_fails"):
             with self.subTest(sysrq=sysrq):
                 self.fresh()
-                self._tractor()
-                if not sysrq:
+                self._tractor(SYSRQ_SETTLE_S="1" if sysrq == "b_fails" else "0")
+                if sysrq in ("missing", "unwritable"):
                     self.sysrq.unlink()
+                if sysrq == "unwritable":
+                    self.sysrq.mkdir()
                 self.set_fake("systemctl_reboot_rc", "1")
                 link = self.start_link("grant")
+                swapper = threading.Thread(target=fail_b_after_u)
+                if sysrq == "b_fails":
+                    swapper.start()
                 try:
                     self.run_sv("once")
                 finally:
                     link.stop()
-                self.assertEqual(self.sysrq_text(), "sub" if sysrq else "")
+                    if swapper.is_alive() or sysrq == "b_fails":
+                        swapper.join()
+                    if self.sysrq.is_dir():
+                        self.sysrq.rmdir()
+                if sysrq in ("unwritable", "b_fails"):
+                    self.assertIn("SYSRQ write 'b' to", self.sv_log())
+                self.assertEqual(self.sysrq_text(), "sub" if sysrq == "ok" else "")
                 self.assertEqual(len(self.calls("systemctl reboot -ff")), 1)
                 self.assertEqual(
                     (self.fake / "reset_issued.at_reboot_ff").read_text(encoding="utf-8").strip(),
@@ -2262,13 +2285,25 @@ class X8SUP_B_Supervisor(unittest.TestCase):
         # its last_action syncs and settles, so a supervisor killed outright
         # there (the unit watchdog's SIGABRT on a hung sync, a SIGKILL) left
         # a record for this boot with no reset sent, and the restarted one
-        # kept the request: motion held for the rest of the boot.
-        for sig in (signal.SIGKILL, signal.SIGABRT):
-            with self.subTest(sig=sig.name):
+        # kept the request: motion held for the rest of the boot. Also in the
+        # sync before `reboot -ff` after the sysrq writes failed (nothing
+        # sent, so the record is dropped after b), unless a timed-out
+        # `systemctl reboot` (rc 124) may still land: then it stays.
+        cases = (("record_syncs", "1", False), ("after_failed_sysrq", "1", False),
+                 ("after_failed_sysrq", "124", True))
+        runs = [(case, sig) for case in cases for sig in (signal.SIGKILL, signal.SIGABRT)]
+        for (where, rc, kept), sig in runs:
+            with self.subTest(where=where, rc=rc, sig=sig.name):
                 self.fresh()
-                self._tractor()
-                self.set_fake("systemctl_reboot_rc", "1")
-                self.set_fake("on_sync_only_for", "force_reboot")
+                if where == "record_syncs":
+                    self._tractor()
+                    self.set_fake("on_sync_only_for", "force_reboot")
+                else:
+                    self._tractor(SYSRQ_SETTLE_S="1")
+                    self.sysrq.unlink()
+                    self.sysrq.mkdir()
+                    self.set_fake("on_sync_after_log", "still alive after sysrq b")
+                self.set_fake("systemctl_reboot_rc", rc)
                 self.set_fake("on_sync_hang", "1")
                 link = self.start_link("grant")
                 try:
@@ -2278,16 +2313,23 @@ class X8SUP_B_Supervisor(unittest.TestCase):
                     self.run_proc.wait(timeout=30)
                     self.assertEqual(self.run_proc.returncode, -sig)
                     self.assertEqual(self.request(), "aaaaaaaa-1000")
-                    self.assertFalse(self.reset_file.exists())
+                    self.assertEqual(self.reset_file.exists(), kept)
                     # Restarted (Restart=on-failure), the fault gone.
                     self.set_docker_info_rc(0)
                     self.set_uptime(1300)
                     self.run_sv("once")
                 finally:
                     link.stop()
-                self.assertIsNone(self.request())
-                self.assertIn("LOCK withdrawn (left from an earlier run with no pending reboot)",
-                              self.sv_log())
+                    if self.sysrq.is_dir():
+                        self.sysrq.rmdir()
+                if kept:
+                    self.assertEqual(self.request(), "aaaaaaaa-1000")
+                    self.assertIn("LOCK kept (left from an earlier run with no pending reboot)",
+                                  self.sv_log())
+                else:
+                    self.assertIsNone(self.request())
+                    self.assertIn("LOCK withdrawn (left from an earlier run with no pending reboot)",
+                                  self.sv_log())
                 self.assertEqual(self.sysrq_text(), "")
                 self.assertEqual(self.calls("systemctl reboot -ff"), [])
 
@@ -2316,7 +2358,7 @@ class X8SUP_B_Supervisor(unittest.TestCase):
         wrapper = self.bin / "dd"
         wrapper.write_text(
             "#!/bin/sh\n"
-            f'if [ -f "$FAKE_DIR/on_dd_hang" ] && {cond}; then\n'
+            f'if [ -f "$FAKE_DIR/on_dd_hang" ] && {{ {cond}; }}; then\n'
             '  rm -f "$FAKE_DIR/on_dd_hang"\n'
             '  : > "$FAKE_DIR/dd_hanging"\n'
             "  sleep 1\n"

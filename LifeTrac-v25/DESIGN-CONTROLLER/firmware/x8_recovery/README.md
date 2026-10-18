@@ -173,9 +173,11 @@ the board then stays up in that boot.
   bounded sync right before `systemctl reboot -ff` (which syncs again
   before it resets). If the hold is gone by then it gives up, and if no
   reset was issued earlier in this boot it withdraws the request. It
-  writes its reset record right before the last of these looks, so a
-  supervisor killed outright during the record syncs or settles (the unit
-  watchdog, SIGKILL) leaves none, and the restart withdraws the request. It
+  writes its reset record right before the last of these looks (and drops
+  it again when `u` and `b` both failed, until the look before
+  `reboot -ff`), so a supervisor killed outright during the record syncs,
+  settles or that sync (the unit watchdog, SIGKILL) leaves none, and the
+  restart withdraws the request. It
   is refused when its reset record cannot be written and no earlier reset
   in this boot recorded one. Stopping the service (`systemctl stop`, a kill
   by hand) withdraws a request that has no reset behind it, because an
