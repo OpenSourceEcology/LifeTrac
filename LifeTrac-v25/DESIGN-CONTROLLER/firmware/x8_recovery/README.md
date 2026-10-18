@@ -134,8 +134,11 @@ the board then stays up in that boot.
     frame. `<seq>` (1-32 letters or digits) comes from the H747's own
     status frames and changes at least once a second; a file whose `<seq>`
     does not change while the supervisor watches is not live and never
-    reads as idle. The supervisor reads at most 256 bytes, never through a
-    symlink, and logs only `busy`, `idle`, `locked` or `invalid` from it.
+    reads as idle. The supervisor reads at most 256 bytes, with an open
+    that refuses a symlink and does not block (GNU `dd`
+    `iflag=nofollow,nonblock`; VERIFY on LmP under PWR-1, and a `dd`
+    without them reads as a missing file, so it fails closed), and logs
+    only `busy`, `idle`, `locked` or `invalid` from it.
   - `/run/lifetrac-supervisor/tractor_reboot_request`, in a root-only
     directory the supervisor creates (never `RuntimeDirectory=`, which
     would delete it when the shutdown stops the supervisor): first line
@@ -158,8 +161,9 @@ the board then stays up in that boot.
   reboot: systemd can still carry out the reboot it accepted (a stop job
   that hangs, then upstream's 30 min `reboot-force`), and the tractor
   must not be movable when it lands. To release a kept hold by hand,
-  remove the request file (`systemctl cancel` the queued reboot first if
-  it should not land). The forced path on a tractor runs only while the
+  `systemctl cancel` the queued reboot, then remove the request file; the
+  next rung treats that reset as cancelled. A rung that stops at the last
+  look does not count toward the boot-loop cap. The forced path on a tractor runs only while the
   link still shows the hold, or when the link is no longer live (stopped
   by the shutdown) and its last line shows the hold; never when the
   request or the idle file is gone or anything else is shown. No OTA

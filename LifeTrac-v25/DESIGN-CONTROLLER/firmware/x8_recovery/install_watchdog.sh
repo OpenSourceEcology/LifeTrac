@@ -172,8 +172,9 @@ watchdog power cycle included, runs stm32h7-program.service, which erases and re
 In production that trips the engine-kill latch through the Opta, and each reset
 restarts the H747's nonce state. Landing the TODO.md PWR prerequisites does not
 change this: PWR-8, no per-boot bank-1 erase by stm32h7-program (X8OS-3); PWR-9,
-H747 nonce seeds from its RNG (H7-13); and PWR-11, the Opta latch semantics after an
-H747 reset settled. Use --i-accept-tractor-prereqs only after D-PWR1 has been
+H747 nonce seeds from its RNG (H7-13); PWR-11, the Opta latch semantics after an
+H747 reset settled; and PWR-12, the key-off hold surviving an H747 reset. Use
+--i-accept-tractor-prereqs only after D-PWR1 has been
 revisited and the new decision is recorded in DECISIONS.md, and those prerequisites
 have landed (PID 1's next reload, anyone's, then arms it).
 EOF

@@ -3969,7 +3969,9 @@ which also needs PWR-12 and PWR-13.
   do one reboot with a staged OTA deployment (gates production arming of L2
   on the base, PWR-2); PB1/PB2/J1-73 from the DT first; 18650 behaviour
   (BQ24195 REG01 first); `poweroff`/`halt` vs the 128 s re-arm; whether a
-  module-only reset clears the camera USB wedge. No RF transmit.
+  module-only reset clears the camera USB wedge; that LmP's `dd` takes
+  `iflag=nofollow,nonblock status=none` (the supervisor's idle-file read
+  fails closed without it). No RF transmit.
   Start with the new read-only `capture_board_state.sh` captures.
 - [ ] **PWR-2 systemd owns the hardware watchdog (L2)** — built:
   `x8_recovery/systemd/` drop-ins (`RuntimeWatchdogSec=30s`,

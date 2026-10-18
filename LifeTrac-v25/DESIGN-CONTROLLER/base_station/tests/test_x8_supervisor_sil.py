@@ -10,7 +10,7 @@ Everything the script would touch on a board is redirected into a temp dir:
 * ``docker``, ``systemctl``, ``fw_printenv``, ``systemd-notify`` and ``sync``
   are fake scripts on a PATH that holds nothing else but a handful of real
   coreutils (``timeout``, ``stat``, ``mv``, ``rm``, ``mkdir``, ``sleep``,
-  ``cat``, ``head``). Each fake appends its argv to one log, so the tests can check
+  ``cat``, ``dd``). Each fake appends its argv to one log, so the tests can check
   what was called and in which order. The fake ``systemctl`` also records
   which ``last_action`` and ``consecutive_reboots`` were on disk at the
   moment it was called, and the fake ``sync`` records which ``*.tmp`` files
@@ -74,7 +74,7 @@ _HAVE_POSIX = (
     and shutil.which("sh") is not None
     and shutil.which("timeout") is not None
 )
-_REAL_TOOLS = ("timeout", "stat", "mv", "rm", "mkdir", "sleep", "cat", "head")
+_REAL_TOOLS = ("timeout", "stat", "mv", "rm", "mkdir", "sleep", "cat", "dd")
 
 BOOT_A = "aaaaaaaa-1111-4111-8111-000000000001"
 BOOT_B = "bbbbbbbb-2222-4222-8222-000000000002"
@@ -180,17 +180,18 @@ if [ -f "$FAKE_REQ" ]; then
   if [ -f "$FAKE_DIR/on_sync_rm_request" ]; then
     rm -f "$FAKE_REQ"
   fi
-  if [ -f "$FAKE_DIR/on_sync_link_busy" ]; then
-    printf 'busy\n' > "$FAKE_DIR/link_mode"
+  for m in busy stale_lock; do
+    [ -f "$FAKE_DIR/on_sync_link_$m" ] || continue
+    printf '%s\n' "$m" > "$FAKE_DIR/link_mode"
     n=0
     while [ "$n" -lt 500 ]; do
       l=
       read -r l < "$FAKE_IDLE" 2>/dev/null
-      case $l in busy*) break ;; esac
+      case $m:$l in busy:busy*|stale_lock:*" 00000000-1") break ;; esac
       n=$((n + 1))
       sleep 0.01
     done
-  fi
+  done
 fi
 exit 0
 """
@@ -460,8 +461,9 @@ class X8SUP_A_Static(unittest.TestCase):
         self.assertIn("REQ_FILE=${LIFETRAC_TRACTOR_REBOOT_REQUEST:-/run/lifetrac-supervisor/tractor_reboot_request}",
                       self.text)
         self.assertIn('mkdir -m 0755 "${REQ_FILE%/*}"', code)
-        # The idle file is read bounded, never through a link.
-        self.assertIn('timeout 2 head -c 256 -- "$IDLE_FILE"', code)
+        # The idle file is read bounded, and the open itself refuses a link
+        # and does not block (a link swapped in after the checks, a FIFO).
+        self.assertIn('timeout 2 dd if="$IDLE_FILE" bs=256 count=1 iflag=nofollow,nonblock status=none', code)
         self.assertIn('[ -L "$IDLE_FILE" ]', code)
 
 
@@ -550,7 +552,7 @@ class X8SUP_B_Supervisor(unittest.TestCase):
         for f in self.fake.glob("*.at_reboot*"):
             f.unlink()
         for name in ("link_mode", "on_reboot_link_mode", "on_sync_rm_request",
-                     "on_sync_link_busy", "systemctl_reboot_rc"):
+                     "on_sync_link_busy", "on_sync_link_stale_lock", "systemctl_reboot_rc"):
             (self.fake / name).unlink(missing_ok=True)
         shutil.rmtree(self.req_file.parent, ignore_errors=True)
         self.idle_file.unlink(missing_ok=True)
@@ -1951,7 +1953,8 @@ class X8SUP_B_Supervisor(unittest.TestCase):
         # request goes or the H747 drops the hold meanwhile, no reboot
         # (2026-10-18 review: a second instance's start could withdraw it).
         for hook, why in (("on_sync_rm_request", "request_gone_or_changed"),
-                          ("on_sync_link_busy", "no_lock:state=busy")):
+                          ("on_sync_link_busy", "no_lock:state=busy"),
+                          ("on_sync_link_stale_lock", "no_lock:state=locked:other_id")):
             with self.subTest(hook=hook):
                 self.fresh()
                 self._tractor()
@@ -1967,6 +1970,25 @@ class X8SUP_B_Supervisor(unittest.TestCase):
                 self.assertEqual(self.state_kv("last_action")["action"], "reboot_abandoned")
                 self.assertFalse(self.reset_file.exists())
                 self.assertIsNone(self.request())
+                # Not a reboot, so it does not move the boot-loop cap.
+                self.assertEqual(self.counter(), "0")
+
+    def test_tractor_lost_last_looks_never_reach_held(self) -> None:
+        # 2026-10-18 second review: each lost last look used to count as a
+        # reboot, so three of them entered HELD with no reboot at all.
+        self._tractor()
+        self.set_fake("on_sync_link_busy", "1")
+        link = self.start_link("grant")
+        for up in (1000, 1030, 1060, 1090, 1120):
+            (self.fake / "link_mode").unlink(missing_ok=True)
+            link.mode = "grant"
+            link.shows("idle ")
+            self.set_uptime(up)
+            self.run_sv("once")
+        self.assertIsNone(self.state_text("held"))
+        self.assertEqual(self.counter(), "0")
+        self.assertEqual(self.calls("systemctl"), [])
+        self.assertEqual(self.sv_log().count("is no longer shown right before the reboot"), 5)
 
     def test_tractor_reset_record_unwritable_refuses_the_reboot(self) -> None:
         self._tractor()
@@ -1980,6 +2002,7 @@ class X8SUP_B_Supervisor(unittest.TestCase):
         self.assertIsNone(self.request())
         self.assertEqual(self.calls("systemctl"), [])
         self.assertEqual(self.state_kv("last_action")["detail"], "reboot_refused:reset_marker")
+        self.assertEqual(self.counter(), "0")
 
     def test_tractor_abandoned_reboot_keeps_the_hold(self) -> None:
         # 2026-10-18 review: an abandoned reboot used to withdraw the
@@ -2030,25 +2053,68 @@ class X8SUP_B_Supervisor(unittest.TestCase):
 
     def test_tractor_second_attempt_keeps_an_earlier_reset_record(self) -> None:
         # The first reboot was accepted and then abandoned (node healthy), so
-        # it can still land. A second attempt later in the boot that is
-        # blocked at the last look must not clear that record or withdraw
-        # the request.
+        # it can still land. A second attempt later in the boot that fails
+        # before or at `systemctl reboot` must not clear that record or
+        # withdraw the request: one case per place the rung would otherwise
+        # clear it.
+        for case in ("last_look_lost", "systemctl_rc_1", "record_unwritable"):
+            with self.subTest(case=case):
+                if hasattr(self, "link"):
+                    self.link.stop()
+                    del self.link
+                self.fresh()
+                self.sysrq.write_text("", encoding="utf-8")
+                self._accepted_reboot(ROLE="tractor", TRACTOR_REBOOT_ENABLED="1")
+                self.set_docker_info_rc(0)
+                self.set_uptime(1180)
+                self.run_sv("once")
+                self.assertIn("LOCK kept (reboot abandoned)", self.sv_log())
+                self.set_docker_info_rc(1)
+                if case == "last_look_lost":
+                    self.set_fake("on_sync_link_busy", "1")
+                    want = "BLOCKED reboot gate=tractor_lock (no_lock:state=busy)"
+                elif case == "systemctl_rc_1":
+                    self.set_fake("systemctl_reboot_rc", "1")
+                    self.set_fake("on_reboot_link_mode", "busy")
+                    want = "link is live but not holding"
+                else:
+                    (self.req_file.parent / "reset_issued.tmp").mkdir()
+                    want = "REFUSED reboot: cannot write"
+                self.set_uptime(1210)
+                self.run_sv("once")
+                log = self.sv_log()
+                self.assertIn("LOCK requested id=aaaaaaaa-1210", log)
+                self.assertIn(want, log)
+                self.assertTrue(self.reset_file.exists())
+                self.assertEqual(self.request(), "aaaaaaaa-1210")
+                self.assertNotIn("LOCK withdrawn", log)
+                self.assertNotIn("LOCK released by hand", log)
+                self.assertEqual(self.calls("systemctl reboot -ff"), [])
+
+    def test_tractor_hold_released_by_hand_is_not_kept_again(self) -> None:
+        # The documented release (cancel the queued reboot, remove the
+        # request) makes that earlier reset no longer count, so a later
+        # attempt that is not granted withdraws its request as usual.
         self._accepted_reboot(ROLE="tractor", TRACTOR_REBOOT_ENABLED="1")
         self.set_docker_info_rc(0)
         self.set_uptime(1180)
         self.run_sv("once")
-        self.assertIn("LOCK kept (reboot abandoned)", self.sv_log())
+        self.assertEqual(self.request(), "aaaaaaaa-1000")
+        self.req_file.unlink()            # by hand, after `systemctl cancel`
+        self.link.mode = "idle"           # the H747 is idle but does not grant
         self.set_docker_info_rc(1)
-        self.set_fake("on_sync_link_busy", "1")
         self.set_uptime(1210)
         self.run_sv("once")
         log = self.sv_log()
-        self.assertIn("LOCK requested id=aaaaaaaa-1210", log)
-        self.assertIn("BLOCKED reboot gate=tractor_lock (no_lock:state=busy)", log)
+        self.assertIn("LOCK released by hand", log)
+        self.assertIn("LOCK withdrawn (not granted:", log)
+        self.assertIsNone(self.request())
+        self.assertFalse(self.reset_file.exists())
+        self.set_docker_info_rc(0)
+        self.set_uptime(9000)
+        self.run_sv("once")
+        self.assertIsNone(self.request())
         self.assertEqual(len(self.calls("systemctl reboot")), 1)
-        self.assertTrue(self.reset_file.exists())
-        self.assertEqual(self.request(), "aaaaaaaa-1210")
-        self.assertNotIn("LOCK withdrawn", log)
 
     def test_unreadable_pending_marker_is_abandoned(self) -> None:
         self._accepted_reboot()
