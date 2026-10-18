@@ -2132,7 +2132,12 @@ class X8SUP_B_Supervisor(unittest.TestCase):
                 log = self.sv_log()
                 if unwritable:
                     self.sysrq.rmdir()
-                    self.assertIn("SYSRQ write 'u' to", log)
+                    # sysrq_write logs the s and b failures itself; u's (quiet)
+                    # failure is logged once, by force_reboot, after b.
+                    self.assertIn("SYSRQ write 's' to", log)
+                    self.assertIn("SYSRQ write 'b' to", log)
+                    self.assertEqual(log.count("SYSRQ write 'u' to"), 1)
+                    self.assertLess(log.index("SYSRQ write 'b' to"), log.index("SYSRQ write 'u' to"))
                 else:
                     self.assertIn("missing, skipping sysrq", log)
                 self.assertFalse(self.sysrq.exists())
