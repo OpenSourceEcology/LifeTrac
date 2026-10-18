@@ -41,10 +41,10 @@ jobs:
     continue-on-error: true
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Cache the Arm toolchain
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/arm-gnu-toolchain-12.2.mpacbti-rel1
           key: arm-gnu-toolchain-12.2.mpacbti-rel1-x86_64-${{ env.ARM_TOOLCHAIN_SHA256 }}
@@ -112,7 +112,7 @@ jobs:
 
       - name: Upload the built images
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: l072-bench-md5-${{ github.sha }}
           path: |

@@ -29,10 +29,10 @@ jobs:
     name: Base station protocol tests
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: '3.11'
 
@@ -74,7 +74,7 @@ jobs:
     name: X8 recovery shell scripts
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # 2026-10-17 (PWR-2/PWR-4): the supervisor and watchdog installer run on
       # the X8 host, whose stripped Python rules out anything but POSIX sh, and
@@ -103,7 +103,7 @@ jobs:
     runs-on: ubuntu-24.04
     name: L072 firmware static checks
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install host toolchain
         run: sudo apt-get update && sudo apt-get install -y build-essential
       - name: make check (memory map invariants)
@@ -136,7 +136,7 @@ jobs:
     name: L072 cross-compile (arm-none-eabi-gcc)
     needs: firmware-l072-static-checks
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install ARM toolchain
         run: |
           sudo apt-get update
@@ -151,7 +151,7 @@ jobs:
           arm-none-eabi-size -A -d build/firmware.elf | tee build/size.txt
           python3 tools/check_size_budget.py build/firmware.elf
       - name: Upload L072 firmware artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: l072-firmware-${{ github.sha }}
           path: |
@@ -167,7 +167,7 @@ jobs:
     name: H7 host driver wire tests
     needs: firmware-l072-cross-compile
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Verify murata_host wire constant sync
         run: python3 LifeTrac-v25/DESIGN-CONTROLLER/tools/check_mh_wire_sync.py
       - name: Build and run COBS/CRC unit test
@@ -207,7 +207,7 @@ jobs:
     name: H7 host driver PTY loopback
     needs: h7-host-driver-tests
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Build loopback driver
         working-directory: LifeTrac-v25/DESIGN-CONTROLLER/firmware/tractor_h7
         run: |
@@ -254,7 +254,7 @@ jobs:
     runs-on: ubuntu-latest
     name: Compile firmware/handheld_mkr
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install arduino-cli
         run: |
           # 2026-08-16 CI repair: upstream install.sh changed its argument parsing
@@ -305,7 +305,7 @@ jobs:
     runs-on: ubuntu-latest
     name: Compile firmware/tractor_opta
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install arduino-cli
         run: |
           # 2026-08-16 CI repair: upstream install.sh changed its argument parsing
@@ -350,7 +350,7 @@ jobs:
     runs-on: ubuntu-latest
     name: Compile firmware/tractor_h7 (M7 core)
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install arduino-cli
         run: |
           # 2026-08-16 CI repair: upstream install.sh changed its argument parsing
@@ -417,7 +417,7 @@ jobs:
     runs-on: ubuntu-latest
     name: tractor_h7 Method G runtime guards
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install arduino-cli
         run: |
           # 2026-08-16 CI repair: upstream install.sh changed its argument parsing
@@ -525,7 +525,7 @@ jobs:
     runs-on: ubuntu-latest
     name: Compile firmware/tractor_h7_m4 (M4 core)
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install arduino-cli
         run: |
           # 2026-08-16 CI repair: upstream install.sh changed its argument parsing
