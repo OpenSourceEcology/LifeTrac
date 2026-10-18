@@ -19,6 +19,16 @@
     Profile-2 (DTS) legs must pin a spot-checked carrier with -ForceFrfHz; the
     profile default is 915.000 MHz, the channel of the RS-11.6 external
     emitter. -AllowDefaultCarrier overrides the refusal.
+
+    Bench kit (2026-10-18): -InjectCmd "<script.py> [args]" starts a command
+    injector on the base (kf_inject.py, dual_inject.py) when -InjectOn fires:
+    first_frame (default; the base rx daemon's first published frame, read on
+    the base from its own log) or fault:<code>[:<sub>|:final] (a tractor
+    tx_smoke FAULT line, polled every 2 s). The trigger time and the
+    injector's output go into the archive (inject.log, inject_trigger.txt).
+    At the end every leg prints and archives TRACTOR_L072_RESET
+    landed|failed|unknown (from the openocd log of the leg-start SWD reset)
+    and BASE_L072_RESET unverified (the gpio163 pulse is not checked).
 #>
 [CmdletBinding()]
 param(
@@ -199,6 +209,24 @@ param(
     # clamp still applies, so this can only go below the ceiling. Used for
     # the SIR discriminator on the fixed RF switch.
     [string]$TxPowerDbm = "",
+    # Bench kit (2026-10-18): command injector on the BASE, started by
+    # -InjectOn. The value is the injector script and its arguments, e.g.
+    # "dual_inject.py 250" or "kf_inject.py 15 20"; it runs in
+    # lifetrac-v25:latest with /tmp/lifetrac_strict as /work, driven by
+    # bench_tools/inject_watch.sh (pushed with the injector when the script is
+    # in bench_tools). Leg W (2026-10-18) started its injector from this
+    # script's 2-line console tail and fired 2 min 41 s late; the trigger now
+    # reads the daemon's own log. Empty (default) = no injector, as before.
+    [string]$InjectCmd    = "",
+    # When the -InjectCmd injector starts:
+    #   first_frame (default)  the base rx daemon's first `published frame_id`,
+    #                          polled every 0.5 s on the base from rx_smoke's log;
+    #   fault:<code>           the first tractor tx_smoke FAULT line with that
+    #                          code; fault:<code>:<sub> also needs that sub byte,
+    #                          fault:<code>:final needs sub bit 7 (the
+    #                          RX_SCAN_FAILED that enters FAILED: fault:0x0D:final
+    #                          is RS-12.15 leg X). Polled from the PC every ~2 s.
+    [string]$InjectOn     = "",
     # Archive final logs + parameters under bench-evidence/ with the git
     # SHA in the folder name (evidence discipline per CODE REVIEWS docs).
     [switch]$Archive
@@ -206,6 +234,221 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Continue"
+
+# --- Helpers (bench kit, 2026-10-18) -----------------------------------------
+# Pure functions, no board access: bench_tools/test_run_live_radio_monitor.ps1
+# loads them from this file's AST (the script body never runs) and feeds them
+# sample adb output.
+
+function ConvertFrom-AdbOutput {
+    # adb from platform-tools 37 ends every line with \r\r\n (see adb_sh in
+    # bench_tools/build_tractor_image.sh, commit fb96439c). PowerShell's
+    # native-output reader treats a lone CR as a line end, so
+    # `$x = cmd /c "adb ..."` gives every line followed by an EMPTY element and
+    # no trailing CR; a single captured string (Out-String, a file, a .NET
+    # reader) keeps the CRs instead. Either way this returns the non-empty
+    # lines with trailing whitespace (CRs included) removed. Use it before a
+    # whole-line compare, an [int] parse or Select-Object -First/-Last.
+    param([object]$Output)
+    foreach ($o in @($Output)) {
+        if ($null -eq $o) { continue }
+        foreach ($l in ("$o" -split "[`r`n]+")) {
+            $t = $l.TrimEnd()
+            if ($t -ne "") { $t }
+        }
+    }
+}
+
+function ConvertTo-InjectSpec {
+    # Checks -InjectCmd / -InjectOn (throws with the reason) and returns
+    # @{ Cmd; Script; On = first_frame|fault; Code; Sub; Final; Label }.
+    # The command reaches the base shell inside nested cmd/adb/sh quotes, so
+    # only plain words pass: <script>.py, then arguments of [A-Za-z0-9_.,:=+-].
+    param([string]$Cmd, [string]$On)
+    $c = "$Cmd".Trim()
+    $o = "$On".Trim()
+    if ($c -eq "") {
+        throw "-InjectOn '$o' needs -InjectCmd (the injector to start on the base, e.g. -InjectCmd `"dual_inject.py 250`")."
+    }
+    $toks = @($c -split '\s+')
+    if ($toks[0] -notmatch '^[A-Za-z0-9_][A-Za-z0-9_.-]*\.py$') {
+        throw "-InjectCmd '$c': the first word must be the injector script, a .py file name (e.g. dual_inject.py)."
+    }
+    foreach ($t in @($toks | Select-Object -Skip 1)) {
+        if ($t -notmatch '^[A-Za-z0-9_.,:=+-]+$') {
+            throw "-InjectCmd '$c': argument '$t' may hold only letters, digits and _ . , : = + -"
+        }
+    }
+    $spec = @{ Cmd = ($toks -join ' '); Script = $toks[0]; On = ""; Code = -1; Sub = -1; Final = $false; Label = "" }
+    if ($o -eq "" -or $o -ieq "first_frame") {
+        $spec.On = "first_frame"
+        $spec.Label = "first_frame"
+    } elseif ($o -match '^fault:(?:0x)?([0-9A-Fa-f]{1,2})(?::(?:(final)|(?:0x)?([0-9A-Fa-f]{1,2})))?$') {
+        $spec.On = "fault"
+        $spec.Code = [Convert]::ToInt32($Matches[1], 16)
+        $spec.Label = "fault:0x{0:X2}" -f $spec.Code
+        if ($Matches[2]) {
+            $spec.Final = $true
+            $spec.Label += ":final"
+        } elseif ($Matches[3]) {
+            $spec.Sub = [Convert]::ToInt32($Matches[3], 16)
+            $spec.Label += (":0x{0:X2}" -f $spec.Sub)
+        }
+    } else {
+        throw "-InjectOn '$o': use first_frame, fault:<code>, fault:<code>:<sub> or fault:<code>:final (hex bytes, e.g. fault:0x0D:final)."
+    }
+    return $spec
+}
+
+function Test-InjectFaultLine {
+    # True when a tx_smoke log line is a FAULT matching the fault: spec. The
+    # daemon prints `code=0x%02X sub=0x%02X` (method_g_stage1_probe.py
+    # format_fault_payload). Code 0x0D means both TX_FIFO_RB_MISMATCH (sub =
+    # fragment index) and RX_SCAN_FAILED (host_types.h); `final` tests sub
+    # bit 7, which only RX_SCAN_FAILED sets (fragment indexes stay < 0x80).
+    param([string]$Line, [hashtable]$Spec)
+    if ($Line -notmatch 'FAULT') { return $false }
+    if ($Line -notmatch 'code=0x([0-9A-Fa-f]{2}) sub=0x([0-9A-Fa-f]{2})') { return $false }
+    $code = [Convert]::ToInt32($Matches[1], 16)
+    $sub = [Convert]::ToInt32($Matches[2], 16)
+    if ($code -ne $Spec.Code) { return $false }
+    if ($Spec.Final) { return (($sub -band 0x80) -ne 0) }
+    if ($Spec.Sub -ge 0) { return ($sub -eq $Spec.Sub) }
+    return $true
+}
+
+function Get-InjectWatchPid {
+    # The watcher pid from `inject_watch.sh start` ("INJECT_WATCH_SPAWNED pid=N"), or $null.
+    param([object]$Output)
+    foreach ($l in @(ConvertFrom-AdbOutput $Output)) {
+        if ($l -match '^INJECT_WATCH_SPAWNED pid=(\d+)$') { return [int]$Matches[1] }
+    }
+    return $null
+}
+
+function Get-InjectSummary {
+    # Reads the base watcher log (inject_watch.sh marker lines) and returns
+    # @{ Status; Detail; Trigger; Start; Exit }; Status is finished, failed,
+    # stopped_at_leg_end, not_started or unknown.
+    param([object]$Output)
+    $r = @{ Status = "unknown"; Detail = "no injector log came back from the base"; Trigger = ""; Start = ""; Exit = "" }
+    $armed = $false; $notStarted = ""; $stopInj = $false; $stopWatch = $false
+    foreach ($l in @(ConvertFrom-AdbOutput $Output)) {
+        if ($l -match '^INJECT_(ARMED|WATCH) ') { $armed = $true }
+        elseif ($l -match '^INJECT_TRIGGER (\S+) \S+ ?(.*)$') { $r.Trigger = ("$($Matches[1]) $($Matches[2])").Trim() }
+        elseif ($l -match '^INJECT_START (\S+) ') { $r.Start = $Matches[1] }
+        elseif ($l -match '^INJECT_EXIT \S+ \S+ rc=(\d+)') { $r.Exit = $Matches[1] }
+        elseif ($l -match '^INJECT_NOT_STARTED \S+ \S+ ?(.*)$') { $notStarted = $Matches[1] }
+        elseif ($l -match '^INJECT_STOP .*injector_running=([01]) watcher_running=([01])') {
+            $stopInj = ($Matches[1] -eq '1'); $stopWatch = ($Matches[2] -eq '1')
+        }
+    }
+    if ($notStarted -ne "") {
+        $r.Status = "not_started"; $r.Detail = $notStarted
+    } elseif ($r.Start -ne "" -and $stopInj) {
+        $r.Status = "stopped_at_leg_end"; $r.Detail = "still running when the leg ended; the harness removed it"
+    } elseif ($r.Start -ne "" -and $r.Exit -ne "") {
+        if ($r.Exit -eq "0") { $r.Status = "finished"; $r.Detail = "ran to its end" }
+        else { $r.Status = "failed"; $r.Detail = "injector exit status $($r.Exit)" }
+    } elseif ($r.Start -ne "") {
+        $r.Status = "unknown"; $r.Detail = "started, but its log has no exit marker"
+    } elseif ($stopWatch) {
+        $r.Status = "not_started"; $r.Detail = "its trigger had not fired when the leg ended"
+    } elseif ($armed) {
+        $r.Status = "not_started"; $r.Detail = "its trigger never fired"
+    }
+    return $r
+}
+
+function Get-TractorResetVerdict {
+    # Verdict on the leg-start SWD reset of the tractor's L072 from the
+    # tractor's /tmp/lifetrac_p0c/ocd_reset.log (openocd + 08_boot_user_app.cfg,
+    # with OCD_EXIT=<rc> appended) and the __OCD_LOG_RC / __OCD_RUNNING markers
+    # of the end-of-leg read. Returns @{ Verdict = landed|failed|unknown; Reason }.
+    # "landed" = openocd drove H7 PF4 (the L072 NRST net) low for 250 ms and
+    # read it back low, then high (Phase D of the cfg). It is not a readback
+    # from the L072 itself; the counter brackets (deltas.py) stay the final word.
+    # -Tag is this leg's OCD_LEG=<stamp>, the log's first line: a log without
+    # it is an earlier leg's (only this harness writes ocd_reset.log, and each
+    # spawn truncates it). -SpawnOutput is what the leg-start spawn printed.
+    param([object]$Output, [bool]$CfgOk = $true, [string]$Tag = "", [object]$SpawnOutput = $null)
+    $lines = @(ConvertFrom-AdbOutput $Output)
+    $logRc = $null; $running = $false; $exit = $null; $low = $null; $high = $null; $firstErr = $null
+    foreach ($l in $lines) {
+        if ($l -match '^__OCD_LOG_RC=(\d+)$') { $logRc = [int]$Matches[1] }
+        elseif ($l -match '^__OCD_RUNNING=1$') { $running = $true }
+        elseif ($l -match '^OCD_EXIT=(\d+)$') { $exit = [int]$Matches[1] }
+        elseif ($l -match 'GPIOF_IDR\.PF_4 \(low\)\s*=\s*(\d+)') { $low = $Matches[1] }
+        elseif ($l -match 'GPIOF_IDR\.PF_4 \(high\)\s*=\s*(\d+)') { $high = $Matches[1] }
+        elseif ($null -eq $firstErr -and $l -match '^(Error|error)\b') { $firstErr = $l }
+    }
+    $cfgNote = ""
+    if (-not $CfgOk) { $cfgNote = "; 08_boot_user_app.cfg was missing at launch" }
+    $spawnNote = ""
+    if ($null -ne $SpawnOutput) {
+        $sp = @(ConvertFrom-AdbOutput $SpawnOutput)
+        if ($sp -notcontains "swd_reset_spawned") {
+            $spText = "nothing"
+            if ($sp.Count -gt 0) { $spText = "'" + ($sp -join ' | ') + "'" }
+            $spawnNote = "; the leg-start spawn printed $spText, not swd_reset_spawned"
+        }
+    }
+    if ($null -eq $logRc) {
+        return @{ Verdict = "unknown"; Reason = "could not read /tmp/lifetrac_p0c/ocd_reset.log from the tractor (adb failed?)$spawnNote$cfgNote" }
+    }
+    if ($logRc -ne 0) {
+        return @{ Verdict = "failed"; Reason = "no openocd log on the tractor: the background reset never started$spawnNote$cfgNote" }
+    }
+    if ($Tag -ne "" -and $lines -notcontains $Tag) {
+        $content = @($lines | Where-Object { $_ -notmatch '^__OCD_' })
+        if ($content.Count -eq 0) {
+            return @{ Verdict = "failed"; Reason = "the openocd log on the tractor is empty: the reset subshell was cut off before it wrote $Tag (a hangup at spawn?)$spawnNote$cfgNote" }
+        }
+        $whose = "an untagged log from an older harness"
+        $prevTag = @($content | Where-Object { $_ -match '^OCD_LEG=' })
+        if ($prevTag.Count -gt 0) { $whose = "the log of $($prevTag[0])" }
+        return @{ Verdict = "failed"; Reason = "the openocd log on the tractor is not this leg's (no $Tag; it is $whose): the leg-start reset was not spawned$spawnNote$cfgNote" }
+    }
+    $banner = (@($lines | Where-Object { $_ -match '^Open On-Chip Debugger' }).Count -gt 0)
+    $exitNote = ""
+    if ($null -ne $exit) {
+        $exitNote = ", openocd exit $exit"
+        if ($exit -ge 128) { $exitNote += " (signal $($exit - 128))" }
+    } elseif ($running) { $exitNote = ", openocd still running" }
+    if ($null -ne $low -and $null -ne $high) {
+        if ($low -eq "0" -and $high -eq "1") {
+            return @{ Verdict = "landed"; Reason = "PF4/NRST read back low then high$exitNote" }
+        }
+        return @{ Verdict = "failed"; Reason = "PF4/NRST read back low=$low high=$high (expect 0 then 1)$exitNote" }
+    }
+    # With OCD_EXIT in the log this leg's job is over; an openocd still seen
+    # running is some other one, so the exit status decides.
+    if ($running -and $null -eq $exit) {
+        return @{ Verdict = "failed"; Reason = "openocd still running at leg end and no NRST pulse in its log (hung)$cfgNote" }
+    }
+    # The shell reports a job killed by signal N as 128+N. 129 (SIGHUP) is the
+    # likely one here: the adb/sudo session hangup reaching nohup before nohup
+    # ignored HUP (the subshell's `trap :` is reset in its children). Without
+    # the openocd banner, openocd itself never started.
+    if ($null -ne $exit -and $exit -ge 128) {
+        $sig = $exit - 128
+        $what = "killed by signal $sig"
+        if ($sig -eq 1) { $what = "killed by SIGHUP (likely the adb/sudo session hangup reaching nohup before nohup ignored HUP)" }
+        elseif ($sig -eq 9) { $what = "killed by SIGKILL" }
+        elseif ($sig -eq 15) { $what = "killed by SIGTERM" }
+        if (-not $banner) { $what += "; openocd never started (no banner in its log)" }
+        return @{ Verdict = "failed"; Reason = "the nohup openocd job was $what (exit $exit) before the NRST pulse$cfgNote" }
+    }
+    if ($null -ne $exit -and $exit -ne 0) {
+        $why = "no first error line"
+        if ($firstErr) { $why = $firstErr }
+        return @{ Verdict = "failed"; Reason = "openocd exit $exit before the NRST pulse: $why$cfgNote" }
+    }
+    if ($firstErr) {
+        return @{ Verdict = "failed"; Reason = "no NRST pulse in the openocd log: $firstErr$cfgNote" }
+    }
+    return @{ Verdict = "unknown"; Reason = "the openocd log has no NRST pulse and no error$exitNote$cfgNote" }
+}
 
 # Bench kit (2026-10-10): refuse a DTS leg on the default carrier BEFORE
 # anything touches a board. Legs that pass -ForceFrfHz are unaffected.
@@ -221,6 +464,12 @@ if ($RegProfile -eq 2 -and $ForceFrfHz -eq 0 -and -not $AllowDefaultCarrier) {
 }
 if ($RegProfile -eq 2 -and $ForceFrfHz -eq 0) {
     Write-Warning "-AllowDefaultCarrier: this DTS leg flies on 915.000 MHz, the RS-11.6 emitter channel."
+}
+# Bench kit (2026-10-18): check the injector options before anything touches a
+# board. $injectSpec stays $null (no injector, the old behaviour) without them.
+$injectSpec = $null
+if ($InjectCmd -ne "" -or $InjectOn -ne "") {
+    $injectSpec = ConvertTo-InjectSpec -Cmd $InjectCmd -On $InjectOn
 }
 
 # Profile env for both daemons; profile 1 needs the 50-ch wide mask.
@@ -311,7 +560,10 @@ if (-not $waitResult -or -not $socket.Connected) {
 # 2. Clean up previous containers
 Write-Host "[CLEANUP] Stopping old containers..."
 cmd /c "`"$adbExe`" -s $TxAdbSerial shell `"echo fio | sudo -S docker rm -f tx_smoke 2>/dev/null`"" | Out-Null
-cmd /c "`"$adbExe`" -s $RxAdbSerial shell `"echo fio | sudo -S docker rm -f rx_smoke 2>/dev/null`"" | Out-Null
+# 2026-10-18: bench_inject is the -InjectCmd injector container. Removed on
+# every launch, with or without -InjectCmd, so one left by an interrupted leg
+# cannot publish commands into this one (a no-op when it does not exist).
+cmd /c "`"$adbExe`" -s $RxAdbSerial shell `"echo fio | sudo -S docker rm -f rx_smoke bench_inject 2>/dev/null`"" | Out-Null
 # 2026-08-08: the PRODUCTION `tractor-camera` container maps
 # /dev/ttymxc3 and is recreated by compose on every reboot. It steals the
 # radio UART, and the failure looks nothing like contention: the L072
@@ -353,6 +605,24 @@ foreach ($s in @($TxAdbSerial, $RxAdbSerial)) {
     $pahoLocal = Join-Path $repoRoot "_paho_pull\paho"
     if (Test-Path $pahoLocal) {
         cmd /c "`"$adbExe`" -s $s push `"$pahoLocal`" /tmp/lifetrac_strict/" | Out-Null
+    }
+}
+# 3a. -InjectCmd (2026-10-18): the base needs bench_tools/inject_watch.sh and the
+# injector script in /tmp/lifetrac_strict. The watcher goes up LF-only (a CRLF
+# checkout would break it on the board); the injector is pushed when it is in
+# bench_tools, otherwise it must already be staged there (legs/stage_boards.sh).
+if ($injectSpec) {
+    $injWatchSrc = Join-Path $helperDir "bench_tools\inject_watch.sh"
+    $injWatchTmp = Join-Path ([System.IO.Path]::GetTempPath()) "lifetrac_inject_watch.sh"
+    [System.IO.File]::WriteAllText($injWatchTmp, ((Get-Content -Raw -LiteralPath $injWatchSrc) -replace "`r", ""))
+    cmd /c "`"$adbExe`" -s $RxAdbSerial push `"$injWatchTmp`" /tmp/lifetrac_strict/inject_watch.sh" | Out-Null
+    $injScriptLocal = Join-Path $helperDir "bench_tools\$($injectSpec.Script)"
+    if (Test-Path -LiteralPath $injScriptLocal) {
+        cmd /c "`"$adbExe`" -s $RxAdbSerial push `"$injScriptLocal`" /tmp/lifetrac_strict/" | Out-Null
+    }
+    $injCheck = @(ConvertFrom-AdbOutput (cmd /c "`"$adbExe`" -s $RxAdbSerial shell `"test -s /tmp/lifetrac_strict/inject_watch.sh && test -s /tmp/lifetrac_strict/$($injectSpec.Script) && echo INJ-STAGED || echo INJ-MISSING`"" 2>$null))
+    if ($injCheck -notcontains "INJ-STAGED") {
+        throw "-InjectCmd: /tmp/lifetrac_strict/inject_watch.sh or /tmp/lifetrac_strict/$($injectSpec.Script) is not on the base ($RxAdbSerial). Stage it (legs/stage_boards.sh) or put the script in bench_tools. No daemon was started."
     }
 }
 
@@ -397,16 +667,30 @@ foreach ($pair in $warmPairs) {
 }
 
 # 4. Reset L072s and attach daemons.
-# RX board (base): gpio163 NRST works; reset THEN launch.
-# TX board (tractor): gpio163 is dead (writes no-op) — use the OpenOCD SWD
+# RX board (base): a gpio163 pulse, UNVERIFIED. gpio163 is not an i.MX pin:
+# it is line 3 of the x8h7 GPIO chip (gpiochip5, DESIGN-LORAFIRMWARE/04), so the
+# write only reaches the L072's NRST if the base's x8h7 bridge is up and its
+# H7 firmware drives PF4 (the L072 NRST net) for that line. It has not reset
+# the base L072 since at least 2026-08-02 (RS-11.4 RESULTS: counters survived
+# ~8 launches) nor on 2026-10-18 (counters carried across legs V-W-W2-X; RS-12.15
+# RESULTS Observation 2), while openocd driving PF4 over SWD did reset it
+# (RS-11.4 leg E). Score base brackets as post - pre. The pulse is kept
+# unchanged (changing the base reset needs its own GO); its output, which
+# used to be discarded, now goes into the archive.
+# TX board (tractor): gpio163 is dead (writes no-op, RS-5.2) — use the OpenOCD SWD
 # path (H7 PA11/BOOT0 low + PF4/NRST via /dev/mem). CRITICAL ORDER: the
 # tractor L072 wedges (TX-line break storm -> ISR livelock) when it runs
 # with /dev/ttymxc3 CLOSED, so launch the TX daemon FIRST (it holds the
 # port open and retries VER x5), then fire the SWD reset into the waiting
 # reader.
-Write-Host "[RESET] RX L072 via gpio163 NRST..."
+Write-Host "[RESET] RX (base) L072: gpio163 pulse (UNVERIFIED: it has not reset the base L072 since 2026-08; base counters carry across legs)..."
 $nrstCmd = "echo fio | sudo -S -p '' sh -c '[ -d /sys/class/gpio/gpio163 ] || echo 163 > /sys/class/gpio/export; echo out > /sys/class/gpio/gpio163/direction; echo 1 > /sys/class/gpio/gpio163/value; sleep 0.02; echo 0 > /sys/class/gpio/gpio163/value; sleep 0.10; echo 1 > /sys/class/gpio/gpio163/value'"
-cmd /c "`"$adbExe`" -s $RxAdbSerial shell `"$nrstCmd`"" | Out-Null
+# Same pulse as before; stderr joins stdout on the board so a failed sysfs
+# write (e.g. "Connection timed out" from a stalled x8h7 bridge) is recorded.
+$nrstOut = @(ConvertFrom-AdbOutput (cmd /c "`"$adbExe`" -s $RxAdbSerial shell `"$nrstCmd 2>&1`""))
+if ($nrstOut.Count -gt 0) {
+    Write-Host "  [RESET] gpio163 pulse output: $($nrstOut -join ' | ')" -ForegroundColor Yellow
+}
 # Bench kit (2026-10-10): /tmp is tmpfs (wiped by every reboot/flash, aged at
 # 5 d) and the flash pipeline may have left /tmp/lifetrac_p0c root-owned, so
 # make the directory writable before the push and check the cfg landed -- the
@@ -414,7 +698,8 @@ cmd /c "`"$adbExe`" -s $RxAdbSerial shell `"$nrstCmd`"" | Out-Null
 cmd /c "`"$adbExe`" -s $TxAdbSerial shell `"echo fio | sudo -S -p '' mkdir -p /tmp/lifetrac_p0c ; echo fio | sudo -S -p '' chmod 0777 /tmp/lifetrac_p0c`"" | Out-Null
 cmd /c "`"$adbExe`" -s $TxAdbSerial push `"$(Join-Path $helperDir '08_boot_user_app.cfg')`" /tmp/lifetrac_p0c/08_boot_user_app.cfg" | Out-Null
 $cfgCheck = cmd /c "`"$adbExe`" -s $TxAdbSerial shell `"test -s /tmp/lifetrac_p0c/08_boot_user_app.cfg && echo CFG-OK || echo CFG-MISSING`"" 2>$null
-if ("$cfgCheck" -notmatch "CFG-OK") {
+$cfgOk = ("$cfgCheck" -match "CFG-OK")
+if (-not $cfgOk) {
     Write-Warning "/tmp/lifetrac_p0c/08_boot_user_app.cfg is not on the tractor ($TxAdbSerial); the SWD reset of the TX L072 will fail."
 }
 
@@ -422,9 +707,32 @@ if ("$cfgCheck" -notmatch "CFG-OK") {
 # immediately. openocd needs ~7-10 s to reach its NRST pulse; the daemon needs
 # ~5 s (docker) + runs 5 VER retries over ~12 s. Backgrounding the reset makes
 # the NRST land mid-retry-window instead of after it.
+# 2026-10-18: the reset is still fired and forgotten here (no new wait, no
+# retry), but openocd now runs in a subshell that first writes this leg's
+# OCD_LEG=<UTC stamp> tag and then appends OCD_EXIT=<rc> to
+# /tmp/lifetrac_p0c/ocd_reset.log (`trap : HUP` keeps the subshell alive for
+# that line when adb hangs up). openocd is started the same way (nohup, same
+# cfgs) but one fork later, inside the subshell, and the caught trap does not
+# pass to that child: a hangup that lands before nohup ignores HUP kills the
+# job, which the log shows as OCD_EXIT=129 with no openocd banner. The log is
+# read back at leg end and judged into TRACTOR_L072_RESET landed/failed/unknown;
+# without this leg's tag it is an earlier leg's log (the spawn never ran).
+# Why: on 2026-10-18 the reset did not land on leg V, the first leg after a
+# flash reboot (RS-12.15 RESULTS Observation 3; also O, Q, R, S, T, U of
+# 09-14/15, while it landed on P and Q2: RS_12_15_clock_authority_2026-09-14/
+# ERRATA.md section 1), and
+# the archives cannot say why -- the only witness, this log, stayed on the
+# tractor's tmpfs and the next leg's reset overwrote it.
 Write-Host "[RESET] TX L072 via OpenOCD SWD (background, BOOT0 low + NRST)..."
-$swdReset = "echo fio | sudo -S -p '' sh -c 'mkdir -p /tmp/lifetrac_p0c; pkill -9 openocd 2>/dev/null; sleep 0.5; for g in 8 10 15; do [ -d /sys/class/gpio/gpio`$g ] || echo `$g > /sys/class/gpio/export 2>/dev/null; done; echo out > /sys/class/gpio/gpio10/direction 2>/dev/null; echo 1 > /sys/class/gpio/gpio10/value 2>/dev/null; sleep 1; for g in 8 10 15; do echo `$g > /sys/class/gpio/unexport 2>/dev/null; done; nohup openocd -f /usr/arduino/extra/openocd_script-imx_gpio.cfg -f /tmp/lifetrac_p0c/08_boot_user_app.cfg >/tmp/lifetrac_p0c/ocd_reset.log 2>&1 & echo swd_reset_spawned'"
-cmd /c "`"$adbExe`" -s $TxAdbSerial shell `"$swdReset`""
+# [A-Z0-9=] only: it passes cmd, adb and the single-quoted sh -c unchanged.
+$ocdTag = "OCD_LEG=" + (Get-Date).ToUniversalTime().ToString("yyyyMMddTHHmmssZ")
+$swdReset = "echo fio | sudo -S -p '' sh -c 'mkdir -p /tmp/lifetrac_p0c; pkill -9 openocd 2>/dev/null; sleep 0.5; for g in 8 10 15; do [ -d /sys/class/gpio/gpio`$g ] || echo `$g > /sys/class/gpio/export 2>/dev/null; done; echo out > /sys/class/gpio/gpio10/direction 2>/dev/null; echo 1 > /sys/class/gpio/gpio10/value 2>/dev/null; sleep 1; for g in 8 10 15; do echo `$g > /sys/class/gpio/unexport 2>/dev/null; done; ( trap : HUP; echo $ocdTag; nohup openocd -f /usr/arduino/extra/openocd_script-imx_gpio.cfg -f /tmp/lifetrac_p0c/08_boot_user_app.cfg; echo OCD_EXIT=`$? ) >/tmp/lifetrac_p0c/ocd_reset.log 2>&1 & echo swd_reset_spawned'"
+# Kept for the leg-end verdict (it used to go straight to the console).
+$swdOut = @(ConvertFrom-AdbOutput (cmd /c "`"$adbExe`" -s $TxAdbSerial shell `"$swdReset`""))
+if ($swdOut.Count -gt 0) { Write-Host ($swdOut -join "`n") }
+if ($swdOut -notcontains "swd_reset_spawned") {
+    Write-Warning "No swd_reset_spawned from the tractor ($TxAdbSerial): the SWD reset of the TX L072 may not have been fired; its counters may carry over."
+}
 
 # RS-5.9: local feed = bench broker on the tractor's own loopback. The
 # conf mount pins the listener to 127.0.0.1 (host netns via --network=host).
@@ -460,6 +768,32 @@ if ($ProbePhaseSweepMs -ne "") { $rxEnvArgs = "$rxEnvArgs -e LIFETRAC_PROBE_PHAS
 if ($ProbeSizesB -ne "") { $rxEnvArgs = "$rxEnvArgs -e LIFETRAC_PROBE_SIZES_B=$ProbeSizesB" }
 Write-Host "[LAUNCH] Starting RX Daemon on Board $RxAdbSerial..." -ForegroundColor Yellow
 cmd /c "`"$adbExe`" -s $RxAdbSerial shell `"echo fio | sudo -S -p '' docker rm -f rx_smoke 2>/dev/null ; echo fio | sudo -S -p '' docker run -d --name rx_smoke --network=host --device=/dev/ttymxc3 -v /tmp/lifetrac_strict:/work -w /work -e PYTHONPATH=/work:/work/paho -e LIFETRAC_MQTT_HOST=127.0.0.1 -e LIFETRAC_CTRL_MQTT_HOST=$HostIp -e LIFETRAC_SKIP_RESET_REQ=1 -e LIFETRAC_KF_REQUEST_DISABLE=$KfRequestDisable $rxEnvArgs $profEnv lifetrac-v25:latest python3 -u /work/image_rx_daemon.py --log-level INFO`""
+
+# 6a. -InjectCmd (2026-10-18): arm the injector now that this leg's rx_smoke
+# exists. first_frame: the watcher runs on the base and pins this rx_smoke's
+# container id, so no adb polling is needed during the leg. fault: the base
+# only gets a fresh log here; the monitor loop polls the tractor and starts the
+# injector when the FAULT line appears. All adb calls stay in this thread,
+# one after another (RS-5.4: concurrent host-side adb has wedged adb).
+$injDeadlineS = $DurationS + 60
+$injPc = New-Object System.Collections.Generic.List[string]   # PC-side record -> inject_trigger.txt
+$injWatchCmd = "echo fio | sudo -S -p '' sh /tmp/lifetrac_strict/inject_watch.sh"
+if ($injectSpec) {
+    $injPc.Add("$((Get-Date).ToUniversalTime().ToString('HH:mm:ss')) PC armed on=$($injectSpec.Label) cmd=$($injectSpec.Cmd) base=$RxAdbSerial")
+    if ($injectSpec.On -eq "first_frame") {
+        $armOut = cmd /c "`"$adbExe`" -s $RxAdbSerial shell `"$injWatchCmd start first_frame $injDeadlineS $($injectSpec.Cmd)`""
+        $armPid = Get-InjectWatchPid $armOut
+        if ($armPid) {
+            Write-Host "[INJECT] armed on the base: $($injectSpec.Cmd) at rx_smoke's first published frame (watcher pid $armPid)" -ForegroundColor Yellow
+        } else {
+            Write-Warning "[INJECT] the base watcher did not report a pid; the injector may not start. Output: $(@(ConvertFrom-AdbOutput $armOut) -join ' | ')"
+        }
+        $injPc.Add("$((Get-Date).ToUniversalTime().ToString('HH:mm:ss')) PC base watcher pid=$armPid")
+    } else {
+        cmd /c "`"$adbExe`" -s $RxAdbSerial shell `"$injWatchCmd reset $($injectSpec.Label)`"" | Out-Null
+        Write-Host "[INJECT] armed: $($injectSpec.Cmd) on the base at the first tractor FAULT matching $($injectSpec.Label) (polled every ~2 s)" -ForegroundColor Yellow
+    }
+}
 
 Start-Sleep -Seconds 4
 
@@ -524,20 +858,82 @@ if ($TxFeed -eq "camera") {
 
 Write-Host "=== MONITORING RADIO TRANSMISSIONS FOR $DurationS SECONDS ===" -ForegroundColor Green
 $startT = Get-Date
+# -InjectCmd state (2026-10-18). Without -InjectCmd the loop is the old one:
+# sleep 5 s, print the last 2 lines of each daemon log.
+$injFaultPending = [bool]($injectSpec -and $injectSpec.On -eq "fault")
+$injStatusPending = [bool]($injectSpec -and $injectSpec.On -eq "first_frame")
+$injMarkersShown = 0
+$injFaultsSeen = @{}
 while (((Get-Date) - $startT).TotalSeconds -lt $DurationS) {
-    Start-Sleep -Seconds 5
+    if ($injFaultPending) {
+        # fault: trigger: read the tractor's tx_smoke log for the FAULT line
+        # every ~2 s inside the usual 5 s console tick.
+        $tickEnd = (Get-Date).AddSeconds(5)
+        while ($injFaultPending -and (Get-Date) -lt $tickEnd) {
+            Start-Sleep -Seconds 2
+            $codeHex = "{0:X2}" -f $injectSpec.Code
+            $faultRaw = cmd /c "`"$adbExe`" -s $TxAdbSerial shell `"echo fio | sudo -S -p '' docker logs tx_smoke 2>&1 | grep -a -i 'code=0x$codeHex'`"" 2>$null
+            foreach ($fl in @(ConvertFrom-AdbOutput $faultRaw)) {
+                if (-not $injFaultsSeen.ContainsKey($fl)) {
+                    $injFaultsSeen[$fl] = $true
+                    $injPc.Add("$((Get-Date).ToUniversalTime().ToString('HH:mm:ss')) PC tractor FAULT: $fl")
+                    Write-Host "  [INJECT] tractor FAULT: $fl" -ForegroundColor Yellow
+                }
+                if (Test-InjectFaultLine -Line $fl -Spec $injectSpec) {
+                    $null = $fl -match 'code=0x([0-9A-Fa-f]{2}) sub=0x([0-9A-Fa-f]{2})'
+                    $reason = "fault:code=0x$($Matches[1].ToUpper()),sub=0x$($Matches[2].ToUpper())"
+                    $startOut = cmd /c "`"$adbExe`" -s $RxAdbSerial shell `"$injWatchCmd start now:$reason $injDeadlineS $($injectSpec.Cmd)`""
+                    $trigPid = Get-InjectWatchPid $startOut
+                    $tsec = [int]((Get-Date) - $startT).TotalSeconds
+                    $injPc.Add("$((Get-Date).ToUniversalTime().ToString('HH:mm:ss')) PC TRIGGER $($injectSpec.Label) at $tsec s after MONITORING: started $($injectSpec.Cmd) on the base (watcher pid $trigPid)")
+                    Write-Host "  [INJECT] TRIGGER $($injectSpec.Label) ($tsec s after MONITORING): starting $($injectSpec.Cmd) on the base (watcher pid $trigPid)" -ForegroundColor Yellow
+                    $injFaultPending = $false
+                    $injStatusPending = $true
+                    break
+                }
+            }
+        }
+        $left = ($tickEnd - (Get-Date)).TotalMilliseconds
+        if ($left -gt 0) { Start-Sleep -Milliseconds ([int]$left) }
+    } else {
+        Start-Sleep -Seconds 5
+    }
     $txStats = cmd /c "`"$adbExe`" -s $TxAdbSerial shell `"echo fio | sudo -S -p '' docker logs --tail 2 tx_smoke 2>&1`""
     $rxStats = cmd /c "`"$adbExe`" -s $RxAdbSerial shell `"echo fio | sudo -S -p '' docker logs --tail 2 rx_smoke 2>&1`""
     Write-Host "--- TX Log ---" -ForegroundColor Cyan
     Write-Host $txStats
     Write-Host "--- RX Log ---" -ForegroundColor Magenta
     Write-Host $rxStats
+    if ($injStatusPending) {
+        # Show the base watcher's new marker lines until the injector has
+        # started or given up (then nothing more is polled until leg end).
+        $marks = @(ConvertFrom-AdbOutput (cmd /c "`"$adbExe`" -s $RxAdbSerial shell `"sh /tmp/lifetrac_strict/inject_watch.sh status`"" 2>$null) | Where-Object { $_ -like 'INJECT_*' -and $_ -ne 'INJECT_STATUS_DONE' })
+        for ($k = $injMarkersShown; $k -lt $marks.Count; $k++) {
+            Write-Host "  [INJECT] base: $($marks[$k])" -ForegroundColor Yellow
+            $injPc.Add("$((Get-Date).ToUniversalTime().ToString('HH:mm:ss')) PC saw on the base: $($marks[$k])")
+        }
+        if ($marks.Count -gt $injMarkersShown) { $injMarkersShown = $marks.Count }
+        if (@($marks | Where-Object { $_ -match '^INJECT_(START|NOT_STARTED) ' }).Count -gt 0) { $injStatusPending = $false }
+    }
 }
 
 # 8. Clean up publisher & containers
 if ($pubProc -and -not $pubProc.HasExited) {
     try { $pubProc.Kill() } catch {}
 }
+
+# 8a. -InjectCmd (2026-10-18): the leg is over, so stop the injector (or the
+# watcher still waiting for its trigger) and collect the base log.
+$injLog = @()
+$injSum = $null
+if ($injectSpec) {
+    $injLog = @(ConvertFrom-AdbOutput (cmd /c "`"$adbExe`" -s $RxAdbSerial shell `"$injWatchCmd stop`""))
+    $injSum = Get-InjectSummary $injLog
+    if ($injectSpec.On -eq "fault" -and $injFaultPending) {
+        $injPc.Add("$((Get-Date).ToUniversalTime().ToString('HH:mm:ss')) PC leg ended; no tractor FAULT matched $($injectSpec.Label) ($($injFaultsSeen.Count) FAULT line(s) with code 0x$('{0:X2}' -f $injectSpec.Code) seen)")
+    }
+}
+
 
 Write-Host "`n=== FINAL LOG SUMMARY ===" -ForegroundColor Cyan
 $txFinal = cmd /c "`"$adbExe`" -s $TxAdbSerial shell `"echo fio | sudo -S -p '' docker logs tx_smoke 2>&1`""
@@ -551,7 +947,9 @@ if ($TxFeed -eq "camera") {
     $camFinal = cmd /c "`"$adbExe`" -s $TxAdbSerial shell `"echo fio | sudo -S -p '' docker logs camera_svc 2>&1`""
     cmd /c "`"$adbExe`" -s $TxAdbSerial shell `"echo fio | sudo -S -p '' docker stop -t 1 camera_svc 2>&1`"" | Out-Null
     Write-Host "--- CAMERA SERVICE LOGS (last 8) ---" -ForegroundColor Yellow
-    Write-Host (($camFinal | Select-Object -Last 8) -join "`n")
+    # adb's \r\r\n puts an empty element after every line (ConvertFrom-AdbOutput),
+    # so a plain -Last 8 showed only 4 lines (leg V, 2026-10-18).
+    Write-Host ((@(ConvertFrom-AdbOutput $camFinal) | Select-Object -Last 8) -join "`n")
 }
 if ($TxFeed -eq "local") {
     # Capture the publisher's OFFERED line for the evidence bundle, then
@@ -566,10 +964,43 @@ if ($TxFeed -eq "local") {
 cmd /c "`"$adbExe`" -s $TxAdbSerial shell `"echo fio | sudo -S -p '' docker stop -t 1 tx_smoke 2>&1`"" | Out-Null
 cmd /c "`"$adbExe`" -s $RxAdbSerial shell `"echo fio | sudo -S -p '' docker stop -t 1 rx_smoke 2>&1`"" | Out-Null
 
+# 8b. Tractor L072 reset check (2026-10-18): read back the openocd log of the
+# leg-start SWD reset (read-only; nothing is reset or re-run here). After the
+# daemon stops, so the extra adb round trip does not lengthen the leg's TX.
+$ocdRaw = cmd /c "`"$adbExe`" -s $TxAdbSerial shell `"cat /tmp/lifetrac_p0c/ocd_reset.log 2>&1; echo __OCD_LOG_RC=`$?; if pgrep -x openocd >/dev/null 2>&1 || pidof openocd >/dev/null 2>&1; then echo __OCD_RUNNING=1; else echo __OCD_RUNNING=0; fi`"" 2>$null
+$ocdLines = @(ConvertFrom-AdbOutput $ocdRaw)
+$resetV = Get-TractorResetVerdict -Output $ocdLines -CfgOk $cfgOk -Tag $ocdTag -SpawnOutput $swdOut
+
 Write-Host "--- TX DAEMON FINAL LOGS ---" -ForegroundColor Yellow
 Write-Host $txFinal
 Write-Host "--- RX DAEMON FINAL LOGS ---" -ForegroundColor Yellow
 Write-Host $rxFinal
+
+# 8c. Leg checks (2026-10-18), printed before the [EVIDENCE] line that
+# legs/leg_post.sh looks for, and repeated in params.txt.
+$baseResetLine = "BASE_L072_RESET unverified (gpio163 pulse sent; nothing checks that the base L072 rebooted, and it has not since 2026-08: score base brackets as post - pre)"
+$nrstNote = "none"
+if ($nrstOut.Count -gt 0) { $nrstNote = $nrstOut -join ' | ' }
+$tractorResetLine = "TRACTOR_L072_RESET $($resetV.Verdict) ($($resetV.Reason))"
+Write-Host "`n=== LEG CHECKS ===" -ForegroundColor Cyan
+$resetColor = "Yellow"
+if ($resetV.Verdict -eq "landed") { $resetColor = "Green" } elseif ($resetV.Verdict -eq "failed") { $resetColor = "Red" }
+Write-Host $tractorResetLine -ForegroundColor $resetColor
+if ($resetV.Verdict -ne "landed") {
+    Write-Host "  The tractor's L072 counters may carry over from before this leg: score its brackets with deltas.py (reset-aware)." -ForegroundColor Yellow
+}
+Write-Host $baseResetLine -ForegroundColor Yellow
+Write-Host "  gpio163 pulse output: $nrstNote"
+$injectLine = ""
+if ($injectSpec) {
+    $injTrigTxt = "-"; if ($injSum.Trigger -ne "") { $injTrigTxt = $injSum.Trigger }
+    $injStartTxt = "-"; if ($injSum.Start -ne "") { $injStartTxt = $injSum.Start }
+    $injExitTxt = "-"; if ($injSum.Exit -ne "") { $injExitTxt = $injSum.Exit }
+    $injectLine = "INJECT $($injSum.Status) (on=$($injectSpec.Label) cmd=$($injectSpec.Cmd) started=$injStartTxt exit=$injExitTxt; $($injSum.Detail)) trigger: $injTrigTxt"
+    $injColor = "Yellow"
+    if ($injSum.Status -eq "finished") { $injColor = "Green" } elseif ($injSum.Status -eq "not_started" -or $injSum.Status -eq "failed") { $injColor = "Red" }
+    Write-Host $injectLine -ForegroundColor $injColor
+}
 
 # 9. Evidence bundle (per the CODE REVIEWS evidence discipline: no
 #    verification claim without a SHA + raw transcript).
@@ -586,6 +1017,17 @@ if ($Archive) {
     if ($camFinal) {
         $camFinal | Out-File -FilePath (Join-Path $dir "camera_service.log") -Encoding utf8
     }
+    # 2026-10-18: the openocd log of the tractor's leg-start reset (the only
+    # witness of whether it landed), and the -InjectCmd records: the base
+    # watcher log (trigger, injector output, exit) and the PC-side timeline.
+    $ocdLines | Out-File -FilePath (Join-Path $dir "tractor_ocd_reset.log") -Encoding utf8
+    if ($injectSpec) {
+        $injLog | Out-File -FilePath (Join-Path $dir "inject.log") -Encoding utf8
+        @($injPc) + @($injectLine) | Out-File -FilePath (Join-Path $dir "inject_trigger.txt") -Encoding utf8
+    }
+    $injStatus = ""; $injTrigger = ""; $injOnLabel = ""
+    if ($injSum) { $injStatus = $injSum.Status; $injTrigger = $injSum.Trigger }
+    if ($injectSpec) { $injOnLabel = $injectSpec.Label }
     @(
         "git_sha=$sha",
         "duration_s=$DurationS",
@@ -625,6 +1067,15 @@ if ($Archive) {
         "tx_serial=$TxAdbSerial",
         "rx_serial=$RxAdbSerial",
         "host_ip=$HostIp",
+        "inject_cmd=$InjectCmd",
+        "inject_on=$injOnLabel",
+        "inject_status=$injStatus",
+        "inject_trigger=$injTrigger",
+        "tractor_l072_reset=$($resetV.Verdict)",
+        "tractor_l072_reset_reason=$($resetV.Reason)",
+        "tractor_ocd_tag=$ocdTag",
+        "base_l072_reset=unverified",
+        "base_gpio163_output=$nrstNote",
         "timestamp=$stamp"
     ) | Out-File -FilePath (Join-Path $dir "params.txt") -Encoding utf8
     Write-Host "[EVIDENCE] archived to $dir" -ForegroundColor Green
