@@ -713,9 +713,10 @@ class X8SUP_B_Supervisor(unittest.TestCase):
         self.run_err = self.root / "run.stderr"
         with open(self.root / "run.stdout", "w", encoding="utf-8") as out, \
                 open(self.run_err, "w", encoding="utf-8") as err:
+            # cwd: a SIGABRT test's core dump lands in the temp dir.
             self.run_proc = subprocess.Popen(
                 [self.shell, str(_SCRIPT), "run"], env=self.env(),
-                stdout=out, stderr=err, start_new_session=True)
+                stdout=out, stderr=err, start_new_session=True, cwd=self.root)
         # This process, not self.run_proc: a later sub-case replaces that,
         # and a loop left running after its temp dir goes finds no `sleep`
         # and spins.
@@ -2250,10 +2251,18 @@ class X8SUP_B_Supervisor(unittest.TestCase):
                     return
                 time.sleep(0.005)
 
+        sleeper = self.bin / "sleep"
+        sleeper.write_text(
+            "#!/bin/sh\n"
+            'printf \'sleep %s\\n\' "$*" >> "$FAKE_LOG"\n'
+            f'exec "{self.tools / "sleep"}" "$@"\n', encoding="utf-8")
+        sleeper.chmod(0o755)
+        self.addCleanup(sleeper.unlink, missing_ok=True)
         for sysrq in ("ok", "missing", "unwritable", "b_fails"):
             with self.subTest(sysrq=sysrq):
                 self.fresh()
-                self._tractor(SYSRQ_SETTLE_S="1" if sysrq == "b_fails" else "0")
+                settle = sysrq in ("unwritable", "b_fails")
+                self._tractor(SYSRQ_SETTLE_S="1" if settle else "0")
                 if sysrq in ("missing", "unwritable"):
                     self.sysrq.unlink()
                 if sysrq == "unwritable":
@@ -2271,8 +2280,12 @@ class X8SUP_B_Supervisor(unittest.TestCase):
                         swapper.join()
                     if self.sysrq.is_dir():
                         self.sysrq.rmdir()
-                if sysrq in ("unwritable", "b_fails"):
+                if settle:
                     self.assertIn("SYSRQ write 'b' to", self.sv_log())
+                    # The s settle, and the u settle only once u was written
+                    # (a failed u has no remount to wait for: b at once).
+                    settles = [ln for ln in self.fake_lines() if ln == "sleep 1"]
+                    self.assertEqual(len(settles), 2 if sysrq == "b_fails" else 1)
                 self.assertEqual(self.sysrq_text(), "sub" if sysrq == "ok" else "")
                 self.assertEqual(len(self.calls("systemctl reboot -ff")), 1)
                 self.assertEqual(
@@ -2376,17 +2389,6 @@ class X8SUP_B_Supervisor(unittest.TestCase):
         # (the shutdown of the reboot it asked for), it keeps the request.
         # (mode, fake files, conf, ready, kept, sysrq written, systemctl calls)
         rc1 = {"systemctl_reboot_rc": "1"}
-        s_failed_at: list[float] = []
-
-        def in_the_settle_after_a_failed_u() -> bool:
-            # u is logged only after b: wait for s's failure, then out of
-            # its 3 s settle and into u's (the look between them is quick).
-            if not s_failed_at:
-                if "SYSRQ write 's' to" not in self.sv_log():
-                    return False
-                s_failed_at.append(time.monotonic())
-            return time.monotonic() - s_failed_at[0] > 4.5
-
         cases = {
             # waiting for the H747 to take the hold
             "handshake": ("idle", {}, {}, lambda: self.req_file.exists(), False, "", 0),
@@ -2414,9 +2416,11 @@ class X8SUP_B_Supervisor(unittest.TestCase):
             # ... or in the sysrq s settle, before u
             "forced_settle": ("grant", rc1, {"SYSRQ_SETTLE_S": "5"},
                               lambda: self.sysrq_text() == "s", False, "s", 1),
-            # ... or in the settle after a failed u (the disks still writable)
-            "forced_failed_u": ("grant", rc1, {"SYSRQ_SETTLE_S": "3"},
-                                in_the_settle_after_a_failed_u, False, "", 1),
+            # ... or in the sync before `reboot -ff` after failed sysrq
+            # writes (the disks still writable)
+            "forced_failed_u": ("grant", {**rc1, "on_sync_after_log": "still alive after sysrq b",
+                                          "on_sync_hang": "1"}, {},
+                                lambda: (self.fake / "sync_hanging").exists(), False, "", 1),
             # in the settle after u (Copilot review on #156): u cannot be
             # undone, so the stop waits for b and `reboot -ff`, and keeps it
             "forced_after_u": ("grant", rc1, {"SYSRQ_SETTLE_S": "3"},
@@ -2456,7 +2460,6 @@ class X8SUP_B_Supervisor(unittest.TestCase):
                     self._dd_hangs_once_when(
                         'r=; read -r r < "${FAKE_REQ%/*}/reset_issued"; [ "${r##*-}" = 1000 ]')
                 if case == "forced_failed_u":
-                    s_failed_at.clear()
                     self.sysrq.unlink()
                     self.sysrq.mkdir()
                 link = self.start_link(mode)

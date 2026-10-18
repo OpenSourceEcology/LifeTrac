@@ -193,10 +193,11 @@
 # (request still ours, idle file still showing that hold) after writing
 # last_action, after the s settle (before u, which remounts the disks
 # read-only and cannot be undone, so from u on it goes ahead, and a stop
-# waits until b and `reboot -ff` are sent), and without
-# sysrq after a bounded sync right before `systemctl reboot -ff`, which syncs
-# again before it resets. If the hold is gone it gives up; when no reset was
-# issued earlier in this boot, the request is withdrawn.
+# waits until b and `reboot -ff` are sent), and, when u was not written (no
+# sysrq file, or its writes failed), after a bounded sync right before
+# `systemctl reboot -ff`, which syncs again before it resets. If the hold is
+# gone it gives up; when no reset was issued earlier in this boot, the
+# request is withdrawn.
 #
 # Reset reason (no telemetry route exists yet; a container can read the file):
 # at startup in a new boot, if $STATE/last_action names the boot id stored in
@@ -611,7 +612,8 @@ validate_config() {
   # with three allowlisted containers, + 20 s when a dropped pending reboot
   # rewrites last_action), or the reboot rung on its own after its own ping
   # (three fw_printenv, five synced records, `systemctl reboot`, the forced
-  # path with 2 x SYSRQ_SETTLE_S, or a 10 s sync without sysrq, and
+  # path with 2 x SYSRQ_SETTLE_S, or one and a 10 s sync when u was not
+  # written, and
   # `reboot -ff`: ~210 s), not counting file
   # writes on wedged storage (see the header). A tractor adds up to two
   # TRACTOR_IDLE_WAIT_S probes before the rung pings again, and one more
@@ -1521,22 +1523,28 @@ force_reboot() {  # REASON WHY
     # A stop from here waits for b and `reboot -ff`: one after u would leave
     # the disks read-only with nothing queued (Copilot review on #156).
     defer_stop
-    # Nothing but the settle from this look to b: u is logged after b, as
-    # an append to the log on the eMMC can block while u's remount runs.
+    # Nothing but the settle from this look to b: u and b are logged after
+    # b, as an append to the log on the eMMC can block while u's remount
+    # runs.
     if sysrq_write u quiet; then
       _fr_u=1
+      sysrq_settle
     else
-      # u failed: the disks are still writable, so a stop goes ahead.
+      # u failed: the disks are still writable, so a stop goes ahead, and
+      # with no remount to wait for, b follows at once.
       resume_stop
     fi
-    sysrq_settle
-    if sysrq_write b; then
-      :
-    elif [ "$ROLE" = tractor ] && [ "$_fr_u" != 1 ] && [ "$_fr_was" != 1 ]; then
-      # Nothing was sent (u and b both failed): drop the record, so a kill
-      # in the sync below leaves none (2026-10-18 review); force_mark writes
-      # it again right before the last look ahead of `reboot -ff`.
-      clear_reset_issued
+    if sysrq_write b quiet; then
+      log "SYSRQ wrote 'b'"
+    else
+      if [ "$ROLE" = tractor ] && [ "$_fr_u" != 1 ] && [ "$_fr_was" != 1 ]; then
+        # Nothing was sent (u and b both failed): drop the record before
+        # anything else, so a kill in the log writes or the sync below
+        # leaves none (2026-10-18 review); force_mark writes it again right
+        # before the last look ahead of `reboot -ff`.
+        clear_reset_issued
+      fi
+      log "SYSRQ write 'b' to $SYSRQ failed"
     fi
     if [ "$_fr_u" = 1 ]; then
       log "SYSRQ wrote 'u' (logged after b)"
@@ -1804,8 +1812,8 @@ usage() {
 on_stop() {
   trap - "$1"
   # Stopped after writing its own reset record but before sending the reset
-  # (the last look ahead of the reset, and after a failed sysrq u the settle
-  # and b): nothing is coming, so the record goes and the request with it.
+  # (the last look ahead of the reset, or a failed sysrq u and b): nothing
+  # is coming, so the record goes and the request with it.
   if [ "$RESET_PROV" = 1 ]; then
     clear_reset_issued
   fi

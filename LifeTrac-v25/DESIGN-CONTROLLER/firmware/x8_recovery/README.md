@@ -167,19 +167,19 @@ the board then stays up in that boot.
   link still shows the hold, or when the link is no longer live (stopped
   by the shutdown) and its last line shows the hold; never when the
   request or the idle file is gone or anything else is shown. It looks
-  again after writing its last_action record, again after the `s` settle (before `u`,
-  which remounts the disks read-only and cannot be undone, so from `u` on
-  it goes ahead with `b`, one settle later), and, without sysrq, after a
-  bounded sync right before `systemctl reboot -ff` (which syncs again
-  before it resets). If the hold is gone by then it gives up, and if no
-  reset was issued earlier in this boot it withdraws the request. It
-  writes its reset record right before the last of these looks (and drops
-  it again when `u` and `b` both failed, until the look before
-  `reboot -ff`), so a supervisor killed outright during the record syncs,
-  settles or that sync (the unit watchdog, SIGKILL) leaves none, and the
-  restart withdraws the request. It
-  is refused when its reset record cannot be written and no earlier reset
-  in this boot recorded one. Stopping the service (`systemctl stop`, a kill
+  again after writing its last_action record, again after the `s` settle
+  (before `u`, which remounts the disks read-only and cannot be undone,
+  so from `u` on it goes ahead with `b`, one settle later), and, when `u`
+  was not written (no sysrq file, or its writes failed), after a bounded
+  sync right before `systemctl reboot -ff` (which syncs again before it
+  resets). If the hold is gone by then it gives up, and if no reset was
+  issued earlier in this boot it withdraws the request. It writes its
+  reset record right before the last of these looks (and drops it again
+  when `u` and `b` both failed, until the look before `reboot -ff`), so a
+  supervisor killed outright during the record syncs, settles or that
+  sync (the unit watchdog, SIGKILL) leaves none, and the restart
+  withdraws the request. It is refused when its reset record cannot be
+  written and no earlier reset in this boot recorded one. Stopping the service (`systemctl stop`, a kill
   by hand) withdraws a request that has no reset behind it, because an
   explicit stop does not restart the service and the startup cleanup
   would not run. That includes a stop after the reset record is written
