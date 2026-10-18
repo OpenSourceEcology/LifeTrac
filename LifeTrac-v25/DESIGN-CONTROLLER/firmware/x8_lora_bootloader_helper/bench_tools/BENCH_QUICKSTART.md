@@ -126,21 +126,24 @@ TI=$TRACTOR_PROBE_IMAGE                                 # tractor probe image
 
 ## 3. Radio firmware (L072)
 
-Both boards run the bench build **`0c1bb0a9`**. The production
-`build/firmware.bin` (`589c1203`) refuses the bench carrier pin, so do not put
-it on a bench board.
+Both boards run the bench build **`e083ae46`** (since 2026-10-18). The
+production `build/firmware.bin` (`148de24e`) refuses the bench carrier pin,
+so do not put it on a bench board.
 
 ```powershell
 # PowerShell (mingw32-make does not work from Git Bash)
 cd LifeTrac-v25\DESIGN-CONTROLLER\firmware\murata_l072
 mingw32-make check
 mingw32-make bench
-(Get-FileHash build\firmware_bench_diag.bin -Algorithm MD5).Hash   # 0C1BB0A9573F813137F941DFA47177D0
+(Get-FileHash build\firmware_bench_diag.bin -Algorithm MD5).Hash   # E083AE46A64686031B39866ECA42E094
 ```
 
 A different md5 means a different toolchain; see the toolchain section of
 [murata_l072/README.md](../../murata_l072/README.md). If you have no
 toolchain, the same bytes are committed as
+[`firmware_bench_diag_e083ae46.bin`](../../../bench-evidence/RS_12_15_reverse_delivery_2026-10-18/firmware_flash/firmware_bench_diag_e083ae46.bin).
+The previous build, `0c1bb0a9` (on both boards 2026-09-15 → 2026-10-18), is
+the rollback image:
 [`firmware_bench_diag_0c1bb0a9.bin`](../../../bench-evidence/RS_13_vector_scene_2026-09-26/firmware/).
 
 Flash with [`flash_l072.sh`](flash_l072.sh), which is

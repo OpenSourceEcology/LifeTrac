@@ -357,9 +357,9 @@ Where it lives:
 ## 6. Bench checks (PWR-1)
 
 None of these asks the L072 to transmit, but each reboots or power-cycles a
-board, so each follows the bench power-up procedure: the first boot of each
-board after 2026-10-12 starts with the checks in BENCH_BOARDS "Not yet
-observed: the next boot"; arm `legs/power_up_guard.sh --wait-power-cycle
+board, so each follows the bench power-up procedure: each boot starts with
+the checks in BENCH_BOARDS "The next boot: observed 2026-10-18" (its list
+for a later boot; the first boot after 2026-10-12 passed them); arm `legs/power_up_guard.sh --wait-power-cycle
 --no-park` before every test reboot or cut (it stops `lifetrac-camera` and
 `tractor-camera` and restages `/tmp`); park both radios at the end. Each
 check needs Dorkmo's OK for bench time.

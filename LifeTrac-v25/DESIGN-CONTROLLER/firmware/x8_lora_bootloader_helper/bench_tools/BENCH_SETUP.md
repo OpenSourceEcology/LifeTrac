@@ -299,11 +299,12 @@ until you flash the LifeTrac build.
 
 1. **Build** in PowerShell, in `LifeTrac-v25/DESIGN-CONTROLLER/firmware/murata_l072`:
    `mingw32-make bench` makes `build/firmware_bench_diag.bin`, md5
-   `0c1bb0a9573f813137f941dfa47177d0`. Use arm-none-eabi-gcc 12.2.1
+   `e083ae46a64686031b39866eca42e094` (before #152: `0c1bb0a9`). Use
+   arm-none-eabi-gcc 12.2.1
    (Arm GNU Toolchain 12.2.MPACBTI-Rel1); the toolchain and the expected md5
    are in [`murata_l072/README.md`](../../murata_l072/README.md). The
-   committed `build/firmware.bin` (md5 `589c120323c2d5e7ef9f459d7a4ba42d`)
-   is the production image. Do not put it on a bench board: it refuses the
+   committed `build/firmware.bin` (md5 `148de24e1f9acce417c46c2c69a5be6b`;
+   before #152: `589c1203`) is the production image. Do not put it on a bench board: it refuses the
    bench's diagnostic register writes.
 2. **Flash** with [`flash_l072.sh`](flash_l072.sh), which does
    [FLASH_RUNBOOK.md](../FLASH_RUNBOOK.md) §1–§2 from the PC and reads
@@ -369,10 +370,10 @@ does the full staging.
   the readback is not `0x80`, run `radio_park.py`.
 - **Base:** if it does not show up on USB, use ssh
   (`provision_bench_board.sh base --ssh --check` works over ssh).
-- **Original pair, at the first power-up after 2026-10-12:** the boot-unit
-  retirement has not been seen across a boot yet. Do the checks in
-  [BENCH_BOARDS.md](BENCH_BOARDS.md#not-yet-observed-the-next-boot) first,
-  before any probe.
+- **Original pair:** the boot-unit retirement held at the first boot after
+  it (2026-10-18,
+  [BENCH_BOARDS.md "The next boot: observed 2026-10-18"](BENCH_BOARDS.md#not-yet-observed-the-next-boot)).
+  At a later power-up, run the same checks first, before any probe.
 
 ## Troubleshooting
 

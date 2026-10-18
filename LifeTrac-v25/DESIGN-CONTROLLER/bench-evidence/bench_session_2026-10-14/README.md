@@ -167,7 +167,8 @@ base, against the deployed `f6e4b463` tree: `Ran 47 tests in 11.316s`, `OK`
 ### Staging and scene
 
 At 00:29:20Z the tractor's `/tmp/lifetrac_strict` was staged from
-`fb96439c`: 15 helper files and a 37-file code tree, all md5 `ok`
+`fb96439c`: 14 helper files plus `08_boot_user_app.cfg`, and a 37-file code
+tree, all md5 `ok`
 ([`staging_tractor.txt`](step1/staging_tractor.txt)). The passes ran
 `camera_service.py` and `x8_image_pipeline` from the image's `/app`, with
 `lora_proto` and `image_pipeline` taken from the staged tree (`/work`), as
@@ -314,9 +315,12 @@ topics from earlier radio sessions, not from the desk check, which never
 published into it: `control/link_airtime`,
 `control/encode_mode_override {"mode":"mono_g4"}`,
 `status/radio_profile/rx` (`"reverted: link silent"`),
-`status/radio_profile/tx` and `status/encode_mode` (mono_g4). The harness
-cleared `encode_mode_override`, `req_keyframe` and `radio_profile` on the
-base at the start of the next radio leg
+`status/radio_profile/tx` and `status/encode_mode` (mono_g4).
+`clear_retained.py`, run through the session helper
+([`rs1215.sh`](../RS_12_15_reverse_delivery_2026-10-18/scripts/rs1215.sh)
+`clear`, from the RS-12.15 round), cleared
+`encode_mode_override`, `req_keyframe` and `radio_profile` on the base at
+15:57:01Z, before the harness started leg V
 ([`legV_clear_retained.txt`](../RS_12_15_reverse_delivery_2026-10-18/legs/legV_clear_retained.txt)).
 
 **The container logs are empty.**
@@ -340,7 +344,8 @@ No board had been rebooted since the three boot units were retired on
 ([retirement README](../board_state_2026-10-12_unit_retirement/README.md)),
 so this boot is the "next boot" that
 [BENCH_BOARDS.md](../../firmware/x8_lora_bootloader_helper/bench_tools/BENCH_BOARDS.md#not-yet-observed-the-next-boot)
-lists checks for.
+lists checks for, in the section now titled "The next boot: observed
+2026-10-18" (until this change, "Not yet observed: the next boot").
 
 **Base on USB.** The base came back on USB this time.
 `provision_bench_board.sh` reached it over adb (`2D0A1209DABC240B`), where
@@ -357,8 +362,9 @@ base did not enumerate on USB.
 starts it when the camera enumerates
 ([`99-w2-01-c2.rules`](../../firmware/x8_lora_bootloader_helper/99-w2-01-c2.rules),
 line 37). It started `tractor-mosquitto` and `tractor-camera` at 08:20:27–29
-on the tractor's clock, both on `lifetrac-tractor-x8:latest`, which is
-`b2a3c8070240` since step 2. At 08:28:33 tractor time (about 15:36Z) the
+on the tractor's clock: `tractor-camera` on `lifetrac-tractor-x8:latest`
+(`b2a3c8070240` since step 2) and `tractor-mosquitto` on
+`eclipse-mosquitto:2`. At 08:28:33 tractor time (about 15:36Z) the
 camera was stopped before any probe, as at every power-up. Afterwards the
 unit read `failed`, the x8-* containers were the only ones Up, and
 `uart_chk` was empty
@@ -369,8 +375,8 @@ The 40 B is the `n_fragments * 40` fallback that `camera_service` uses when
 `lora_proto` does not import. The image carries no `lora_proto.py` (its
 build context is `firmware/tractor_x8`), as RS13_VECTOR_LEG.md step 1 says.
 
-The checks of BENCH_BOARDS.md "Not yet observed: the next boot", plus the
-journal of the retired units:
+The checks of that BENCH_BOARDS.md section, plus the journal of the retired
+units:
 
 | check | base | tractor |
 |---|---|---|
@@ -448,21 +454,25 @@ The boards were left on it with both radios at `0x80`
    before teardown and before any reboot: with the journald driver they do
    not survive a reboot. The bring-up guard that refused on an exited
    `rx_smoke` should allow exited harness leftovers, as Step 3 does.
-4. **`fb96439c` is only on the session branch.** It needs to reach `main`
-   with this evidence. `deploy_base.sh`'s adb path has the same fix but has
-   not been exercised. Now that the base is back on adb, it could be.
-5. **BENCH_BOARDS.md is out of date in three places.** "Not yet observed:
-   the next boot" has now been observed (above), which also settles the open
-   item "Confirm the retirement at the next boot of each board". The base's
-   access line says it did not enumerate on USB after the 10-10 power cycle,
-   and on 10-18 it did.
+4. **`fb96439c` goes to `main` with this evidence.** It was made on the
+   session branch, which carries this folder. `deploy_base.sh`'s adb path
+   has the same fix but has not been exercised. Now that the base is back on
+   adb, it could be.
+5. **BENCH_BOARDS.md updated in the same change** (it was out of date in
+   three places on 2026-10-18): the next-boot section now records the
+   2026-10-18 boot, the open item "Confirm the retirement at the next boot of
+   each board" is closed, and the base's access line says it is back on
+   USB/adb.
 6. **Production camera unit, 40 B VECTOR cold budget.** When
    `lifetrac-camera.service` runs `b2a3c8070240` without the `/work` mount,
    it cannot import `lora_proto` and would hold VECTOR to 40 B until a
    `link_budget` arrives. This does no harm today: it boots in mode 0 and is
    stopped at every bench power-up. It matters for any production use of
    VECTOR. Either `lora_proto.py` goes into the tractor image, or
-   `fragment.py` stops depending on it.
+   `camera_service.py` (its link-budget code imports `lora_proto` itself)
+   and `fragment.py` both stop depending on it. Tracked in
+   [TODO.md](../../TODO.md), RS-13, "Production camera unit, 40 B VECTOR cold
+   budget".
 7. Low priority: the May copy `docker-compose.video-test.yml.bak_20260527_152255`
    is still in the base's deployed tree.
 

@@ -2830,8 +2830,8 @@ conflicts. Every leg needs GO; radios stay parked between legs.
       in scan FAILED, loss 6.5 % (130/2010), max gap 0.6 s, kept 0 (no LOCK while FAILED).
   Every leg: tractor clk_demotion_reset 0, tx_first_anchor 1 (no echo adopted),
   fhss_dec_snapped 0, fhss_dec_rej_epoch_drift 0; base tx_stream_streak_max 1; no
-  gap over 3 s; stop rule never tripped. The 2026-10-14 PASS (>= 60 % delivered vs
-  v2's 26 / 4.7 / 14 %, max gap <= 1 s, loss not worse than leg U's 10.5 %) is met
+  gap over 3 s; stop rule never tripped. The 2026-10-14 plan and PASS/STOP criteria (>= 60 % delivered vs
+  v2's 26 / 4.7 / 14 %, max gap <= 1 s, loss not worse than leg U's 10.5 %, ...; in full: `git show 3c8ced60:LifeTrac-v25/DESIGN-CONTROLLER/TODO.md`, lines 2820-2835, restated in RESULTS.md "Scored legs") are met
   on V, W2 and X; W as flown had 10.6 % with its injector late, and W2 re-flew it. Boards stay on `e083ae46`.
   Open for the design owner: closing the decay window (a grid-policy change
   that touches the F6 recovery tier; the 1 fps gap is the same question); a
@@ -3474,7 +3474,8 @@ explicit GO)
   - P8 as an absolute bound, p95 ≤ the 350 ms budget (A17);
   - P6's return clause to count the in-flight frame (A18);
   - write the FHSS P6 bound on paper.
-- [x] **Images — DONE 2026-10-14/15** (no radio; record
+- [~] **Images — both rebuilt and step 0/1 run 2026-10-14/15; the bw500 video
+  pass at 243 B is still open** (no radio; record
   [`bench_session_2026-10-14/`](bench-evidence/bench_session_2026-10-14/)).
   Planned: rebuild both images from a SHA with the A16 fix and the
   `vector_stats` counters (the deployed base `4623980c2dac`, `d3751286`,
@@ -3507,7 +3508,10 @@ explicit GO)
     fragment) until link_budget arrives (provisional 243 B)"
     ([log](bench-evidence/bench_session_2026-10-14/step1/step1_camera_service_bw500_moving.log));
     frame bytes max 203 on every pass. The bw500 video pass is therefore not
-    yet the P8 reference for bw500 legs: re-run it after the kit fix below.
+    yet the P8 reference for bw500 legs.
+  - [ ] **Open:** re-run the bw500 video pass (camera-only) at 243 B after
+    the `step1_pass.sh` fix in the bench-kit follow-ups below. Close this
+    item when that pass is recorded.
 - [ ] **RS-13.2 desk check:** the browser on the production compose (base:
   `mosquitto` + rebuilt `web_ui` only), replaying the round-4 captures. Merged in
   #143:
@@ -3619,16 +3623,32 @@ explicit GO)
     [W](bench-evidence/RS_12_15_reverse_delivery_2026-10-18/legs/legW_deltas.txt),
     [W2](bench-evidence/RS_12_15_reverse_delivery_2026-10-18/legs/legW2_deltas.txt),
     [X](bench-evidence/RS_12_15_reverse_delivery_2026-10-18/legs/legX_deltas.txt)).
-    The tractor's restart at 0 after its SWD reset. Score base deltas as
-    post minus pre and the tractor's as post after a reset;
-    [`scripts/deltas.py`](bench-evidence/RS_12_15_reverse_delivery_2026-10-18/scripts/deltas.py)
-    does both. Still to find out: whether the pulse reaches the base L072's
-    NRST at all.
+    The tractor's counters restart at 0 when its SWD reset lands, which the
+    harness does not check (it did not land on leg V, the first leg after
+    the flash reboot: RESULTS Observation 3). Score with
+    [`scripts/deltas.py`](bench-evidence/RS_12_15_reverse_delivery_2026-10-18/scripts/deltas.py):
+    post after a reset (any counter decreased), post minus pre otherwise.
+    Still to find out: whether the pulse reaches the base L072's NRST at
+    all, and whether the harness should check that the tractor's reset
+    landed.
   - Seen again for RS-12.21: the post-leg parks took up to three attempts per
     board (`PARK_TRANSIENT` / `PARK_FAIL` while the scan SM was still walking)
     before `PARK_OK` (`legs/leg*_park.txt`); the end-of-round check read
     `0x80` on both
     ([check](bench-evidence/RS_12_15_reverse_delivery_2026-10-18/legs/session_end_radio_check.txt)).
+- [ ] **Production camera unit, 40 B VECTOR cold budget** (found 2026-10-18,
+  no radio). The tractor image `b2a3c8070240` has no `lora_proto.py` (its
+  build context is `firmware/tractor_x8`), so without the bench's `/work`
+  mount `camera_service` holds VECTOR to its `n_fragments * 40` = 40 B
+  fallback until a `link_budget` arrives: the boot-started unit logged
+  "VECTOR budget 40 B (one fragment) until link_budget arrives (provisional
+  None B)"
+  ([log](bench-evidence/bench_session_2026-10-14/power_cycle_2026-10-18/01_tractor_camera_stop.txt)).
+  No harm today (it boots in mode 0 and is stopped at every bench power-up).
+  Before any production VECTOR leg, put `lora_proto.py` in the tractor
+  image, or make `camera_service.py` (its link-budget code imports
+  `lora_proto` itself) and `x8_image_pipeline/fragment.py` stop depending on
+  it.
 - [ ] Production-stack VECTOR legs, after B1, RS-9.2/9.4 and a production-legal
   DTS carrier (RS-11.7). The boards run the bench (register-write diag) L072
   build.

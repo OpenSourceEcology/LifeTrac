@@ -5,7 +5,11 @@ flashed with the RS-12.15 reverse-delivery fix (bench build `e083ae46`) and
 four profile-1 legs were flown. Legs V (camera), W2 (synthetic feed, the
 re-fly of W) and X (synthetic feed, commands only after the tractor's scan
 machine had reached FAILED) meet every PASS criterion of the TODO item
-([TODO.md](../../TODO.md), "RS-12.15 (reverse-delivery half)"). The tractor
+"RS-12.15 (reverse-delivery half)" as it was written before the round. In
+[TODO.md](../../TODO.md) that plan and its PASS/STOP block have since been
+replaced by these results. The original text is lines 2820–2835 of
+`git show 3c8ced60:LifeTrac-v25/DESIGN-CONTROLLER/TODO.md` (the #152
+merge), and "Scored legs" below restates each criterion. The tractor
 heard 22/23 (V), 72/72 (W2) and 36/36 (X) of the base's commands. On the v2
 firmware it heard 2/43 and 7/49 on the camera legs T and U, and 19/72 on the
 synthetic leg R. No stop rule tripped. Leg W as flown started its injector
@@ -13,7 +17,7 @@ synthetic leg R. No stop rule tripped. Leg W as flown started its injector
 boards were left on `e083ae46`, and a check at 16:41Z found both radios
 parked (`0x80`).
 
-The leg letters V, W and X follow the TODO's plan. This leg V is not the
+The leg letters V, W and X follow that plan. This leg V is not the
 RS-1.4 leg V of 2026-09-15
 ([RS_1_4_auto_policy_2026-09-15](../RS_1_4_auto_policy_2026-09-15/RESULTS.md)).
 
@@ -59,9 +63,11 @@ and from 10/33 to 33/33 in scan FAILED.
 - At about 15:28 the operator power-cycled both boards (the base reported
   9 min of uptime at 15:37:02,
   [03_nextboot_base.txt](../bench_session_2026-10-14/power_cycle_2026-10-18/03_nextboot_base.txt)).
-  The tractor's radio came back up listening (RXCONT, `0x85`). The power-up
-  guard parked it (PARK_OK at 15:38:02) and found the base already at `0x80`
-  ([04_power_up_guard.txt](../bench_session_2026-10-14/power_cycle_2026-10-18/04_power_up_guard.txt)).
+  Both radios came back up listening (RXCONT, `0x85`). The power-up guard
+  parked the tractor (PARK_OK at 15:38:02) and the base (PARK_OK at
+  15:38:38), and both then read `0x80`
+  ([04_power_up_guard.txt](../bench_session_2026-10-14/power_cycle_2026-10-18/04_power_up_guard.txt),
+  [05_radio_recheck.txt](../bench_session_2026-10-14/power_cycle_2026-10-18/05_radio_recheck.txt)).
   The rest of that boot is in
   [bench_session_2026-10-14](../bench_session_2026-10-14/).
 
@@ -84,24 +90,28 @@ and the watchdog).
 | rs116 health | 15:56:02: STATS-OK on attempt 1, `radio_state=4`, every radio and FHSS counter 0 except `radio_dio0=1` ([session_health_tractor.txt](legs/session_health_tractor.txt)) | 15:56:00: the same, with `radio_dio0=0` ([session_health_base.txt](legs/session_health_base.txt)) |
 
 The health probe printed `RS115-INSTRUMENTED-FIRMWARE=YES`,
-`RS12-URC-COUNTERS=YES` and `RS12-10-COUNTERS=YES` on both boards. The full
-v2 counter tail was present: `fhss_dec_*`, `clk_demotion_reset`/`_kept`,
-`tx_first_anchor` and `tx_stream_streak_max`. After the reboot,
+`RS12-URC-COUNTERS=YES` and `RS12-10-COUNTERS=YES` on both boards. The v2
+counter tail was present: `fhss_dec_aligned`/`_snapped`/`_rej_locked_out`,
+`clk_demotion_reset`/`_kept`, `tx_first_anchor` and `tx_stream_streak_max`
+(the probe lists only those three `fhss_dec_*` counters; the full set is in
+the rs115 brackets). After the reboot,
 `tractor-camera` had come back up and was stopped again
 (tractor_after_flash.txt).
 
 Between 15:54:56 and 15:55:32, `/tmp/lifetrac_strict` was re-staged on both
-boards from `bench-session-2026-10-14` at `d484a92d`: 14 tool files plus the
-37-file code tree, every file `ok`. The tractor also got
+boards from `bench-session-2026-10-14` at `d484a92d`: 14 helper files plus
+the 37-file code tree, every file `ok`. The tractor also got
 `08_boot_user_app.cfg`
 ([staging_tractor.txt](legs/staging_tractor.txt),
 [staging_base.txt](legs/staging_base.txt)).
 
-`flash_l072.sh` printed "not a recorded build" for this image. Its md5 list
-(`case "$MD5"` in
+`flash_l072.sh` printed "not a recorded build" for this image
+(preflight_tractor.txt, flash_tractor.txt and the base equivalents). At the
+flash, its md5 list (`case "$MD5"` in
 [flash_l072.sh](../../firmware/x8_lora_bootloader_helper/bench_tools/flash_l072.sh))
-does not have `e083ae46` yet, and it still describes `0c1bb0a9` as the build
-on both boards.
+did not yet have `e083ae46` and still described `0c1bb0a9` as the build on
+both boards. The list was updated after the round: `e083ae46` and `148de24e`
+were added, and `0c1bb0a9` / `589c1203` are kept as the previous builds.
 
 ## Setup
 
@@ -155,7 +165,7 @@ Each leg ran the same steps:
 
 [scripts/rs1215.sh](scripts/rs1215.sh) is the session helper used for these
 steps. [scripts/deltas.py](scripts/deltas.py) scores the brackets against the
-TODO's criteria (see "Counter resets" below).
+plan's criteria (see "Counter resets" below).
 
 The post step also tried to pull an RS-13 base capture (`rs13_cap_base`).
 This round never ran one, so every `leg*_post_transcript.txt` shows
@@ -211,6 +221,17 @@ U also published only to `tile_delta` (477 and 537 frames in their
   `fhss_dec_aligned` equals its `radio_rx_ok` on every leg, and its TX log
   shows the same number of decoded commands ("tractor decoded cmds" in
   `leg*_gaps.txt`).
+- **Delivery counts radio frames,** every send including retries, as the
+  TODO item defines it. It does not say whether the base's command layer saw
+  each command through. That layer retries a pending command until the
+  acknowledgement it waits for arrives (a keyframe for `0x60`, an
+  `ENCODE_MODE_ACK` for `0x63`) or its deadline passes. It logged
+  `cmd … GAVE UP` once in W (`0x60`), four times in W2 (three `0x60`, one
+  `0x63`), once in X (`0x63`) and never in V (each leg's `rx_daemon.log`).
+  X's give-up came at 16:34:26.258, after the injector had finished; the last
+  two X sends (16:34:19.152 and 16:34:22.679) were its retries, and the
+  tractor's counters show them received. This round did not look into why
+  those acknowledgements did not arrive.
 - **Loss** compares fragments sent with fragments decoded. Fragments sent are
   the per-frame TX events in `tx_daemon.log`; fragments decoded are the
   `frag_arrival` lines in the base's `rx_daemon.log`. This is what
@@ -220,7 +241,7 @@ U also published only to `tile_delta` (477 and 537 frames in their
 
 ### Scored legs
 
-| TODO criterion | V (camera) | W2 (synth, W re-fly) | X (post-FAILED) |
+| criterion (TODO plan, `3c8ced60` lines 2829–2835) | V (camera) | W2 (synth, W re-fly) | X (post-FAILED) |
 |---|---:|---:|---:|
 | delivery ≥ 60 % | **22/23 = 95.7 %** | **72/72 = 100 %** | **36/36 = 100 %** |
 | tractor `clk_demotion_reset` = 0 | 0 | 0 | 0 |
@@ -400,9 +421,11 @@ Sources: [legX_faults.txt](legs/legX_faults.txt),
   ([sx1276_rx_scan_fail.h](../../firmware/murata_l072/include/sx1276_rx_scan_fail.h)).
 - **The base was silent until 16:32:16.957.** Its `radio_tx_ok` delta (36)
   equals its 36 `command TX` lines, all at or after that time, so no base
-  traffic could LOCK the tractor before FAILED. The TODO's "if base
-  background traffic keeps LOCKing it" case did not arise.
-- **The silence was about 2 min, not the planned ≥ 150 s.** The final fault
+  traffic could LOCK the tractor before FAILED. The plan's "if base
+  background traffic keeps LOCKing it" case (TODO item as merged in #152,
+  `3c8ced60`, line 2827) did not arise.
+- **The silence was about 2 min, not the planned ≥ 150 s** (the same plan,
+  line 2825). The final fault
   came at 117 s after MONITORING and the injector started on it. The
   condition the leg exists for still held: the tractor was in scan FAILED
   before any command went on air.
@@ -430,8 +453,11 @@ Sources: [legX_faults.txt](legs/legX_faults.txt),
      reset and then uses the post value. On W, W2 and X it caught the reset
      through at least two counters. For W2 these were `radio_crc_err` 1 → 0
      and `tx_done_to_rearm_max_us`; in the same leg `host_parse_ok` went
-     1368 → 1395 across 1239 TXs. The rule would miss a reset if every
-     counter happened to end above its pre-leg value.
+     1368 → 1379 across 1239 TXs, which only a reset explains
+     ([legW2_pre_tractor.txt](legs/legW2_pre_tractor.txt),
+     [legW2_post_tractor.txt](legs/legW2_post_tractor.txt)). The rule
+     would miss a reset if every counter happened to end above its pre-leg
+     value.
    - **Base.** The base's counters were never reset. They accumulated
      through all four legs (`radio_tx_ok` 0 → 23 → 50 → 122 → 158), so
      post − pre is the right delta there.
@@ -452,7 +478,9 @@ Sources: [legX_faults.txt](legs/legX_faults.txt),
      [legV_pre_tractor.txt](legs/legV_pre_tractor.txt),
      [legV_post_tractor.txt](legs/legV_post_tractor.txt)). After a reset,
      both counters would have restarted.
-   - **Scoring is unaffected:** every radio counter was 0 at V's pre bracket.
+   - **Scoring is unaffected:** every scored counter (`radio_rx_ok`,
+     `radio_tx_ok`, `fhss_*`, `clk_*`, `tx_first_anchor`) was 0 at V's pre
+     bracket, so post − pre equals post.
    - **Same pattern on 09-14/15.** The first leg after each flash there shows
      the same carry-over: `host_errors` 97765 / 118306 / 46836 unchanged
      across legs R, T and U (their `pre_tractor` and `post_tractor`
@@ -473,7 +501,8 @@ Sources: [legX_faults.txt](legs/legX_faults.txt),
    runbook's step "On the first `published frame_id` line start the
    injector"
    ([BENCH_RUNBOOK.md](../../firmware/x8_lora_bootloader_helper/bench_tools/BENCH_RUNBOOK.md))
-   needs that kind of trigger on the synthetic feed.
+   needs that kind of trigger on the synthetic feed. The runbook now says so
+   (added in the same change as this file).
 
 5. **The final RX_SCAN_FAILED sub byte is `0x83`, not `0x84`.** Bits 3..0
    are the index of the current attempt, counted from 0. With
@@ -556,8 +585,11 @@ The tractor's wall clock read 2026-09-29 throughout. At the flash it read
 08:43:11 at `T3`, just before the reboot, and 08:42:41 at "up 0 min" after it
 (tractor_after_flash.txt).
 
-Within this round's single boot it ran a steady 7 h 09 min 09 s (± about 1 s)
-behind PC time. Two independent measurements agree:
+Within this round's single boot it ran a steady 19 days 7 h 09 min 09 s
+behind PC time: at the end of the round it read 09:32:39 while the PC read
+16:41:49 on 2026-10-18 (session_end_radio_check.txt). The conversions below
+use only the time-of-day offset, 7 h 09 min 09 s (± about 1 s). Two
+independent measurements agree on it:
 
 - The X watcher logged each fault 7 h 09 min 09.4–10.6 s after its tractor
   stamp (legX_faults.txt; it polls every 2 s).
@@ -629,7 +661,10 @@ after 15:53.
   - `clear_retained`: the base broker cleared before the leg.
   - `pre_base`, `pre_tractor`, `post_base`, `post_tractor`: the rs115
     brackets.
-  - `deltas`: `deltas.py` scoring against the TODO criteria.
+  - `deltas`: `deltas.py` scoring against the plan's criteria. Its
+    "criteria (DC/TODO.md RS-12.15 reverse-delivery PASS / STOP)" line means
+    the TODO text as it was before the round (at `3c8ced60`; see the
+    Status paragraph).
   - `report`: `rs12_leg_report.py` (W and X cut at 1 024 B).
   - `gaps`: `frag_gap_report.py`.
   - `p2p4`: archive greps (published frames, TX trains, drops, tractor
@@ -667,7 +702,9 @@ Each holds `params.txt`, `tx_daemon.log` and `rx_daemon.log`, plus either
 
 - [RS_12_15_clock_authority_2026-09-14/RESULTS.md](../RS_12_15_clock_authority_2026-09-14/RESULTS.md)
   and its `legs/`: legs R, T and U.
-- [TODO.md](../../TODO.md): the RS-12.15 reverse-delivery item and its PASS
-  criteria.
+- [TODO.md](../../TODO.md): the RS-12.15 reverse-delivery item, now with
+  this round's results. Its ON-AIR plan and PASS/STOP criteria as written
+  before the round are lines 2820–2835 of
+  `git show 3c8ced60:LifeTrac-v25/DESIGN-CONTROLLER/TODO.md` (#152).
 - [bench_session_2026-10-14](../bench_session_2026-10-14/): the image build
   and the 2026-10-18 power cycle.

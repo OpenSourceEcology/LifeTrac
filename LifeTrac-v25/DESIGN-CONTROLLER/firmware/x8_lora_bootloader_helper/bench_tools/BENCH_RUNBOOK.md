@@ -171,11 +171,15 @@ does it right; the harness itself has no injector hook yet (TODO, RS-13
 bench-kit follow-ups). After `archived to ...`:
 post-brackets both boards, `rs12_leg_report.py`, `frag_gap_report.py`,
 copy brackets/injector/report transcripts into the evidence `legs/` dir.
-Counter deltas: the harness resets the tractor's L072 at leg start (SWD), so
-its counters restart at 0 and its delta is the post value. The base's L072
-counters are **not** reset by the harness's gpio163 pulse and accumulate
-across legs (2026-10-18), so its delta is post minus pre.
-`RS_12_15_reverse_delivery_2026-10-18/scripts/deltas.py` handles both.
+Counter deltas: the harness fires an SWD reset of the tractor's L072 at leg
+start and does not check it. It usually lands and the counters restart at
+0, but not always: it did not on the first leg after a flash reboot
+(2026-10-18 leg V, RESULTS Observation 3; legs R, T and U of 09-14/15 too).
+The base's L072 counters are **not** reset by the harness's gpio163 pulse
+and accumulate across legs (2026-10-18). Score with
+`RS_12_15_reverse_delivery_2026-10-18/scripts/deltas.py`: it treats any
+counter that decreased as a reset and only then takes the post value, and
+takes post minus pre otherwise.
 Then `radio_park.py` both → `PARK_OK` with both readbacks `0x80`. Do it
 after the post-brackets and reports, i.e. a couple of minutes after the
 daemons stopped, so the firmware's scan SM has already failed out and has
