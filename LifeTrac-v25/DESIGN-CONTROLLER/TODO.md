@@ -3958,7 +3958,7 @@ watchdogs; none of this may gate it. **On the tractor every module reset is
 an engine stop**, so tractor arming waits on PWR-8, PWR-9 and PWR-11, and
 the tractor reboots itself only when idle (Dorkmo, 2026-10-18,
 [DECISIONS.md D-PWR1](DECISIONS.md#d-pwr1--tractor-automatic-reboots-idle-only)),
-which also needs PWR-13.
+which also needs PWR-12 and PWR-13.
 
 - [ ] **PWR-1 Bench reset-reach checks** — the plan's §6 list, each with
   Dorkmo's OK and the bench power-up procedure (`power_up_guard.sh`): does
@@ -4041,18 +4041,28 @@ which also needs PWR-13.
   `firmware/x8_recovery/lifetrac-supervisor.sh` and the plan's L3 guards):
   a link service on the tractor X8, part of the Linux↔H747 link X8OS-3
   picks, writes `/run/lifetrac/tractor_idle` (`busy|idle <seq>`, or
-  `locked <seq> <id>`) at least once a second from the H747's own status
-  frames, and mirrors `/run/lifetrac/tractor_reboot_request` to the H747.
-  M7 firmware: decide what "engine stopped" reads from (only the Opta's
-  ignition sense I1 / `safety_state` `IGNITION_OFF` is wired today); report
+  `locked <seq> <id>`, all from one H747 frame) at least once a second
+  from the H747's own status frames, and mirrors
+  `/run/lifetrac-supervisor/tractor_reboot_request` to the H747. The link is
+  a host systemd unit with no dependency on `docker.service`; its directory
+  comes from a tmpfiles.d entry it owns; it only reads the request and
+  never creates, deletes or owns the request's directory (no
+  `RuntimeDirectory=` there); on stop it leaves its last line in place.
+  M7 firmware: "engine stopped" needs an engine-running signal (RPM, oil
+  pressure or alternator), not the Opta's ignition sense I1 alone, and
+  until PWR-12 makes the key-off hold survive an H747 reset the H747
+  reports busy while I1 is low or a `SHUTDOWN_REQ` is in progress; report
   idle only with every valve output off for a settling time; on a request
-  while idle, latch a motion hold that refuses every motion command until
-  the H747 resets or the link reports no request (no timeout: a stopped
-  tractor that waits for a person is the safe side), and show the operator
-  that the X8 is rebooting. Also turn off LmP's `docker.service`
+  while idle, latch a motion hold that refuses every motion command, keep
+  it while busy, re-latch it for a new request id, and release it only
+  when the H747 resets or the link reports no request (no timeout: a
+  stopped tractor that waits for a person is the safe side); show the
+  operator that the X8 is rebooting. Also turn off LmP's `docker.service`
   `FailureAction=reboot` on the tractor (drop-in, after checking the unit on
   the bench), since it reboots without waiting for idle; the supervisor
-  covers that fault with an idle-gated reboot. Gates tractor arming.
+  covers that fault with an idle-gated reboot (`CHECK_DOCKER=1`), and LmP
+  ties it to OTA rollback, so a Docker-breaking update then rolls back only
+  through the armed supervisor. Gates tractor arming.
 
 ---
 

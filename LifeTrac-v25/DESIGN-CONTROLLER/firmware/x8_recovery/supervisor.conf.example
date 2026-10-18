@@ -41,8 +41,8 @@
 # itself (its status file shows reboot_blocked=tractor_reboot_disabled).
 ROLE=tractor
 
-# Leave at 0 on a tractor until TODO.md PWR-8, PWR-9, PWR-11 and PWR-13 are
-# done. Even at 1 a tractor reboots only while idle (DECISIONS.md D-PWR1):
+# Leave at 0 on a tractor until TODO.md PWR-8, PWR-9, PWR-11, PWR-12 and
+# PWR-13 are done. Even at 1 a tractor reboots only while idle (DECISIONS.md D-PWR1):
 # the H747 must report a live "idle" in /run/lifetrac/tractor_idle and then
 # confirm a motion hold for the reboot; without the H747 link service
 # (PWR-13) every tractor reboot is blocked (reboot_blocked=tractor_not_idle).
@@ -124,8 +124,9 @@ REBOOT_MAX_CONSECUTIVE=3
 HEALTHY_RESET_S=1800
 # Still alive this long after `systemctl reboot` was accepted -> forced path
 # (sysrq s,u,b, then `systemctl reboot -ff`), but only if the node still has a
-# fault and the gates still pass (armed, not HELD, tractor gate). Matches the
-# 3 min reboot.target JobTimeoutSec drop-in (min 1).
+# fault and the gates still pass (armed, not HELD, tractor gate and, on a
+# tractor, the H747's motion hold). Matches the 3 min reboot.target
+# JobTimeoutSec drop-in where L2 is installed (not the tractor) (min 1).
 FORCE_REBOOT_AFTER_S=180
 # Pause between the sysrq s, u and b writes (0..10).
 SYSRQ_SETTLE_S=3

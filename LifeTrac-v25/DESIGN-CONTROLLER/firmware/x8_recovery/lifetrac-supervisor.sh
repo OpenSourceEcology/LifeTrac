@@ -11,7 +11,10 @@
 #   lifetrac-supervisor.sh clear-hold  # leave HELD and zero the reboot counter
 #
 # `once` takes the same actions as `run` when the board is armed. Do not run it
-# by hand on an armed board while the service is active (they share state).
+# by hand on an armed board while the service is active (they share state, and
+# on a tractor one instance's start can withdraw the other's motion-hold
+# request; the look right before `systemctl reboot` catches that, but there is
+# no lock between instances).
 #
 # Why it is shaped this way (2026-10-17, from the adversarial review of the
 # reboot plan):
@@ -53,26 +56,40 @@
 #     link) and the two files below; no such service exists yet, so today
 #     this gate blocks every tractor reboot. Contract:
 #       $IDLE_FILE (/run/lifetrac/tractor_idle), written by the link service
-#       at least once a second, tmp + rename. First line:
+#       at least once a second, tmp + rename, in a directory the link service
+#       owns. First line:
 #         busy <seq>          not idle, or the H747 does not know
 #         idle <seq>          engine stopped and every valve output off
 #         locked <seq> <id>   idle, and the H747 holds motion off for
 #                             reboot request <id>
 #       <seq> is a token from the H747's own status frames (1-32 letters or
 #       digits) that changes at least once a second; the link service copies
-#       it and never makes one up. A file whose <seq> does not change while
-#       the supervisor watches is not live and never reads as idle.
-#       $REQ_FILE (/run/lifetrac/tractor_reboot_request), written only by
-#       the supervisor: first line <id>. The link service mirrors it to the
-#       H747 continuously. The H747 latches the hold when it sees a request
-#       while idle and releases it only when it resets or the link service
-#       reports that no request file exists. A link service that stops
-#       (shutdown) leaves the hold in place.
+#       it and never makes one up. State, <seq> and <id> come from one H747
+#       frame. A file whose <seq> does not change while the supervisor
+#       watches is not live and never reads as idle; a stopped link service
+#       leaves its last line in place. Anything other than busy, idle or
+#       locked reads as "invalid"; the file is read at most 256 bytes at a
+#       time and never through a symlink.
+#       $REQ_FILE (/run/lifetrac-supervisor/tractor_reboot_request), in a
+#       root-only directory the supervisor creates (0755, never
+#       RuntimeDirectory=, which would delete it when the shutdown stops
+#       us); the link service only reads it. First line <id>: 1-40 letters,
+#       digits or "-" (the supervisor writes <boot id prefix>-<uptime>). The
+#       link service mirrors it to the H747 continuously. The H747 latches
+#       the hold when it sees a request while idle, keeps it while busy, and
+#       releases it only when it resets or the link service reports that no
+#       request file exists. A new <id> while it holds keeps the hold and
+#       re-latches it for the new <id>. A link service that stops (shutdown)
+#       leaves the hold in place.
 #     The supervisor waits up to TRACTOR_IDLE_WAIT_S polls (one a second) for
 #     a live "idle", writes the request, waits again for a live
-#     "locked <seq> <id>", and withdraws the request (deletes the file) on any
-#     path where the reboot does not happen. Never overridden, OTA probation
-#     included.
+#     "locked <seq> <id>", and looks once more right before it issues the
+#     reset. Before that point it withdraws the request (deletes the file)
+#     on any path where the reboot does not happen. Once the reset is issued
+#     ($RESET_FILE, next to the request, records it for this boot) the
+#     request stays until the reset, whatever happens next: an accepted
+#     `systemctl reboot` can still land after this process gives up on it.
+#     Never overridden, OTA probation included.
 #   - ROLE has no permissive default (2026-10-17 review). A missing config,
 #     a file that does not set ROLE, a ROLE line the shell could not run
 #     (`ROLE = tractor`, a UTF-8 BOM), an invalid value, or a file that
@@ -119,7 +136,9 @@
 #        armed    the armed file; disarmed -> "WOULD reboot".
 #        lock     ROLE=tractor: the request is written and the H747 must
 #                 answer with a live "locked <seq> <id>"; otherwise the
-#                 request is withdrawn and the reboot blocked.
+#                 request is withdrawn and the reboot blocked. Checked again
+#                 (request and idle file, one read) right before
+#                 `systemctl reboot`.
 #      OTA trial boot (review finding, 2026-10-17): raising the cap alone did
 #      not let u-boot's rollback fire when the counter carried over from
 #      before the update, or when a held file was left from before it. So
@@ -142,7 +161,9 @@
 # path runs at once. If it is accepted and this process is still alive
 # FORCE_REBOOT_AFTER_S later (a shutdown job hung before it stopped us; once it
 # has stopped us, the reboot.target JobTimeoutSec drop-in in
-# systemd/reboot.target.d bounds the hang), the forced path runs only if the
+# systemd/reboot.target.d bounds the hang where L2 is installed, and on a
+# tractor, which has no L2 under D-PWR1, upstream's 30 min reboot.target
+# bound does, with motion held), the forced path runs only if the
 # gates still pass (armed, not HELD, tractor gate, and on a tractor the
 # motion hold, below), a node fault is still present and the pending marker
 # is not stale (older than
@@ -161,9 +182,11 @@
 # buys nothing and loses the sync.
 # On a tractor the forced path first looks at the motion hold: it forces when
 # $IDLE_FILE shows a live "locked <seq> <id>" for the request on disk, or
-# when the link service is not live (stopped by the shutdown: the H747 keeps
-# the hold until it resets). It does not force, and withdraws the request,
-# when the request file is gone or the link is live but not showing the hold.
+# when the link service is not live (stopped by the shutdown) and its last
+# line is that same "locked <seq> <id>" (the H747 keeps the hold until it
+# resets). It does not force when the request file is gone, the idle file is
+# missing, the live link does not show the hold, or the frozen last line is
+# anything else (busy, idle, a hold for another request).
 #
 # Reset reason (no telemetry route exists yet; a container can read the file):
 # at startup in a new boot, if $STATE/last_action names the boot id stored in
@@ -196,9 +219,12 @@
 #   last_reset_reason, consecutive_reboots, held, probation_reboot; per_boot/
 #   holds this boot's streaks, restart counts, the previous boot id and a
 #   pending reboot, and is wiped when the boot id changes. Tractor only, on
-#   tmpfs: $IDLE_FILE (read) and $REQ_FILE (written, see D-PWR1 above); a
-#   request left from an earlier run without a pending reboot is withdrawn
-#   at start.
+#   tmpfs: $IDLE_FILE (read) and $REQ_FILE (written, see D-PWR1 above), and
+#   $RESET_FILE (boot id, uptime and request id of a reset issued in this
+#   boot). A request left from an earlier run is withdrawn at start unless
+#   a reboot is pending or a reset was issued in this boot.
+#   To release a kept hold by hand: rm $REQ_FILE (a queued reboot can still
+#   land afterwards; `systemctl cancel` it first if it should not).
 # Config: ${LIFETRAC_SUPERVISOR_CONF:-/etc/lifetrac/supervisor.conf}, see
 # supervisor.conf.example. Test overrides: LIFETRAC_SUPERVISOR_ARMED_FILE,
 # LIFETRAC_SYSRQ, LIFETRAC_PROC_UPTIME, LIFETRAC_BOOT_ID_FILE,
@@ -216,10 +242,15 @@ SYSRQ=${LIFETRAC_SYSRQ:-/proc/sysrq-trigger}
 PROC_UPTIME=${LIFETRAC_PROC_UPTIME:-/proc/uptime}
 BOOT_ID_FILE=${LIFETRAC_BOOT_ID_FILE:-/proc/sys/kernel/random/boot_id}
 IDLE_FILE=${LIFETRAC_TRACTOR_IDLE_FILE:-/run/lifetrac/tractor_idle}
-REQ_FILE=${LIFETRAC_TRACTOR_REBOOT_REQUEST:-/run/lifetrac/tractor_reboot_request}
+REQ_FILE=${LIFETRAC_TRACTOR_REBOOT_REQUEST:-/run/lifetrac-supervisor/tractor_reboot_request}
+RESET_FILE=${REQ_FILE%/*}/reset_issued
 IDLE_POLL=${LIFETRAC_IDLE_POLL:-1}
 case $IDLE_POLL in
   ''|.*|*.|*[!0-9.]*|*.*.*) IDLE_POLL=1 ;;
+esac
+case $IDLE_POLL in
+  *[1-9]*) ;;
+  *) IDLE_POLL=1 ;;   # 0 would make the liveness window too short to see
 esac
 
 RUN=$STATE/per_boot
@@ -250,6 +281,9 @@ IDLE_LIVE=0
 IDLE_ST=
 IDLE_SEQ=
 IDLE_RID=
+IDLE_SEEN=
+TF_ID=
+RESET_ISSUED=0
 
 set_defaults() {
   ROLE=tractor   # fail-safe, see the header: only an explicit ROLE=base is base
@@ -700,7 +734,8 @@ startup() {
   fi
   # A request with no pending reboot behind it (this process died between
   # writing it and systemd taking the reboot, or the state was lost) must not
-  # keep the tractor's motion hold on.
+  # keep the tractor's motion hold on, unless a reset was issued in this boot
+  # (withdraw_lock keeps it then).
   if [ -e "$REQ_FILE" ] && [ ! -f "$RUN/reboot_pending" ]; then
     withdraw_lock "left from an earlier run with no pending reboot"
   fi
@@ -933,31 +968,57 @@ compute_cap() {
 
 # ------------------------------------------------- tractor idle gate (D-PWR1)
 # idle_read: set IDLE_ST, IDLE_SEQ and IDLE_RID from the first line of
-# $IDLE_FILE; fail if it is missing or empty. A <seq> that is not 1-32
-# letters or digits reads as empty, which never counts as a change.
+# $IDLE_FILE; fail if it is missing, empty, not a regular file or a symlink
+# (the link service's directory is not root's), or the read does not finish
+# in 2 s. At most 256 bytes are read. IDLE_ST is busy, idle, locked or
+# "invalid". A <seq> that is not 1-32 letters or digits reads as empty, which
+# never counts as a change; an <id> that is not 1-40 letters, digits or "-"
+# reads as empty, which never matches a request. Nothing else from the file
+# reaches the log or the status file.
 idle_read() {
   IDLE_ST=
   IDLE_SEQ=
   IDLE_RID=
-  [ -f "$IDLE_FILE" ] || return 1
-  _ir=
-  { read -r _ir < "$IDLE_FILE"; } 2>/dev/null || [ -n "$_ir" ] || return 1
+  if [ ! -f "$IDLE_FILE" ] || [ -L "$IDLE_FILE" ]; then
+    return 1
+  fi
+  _ir=$(timeout 2 head -c 256 -- "$IDLE_FILE" 2>/dev/null) || return 1
+  _ir=${_ir%%"$NL"*}
   _ir=${_ir%"$CR"}
+  [ -n "$_ir" ] || return 1
   _ir_ifs=$IFS
   IFS=" $TAB"
   # shellcheck disable=SC2086
   set -- $_ir
   IFS=$_ir_ifs
-  IDLE_ST=${1:-}
+  case ${1:-} in
+    busy|idle|locked) IDLE_ST=$1 ;;
+    *) IDLE_ST=invalid ;;
+  esac
   IDLE_SEQ=${2:-}
-  IDLE_RID=${3:-}
   case $IDLE_SEQ in
     ''|*[!0-9A-Za-z]*) IDLE_SEQ= ;;
   esac
   if [ ${#IDLE_SEQ} -gt 32 ]; then
     IDLE_SEQ=
   fi
+  IDLE_RID=${3:-}
+  case $IDLE_RID in
+    ''|*[!0-9A-Za-z-]*) IDLE_RID= ;;
+  esac
+  if [ ${#IDLE_RID} -gt 40 ]; then
+    IDLE_RID=
+  fi
   return 0
+}
+
+# idle_seen WANT: set IDLE_SEEN to what the last read showed, for logs:
+# IDLE_ST, or "locked:other_id" for a hold on a request other than WANT.
+idle_seen() {
+  IDLE_SEEN=${IDLE_ST:-none}
+  if [ "$IDLE_ST" = locked ] && [ "$1" != idle ] && [ "$IDLE_RID" != "$1" ]; then
+    IDLE_SEEN=locked:other_id
+  fi
 }
 
 # idle_probe WANT: poll $IDLE_FILE every $IDLE_POLL for up to
@@ -965,7 +1026,7 @@ idle_read() {
 # request); any other WANT is a request id and passes only on a live
 # "locked <seq> WANT". Live = <seq> differs from the first read, so a file
 # left behind by a dead link service never passes. Sets IDLE_LIVE (1 once
-# <seq> changed) and IDLE_WHY.
+# <seq> changed) and IDLE_WHY; IDLE_ST and IDLE_RID keep the last read.
 idle_probe() {
   IDLE_LIVE=0
   if ! idle_read; then
@@ -990,7 +1051,7 @@ idle_probe() {
     if [ "$1" = idle ]; then
       case $IDLE_ST in
         idle|locked) IDLE_WHY="state=$IDLE_ST"; return 0 ;;
-        *) IDLE_WHY="state=${IDLE_ST:-empty}"; return 1 ;;
+        *) IDLE_WHY="state=$IDLE_ST"; return 1 ;;
       esac
     fi
     case $IDLE_ST in
@@ -1000,21 +1061,27 @@ idle_probe() {
           return 0
         fi ;;
       idle) ;;
-      *) IDLE_WHY="state=${IDLE_ST:-empty}"; return 1 ;;
+      *) IDLE_WHY="state=$IDLE_ST"; return 1 ;;
     esac
   done
+  idle_seen "$1"
   if [ "$IDLE_LIVE" = 0 ]; then
-    IDLE_WHY="not_live:seq_unchanged_for_${TRACTOR_IDLE_WAIT_S}_polls"
+    IDLE_WHY="not_live:seq_unchanged_for_${TRACTOR_IDLE_WAIT_S}_polls:last=$IDLE_SEEN"
   else
-    IDLE_WHY="no_lock:state=${IDLE_ST:-empty}${IDLE_RID:+:$IDLE_RID}"
+    IDLE_WHY="no_lock:state=$IDLE_SEEN"
   fi
   return 1
 }
 
 # tractor_lock ID: ask the H747 to hold motion off for reboot request ID and
 # wait for it. On failure the request is withdrawn and the reboot blocked.
+# The request's directory is root-only and made here (never by the link
+# service, never RuntimeDirectory=), so no other user can plant or swap a
+# name in it.
 tractor_lock() {
-  mkdir -p "${REQ_FILE%/*}" 2>/dev/null
+  if [ ! -d "${REQ_FILE%/*}" ]; then
+    mkdir -m 0755 "${REQ_FILE%/*}" 2>/dev/null
+  fi
   if ! kv_put "$REQ_FILE" "$1"; then
     log "REFUSED reboot: cannot write the motion-hold request $REQ_FILE reason=$_rr"
     add_decision reboot_refused:lock_request
@@ -1033,11 +1100,74 @@ tractor_lock() {
   return 1
 }
 
+# lock_still_held ID: one more look right before the reset is issued (the
+# records written after tractor_lock can take a minute): the request on disk
+# is still ID and the idle file's first line is still "locked <seq> ID". One
+# read, no liveness wait: tractor_lock saw the link live moments ago, and a
+# link stopped since then leaves the H747 holding.
+lock_still_held() {
+  kv_get "$REQ_FILE" ""
+  if [ "$KV" != "$1" ]; then
+    IDLE_WHY="request_gone_or_changed"
+    return 1
+  fi
+  if ! idle_read; then
+    IDLE_WHY="missing:$IDLE_FILE"
+    return 1
+  fi
+  if [ "$IDLE_ST" != locked ] || [ "$IDLE_RID" != "$1" ]; then
+    idle_seen "$1"
+    IDLE_WHY="no_lock:state=$IDLE_SEEN"
+    return 1
+  fi
+  return 0
+}
+
+# reset_issued: did this boot issue a tractor reset (an accepted or timed-out
+# `systemctl reboot`, or the forced path)? Then the request stays until the
+# reset. $RESET_FILE is on tmpfs, so it goes with the reboot; one naming
+# another boot (only where it is not tmpfs, e.g. the SIL tests) does not
+# count. An unreadable one does.
+reset_issued() {
+  [ "$RESET_ISSUED" = 1 ] && return 0
+  [ -e "$RESET_FILE" ] || return 1
+  kv_get "$RESET_FILE" ""
+  _ri=${KV%% *}
+  if [ -n "$_ri" ] && [ "$_ri" != "$BOOT_ID" ]; then
+    return 1
+  fi
+  return 0
+}
+
+# mark_reset_issued ID: record that a reset for request ID is about to be
+# issued in this boot. Fails if the record cannot be written.
+mark_reset_issued() {
+  RESET_ISSUED=1
+  kv_put "$RESET_FILE" "$BOOT_ID $UP $1"
+}
+
+# clear_reset_issued: the reset this rung was about to issue was not issued
+# (refused, or `systemctl reboot` failed outright, not a timeout, so systemd
+# queued nothing), and none was issued earlier in this boot.
+clear_reset_issued() {
+  RESET_ISSUED=0
+  rm -f "$RESET_FILE" 2>/dev/null
+  if [ -e "$RESET_FILE" ]; then
+    RESET_ISSUED=1
+    log "ERROR cannot remove $RESET_FILE: the motion-hold request stays until the reset or a person removes $REQ_FILE"
+  fi
+}
+
 # withdraw_lock WHY: delete the request, so the link service tells the H747
 # to release its motion hold. Called on every path where the reboot does not
-# happen.
+# happen; a no-op once a reset has been issued in this boot (reset_issued):
+# systemd may still carry the reboot out, so the hold stays until it does.
 withdraw_lock() {
   [ -e "$REQ_FILE" ] || return 0
+  if reset_issued; then
+    log "LOCK kept ($1): a reset was issued in this boot ($RESET_FILE), so $REQ_FILE stays and the H747 keeps holding motion off until the reset; to release it by hand, remove $REQ_FILE (a queued reboot can still land)"
+    return 0
+  fi
   rm -f "$REQ_FILE" 2>/dev/null
   if [ -e "$REQ_FILE" ]; then
     log "ERROR cannot remove $REQ_FILE ($1): the H747 keeps holding motion off until it resets or the file is removed"
@@ -1047,27 +1177,33 @@ withdraw_lock() {
   return 0
 }
 
-# tractor_force_ok: may the forced path reset a tractor now? Yes if the hold
-# for the request on disk is live, or if the link service is not live (the
-# shutdown stopped it; the H747 keeps the hold until it resets). No if the
-# request is gone or the link is live without the hold.
+# tractor_force_ok: may the forced path reset a tractor now? Sets TF_ID to the
+# request on disk. Yes if the hold for it is live, or if the link service is
+# not live (the shutdown stopped it) and its last line shows that hold (the
+# H747 keeps it until it resets). No if the request is gone, the idle file is
+# missing, the live link does not show the hold, or the frozen last line is
+# anything else.
 tractor_force_ok() {
   kv_get "$REQ_FILE" ""
-  _tf_id=$KV
-  if [ -z "$_tf_id" ]; then
+  TF_ID=$KV
+  if [ -z "$TF_ID" ]; then
     log "BLOCKED forced reboot gate=tractor_lock: no motion-hold request at $REQ_FILE, so the H747 may not be holding motion off"
     return 1
   fi
-  if idle_probe "$_tf_id"; then
-    log "LOCK still held id=$_tf_id ($IDLE_WHY): forcing"
+  if idle_probe "$TF_ID"; then
+    log "LOCK still held id=$TF_ID ($IDLE_WHY): forcing"
     return 0
   fi
   if [ "$IDLE_LIVE" = 1 ]; then
-    log "BLOCKED forced reboot gate=tractor_lock: the H747 link is live but not holding request $_tf_id ($IDLE_WHY)"
+    log "BLOCKED forced reboot gate=tractor_lock: the H747 link is live but not holding request $TF_ID ($IDLE_WHY)"
     return 1
   fi
-  log "LOCK id=$_tf_id: the H747 link is not live ($IDLE_WHY; stopped by the shutdown?) and the H747 keeps its hold until it resets, so forcing"
-  return 0
+  if [ "$IDLE_ST" = locked ] && [ "$IDLE_RID" = "$TF_ID" ]; then
+    log "LOCK id=$TF_ID: the H747 link is not live ($IDLE_WHY; stopped by the shutdown?) and its last report shows the hold, which the H747 keeps until it resets, so forcing"
+    return 0
+  fi
+  log "BLOCKED forced reboot gate=tractor_lock: the H747 link is not live ($IDLE_WHY) and its last report does not show a hold for request $TF_ID"
+  return 1
 }
 
 write_last_action() {  # ACTION REASON CONSECUTIVE [DETAIL]
@@ -1146,8 +1282,9 @@ uptime_s=$UP"
     kv_put "$RUN/node_streak" 0
     return 0
   fi
+  _rr_id=$BOOT8-$UP
   if [ "$ROLE" = tractor ]; then
-    tractor_lock "$BOOT8-$UP" || return 0
+    tractor_lock "$_rr_id" || return 0
     # The probes took up to 2 x TRACTOR_IDLE_WAIT_S; the rest of the rung
     # starts with a fresh unit-watchdog budget (each step is bounded).
     notify_watchdog
@@ -1171,6 +1308,35 @@ bootcount=$PROBATION_BC"
     withdraw_lock "reboot refused"
     return 0
   fi
+  _rr_was=0
+  if [ "$ROLE" = tractor ]; then
+    # A reset issued earlier in this boot (abandoned since) can still land,
+    # so its record is never cleared below.
+    if reset_issued; then
+      _rr_was=1
+    fi
+    # Recorded before systemd can take the reboot: from here on no path in
+    # this boot, a restarted supervisor included, withdraws the request.
+    if ! mark_reset_issued "$_rr_id"; then
+      if [ "$_rr_was" != 1 ]; then
+        clear_reset_issued
+      fi
+      log "REFUSED reboot: cannot write $RESET_FILE, so a later pass or restart could release the motion hold while the reboot is queued reason=$_rr"
+      add_decision reboot_refused:reset_marker
+      abandon_reboot "$_rr" reboot_refused:reset_marker
+      return 0
+    fi
+    if ! lock_still_held "$_rr_id"; then
+      if [ "$_rr_was" != 1 ]; then
+        clear_reset_issued
+      fi
+      log "BLOCKED reboot gate=tractor_lock ($IDLE_WHY): the motion hold for request $_rr_id is no longer shown right before the reboot reason=$_rr"
+      add_decision reboot_blocked:tractor_lock_lost
+      BLOCKED=tractor_lock
+      abandon_reboot "$_rr" reboot_blocked:tractor_lock_lost
+      return 0
+    fi
+  fi
   add_decision reboot
   timeout 30 systemctl reboot >/dev/null 2>&1
   _rr_rc=$?
@@ -1181,9 +1347,17 @@ bootcount=$PROBATION_BC"
     # uptime file cannot be read.
     _rr_up=$UP
     read_uptime || UP=$_rr_up
-    kv_put "$RUN/reboot_pending" "$UP $PROBATION $_rr"
+    if ! kv_put "$RUN/reboot_pending" "$UP $PROBATION $_rr"; then
+      log "ERROR cannot write $RUN/reboot_pending: no forced path for this reboot"
+    fi
     log "ACTION reboot: systemctl reboot accepted; forced path if still alive after ${FORCE_REBOOT_AFTER_S}s"
     return 0
+  fi
+  # rc 124: `systemctl reboot` timed out and systemd may still have queued
+  # the reboot, so a tractor keeps its reset record. Any other failure
+  # queued nothing.
+  if [ "$ROLE" = tractor ] && [ "$_rr_rc" -ne 124 ] && [ "$_rr_was" != 1 ]; then
+    clear_reset_issued
   fi
   rc_note "$_rr_rc"
   force_reboot "$_rr" "systemctl_reboot_rc_$_rr_rc"
@@ -1206,6 +1380,9 @@ check_pending_reboot() {
   _pr_rsn=${_pr_rest#* }
   if ! to_int "$_pr_up"; then
     rm -f "$RUN/reboot_pending" 2>/dev/null
+    log "PENDING marker unreadable: dropped, not forcing"
+    add_decision force_skipped:unreadable
+    abandon_reboot unknown force_skipped:pending_marker_unreadable
     return 1
   fi
   _pr_el=$((UP - INT))
@@ -1266,11 +1443,18 @@ sysrq_settle() {
 }
 
 force_reboot() {  # REASON WHY
-  if [ "$ROLE" = tractor ] && ! tractor_force_ok; then
-    add_decision force_blocked:tractor_lock
-    BLOCKED=tractor_lock
-    abandon_reboot "$1" "force_blocked:tractor_lock:$2"
-    return 0
+  if [ "$ROLE" = tractor ]; then
+    if ! tractor_force_ok; then
+      add_decision force_blocked:tractor_lock
+      BLOCKED=tractor_lock
+      abandon_reboot "$1" "force_blocked:tractor_lock:$2"
+      return 0
+    fi
+    # A reset can land at any moment from here, and the request stays until
+    # it does, even if this path returns.
+    if ! mark_reset_issued "$TF_ID"; then
+      log "ERROR cannot write $RESET_FILE: this process keeps the motion-hold request, a restarted one would not"
+    fi
   fi
   kv_int "$STATE/consecutive_reboots" 0
   write_last_action force_reboot "$1" "$INT" "$2"
@@ -1298,7 +1482,9 @@ force_reboot() {  # REASON WHY
 # record with action=reboot_abandoned, same boot id and reason, so a later
 # reset in this boot (power cut, brown-out, L2 bite, or the accepted reboot
 # completing late) reads as supervisor:reboot_abandoned:<reason> instead of a
-# plain supervisor reboot. Not deleted: that late completion stays possible.
+# plain supervisor reboot. Not deleted: that late completion stays possible,
+# which is also why a tractor keeps its motion-hold request once the reset
+# was issued (withdraw_lock).
 abandon_reboot() {
   kv_int "$STATE/consecutive_reboots" 0
   write_last_action reboot_abandoned "$1" "$INT" "$2"

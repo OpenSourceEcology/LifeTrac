@@ -170,11 +170,12 @@ only when idle, and a watchdog reset cannot wait for idle, so L2 is not installe
 the tractor. The flag below is only for a revisited decision. Also: every reboot, a
 watchdog power cycle included, runs stm32h7-program.service, which erases and reflashes H747 bank 1 and resets the H747.
 In production that trips the engine-kill latch through the Opta, and each reset
-restarts the H747's nonce state. Arm the tractor only after the TODO.md PWR
-prerequisites land: PWR-8, no per-boot bank-1 erase by stm32h7-program (X8OS-3);
-PWR-9, H747 nonce seeds from its RNG (H7-13); and PWR-11, the Opta latch semantics
-after an H747 reset settled. When they have, re-run with --i-accept-tractor-prereqs
-(PID 1's next reload, anyone's, then arms it).
+restarts the H747's nonce state. Landing the TODO.md PWR prerequisites does not
+change this: PWR-8, no per-boot bank-1 erase by stm32h7-program (X8OS-3); PWR-9,
+H747 nonce seeds from its RNG (H7-13); and PWR-11, the Opta latch semantics after an
+H747 reset settled. Use --i-accept-tractor-prereqs only after D-PWR1 has been
+revisited and the new decision is recorded in DECISIONS.md, and those prerequisites
+have landed (PID 1's next reload, anyone's, then arms it).
 EOF
 }
 
@@ -251,7 +252,7 @@ case "$cmd" in
         exit 3
       fi
     fi
-    [ "$ROLE" = tractor ] && echo "TRACTOR: installing on the operator's word that the PWR prerequisites have landed."
+    [ "$ROLE" = tractor ] && echo "TRACTOR: installing against DECISIONS.md D-PWR1, on the operator's word that the decision was revisited and the PWR prerequisites have landed."
     [ "$ROLE" = base ] && base_note
     for f in "$WD_SRC" "$RT_SRC"; do
       [ -f "$f" ] || { echo "install_watchdog: missing $f (push the whole x8_recovery folder)" >&2; exit 2; }

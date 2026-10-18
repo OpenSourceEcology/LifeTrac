@@ -335,12 +335,12 @@ None of these decisions is implemented. Each one lists its options and a **RECOM
 | Option | Pros | Cons |
 |---|---|---|
 | A. Keep off | No surprise engine stops | A hung tractor X8 waits for someone to power-cycle it by hand |
-| **B. Allow when idle** | Recovers a hung tractor without stopping the engine mid-work | Needs an idle signal and a motion hold from the H747 (PWR-13); until then nothing reboots |
+| **B. Allow when idle** | Recovers a hung tractor without stopping the engine mid-work | Needs an idle signal and a motion hold from the H747 (PWR-13); until then the supervisor never reboots it |
 | C. Allow anytime | Fastest recovery | Can stop the engine mid-operation |
 
-**PICK: B.** Picked by Dorkmo on 2026-10-18, after PWR-8, PWR-9, PWR-11 and X8OS-3 land. What it means:
+**PICK: B.** Picked by Dorkmo on 2026-10-18, after PWR-8, PWR-9, PWR-11 and X8OS-3 land. The review of the implementation the same day added PWR-12: the key-off self-holding relay drops when the H747 resets, so until that is fixed the H747 must not report idle with the key off. What it means:
 
-* **Supervisor (L3), built:** with `TRACTOR_REBOOT_ENABLED=1` a tractor reboot still needs a live `idle` report from the H747 and a confirmed motion hold for that reboot (`locked <seq> <id>`), so the tractor cannot be moved during a shutdown that takes minutes. Any reboot that does not happen withdraws the request. Never overridden, OTA probation included. SIL: `base_station/tests/test_x8_supervisor_sil.py`.
-* **H747 and the X8 link service, PWR-13:** report idle (engine stopped, every valve output off) and hold motion off until the H747 resets or the request is withdrawn. Until this exists the gate blocks every tractor reboot.
+* **Supervisor (L3), built:** with `TRACTOR_REBOOT_ENABLED=1` a tractor reboot still needs a live `idle` report from the H747 and a confirmed motion hold for that reboot (`locked <seq> <id>`), so the tractor cannot be moved during a shutdown that takes minutes. Until the reboot is issued, any reboot that does not happen withdraws the request. Once it is issued (`systemctl reboot` accepted or timed out, or the forced path), the request and the hold stay until the reset, because systemd can still carry out an accepted reboot after the supervisor gives up on it. Never overridden, OTA probation included. SIL: `base_station/tests/test_x8_supervisor_sil.py`.
+* **H747 and the X8 link service, PWR-13:** report idle (engine stopped, every valve output off) and hold motion off until the H747 resets or the request is withdrawn. Idle is checked when the reboot is requested; the hold covers motion, not engine start. "Engine stopped" needs an engine-running signal other than the ignition sense I1, and until PWR-12 the H747 reports busy while the key is off. Until this exists the gate blocks every tractor reboot.
 * **No systemd-owned hardware watchdog (L2) on the tractor:** a watchdog reset cannot wait for idle. The tractor keeps today's u-boot-armed, kernel-petted WDOG1, so a kernel hang still resets it.
-* **LmP's `docker.service` `FailureAction=reboot` goes off on the tractor** (PWR-13): it reboots without waiting for idle.
+* **LmP's `docker.service` `FailureAction=reboot` goes off on the tractor** (PWR-13): it reboots without waiting for idle. LmP ties it to OTA rollback, so with it off a Docker-breaking update rolls back only through the armed, idle-gated supervisor.

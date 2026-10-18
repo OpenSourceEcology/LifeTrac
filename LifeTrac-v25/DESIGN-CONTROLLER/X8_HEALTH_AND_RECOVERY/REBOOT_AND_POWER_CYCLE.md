@@ -12,10 +12,13 @@ inferred from datasheets, schematics or source code that need a bench check
 (collected in §6 / TODO PWR-1). Tracked as TODO.md **PWR-1..PWR-13**.
 
 **Decided 2026-10-18 (Dorkmo, [DECISIONS.md D-PWR1](../DECISIONS.md#d-pwr1--tractor-automatic-reboots-idle-only)):
-the tractor reboots itself only when idle**, meaning the engine is stopped,
-every valve output is off, and the H747 is holding motion off until the
-reset. The supervisor enforces this (L3 guards below); the H747 side is
-TODO PWR-13.
+the supervisor reboots the tractor only when idle**, meaning the engine is
+stopped and every valve output is off when the reboot is requested, and the
+H747 then holds motion off until the reset. The supervisor enforces this
+(L3 guards below); the H747 side is TODO PWR-13, after PWR-12. Two automatic
+resets stay outside the rule: a WDOG1 bite on a kernel hang (kept on
+purpose) and LmP's `docker.service` `FailureAction=reboot` until PWR-13
+turns it off on the tractor.
 
 Question this answers: *how can we reboot or power-cycle the Portenta X8 and
 the Max Carrier, which of those do we already use, and how do we build them
@@ -139,9 +142,11 @@ Hardware facts behind the table:
   authoritative ones and must survive every rung**; the M7 must read the
   Opta `safety_state` at boot and stay latched if it is not `NORMAL`
   (PWR-11). Recovery restores comms and telemetry, not motion. The base node
-  has no such effect. Since D-PWR1 an automatic tractor reboot also needs
-  the tractor idle and the H747 holding motion off, so it never lands
-  mid-work.
+  has no such effect. Since D-PWR1 a supervisor-initiated tractor reboot
+  also needs the tractor idle and the H747 holding motion off, so it never
+  lands mid-work. Two automatic resets still can: LmP's `docker.service`
+  `FailureAction=reboot` (until PWR-13 turns it off) and a WDOG1 bite on a
+  kernel hang (kept by D-PWR1).
 - **Reboot loops wear the valve controller's flash.** On the tractor every
   boot erases and reprograms H747 bank 1 (~13 s). Any automatic reboot path
   on the tractor waits on PWR-8 (program only on mismatch, or X8OS-3).
@@ -220,8 +225,10 @@ override the valve watchdogs.
   (PWR-8, PWR-9, PWR-11), kept only for a revisited decision. The tractor
   keeps what it has today: u-boot arms WDOG1 and the kernel pets it, so only
   a kernel hang resets it, and its shutdowns keep upstream's 30 min
-  `reboot.target` bound (the supervisor's forced path covers its own
-  reboots, under the H747's motion hold). Bench needs an explicit opt-in,
+  `reboot.target` bound. The supervisor's forced path covers only a reboot
+  that stalls before the shutdown stops the supervisor; a stop job that
+  hangs after that holds the tractor, with motion held, for up to those
+  30 min. Bench needs an explicit opt-in,
   is refused on a board without the bench marker, and is only for the PWR-1
   checks.
 - Coexistence: once systemd owns `/dev/watchdog0`, `wdt_pet.sh start` sees
@@ -243,7 +250,8 @@ Ladder, cheapest first:
 
 1. restart an **allowlisted** container that is unhealthy for N passes
    (per-boot cap, then it counts as a node fault);
-2. `systemctl reboot`, bounded by the L2 `reboot.target` timeout;
+2. `systemctl reboot`, bounded by the L2 `reboot.target` timeout where L2
+   is installed (not the tractor: upstream's 30 min there);
 3. if the reboot command fails or the supervisor is still alive after a
    timeout: `sysrq` `s`, `u`, `b` (sync, read-only remount, immediate
    reboot), falling back to `systemctl reboot -ff`.
@@ -270,7 +278,7 @@ Guards:
 |---|---|
 | Arming | Acts only if `/etc/lifetrac/supervisor.armed` exists; otherwise logs `WOULD …` and does nothing. Bench boards never get the file without a GO. |
 | Tractor | Reboot rungs off unless `TRACTOR_REBOOT_ENABLED=1` (§4: engine stop, flash wear, nonces). `ROLE` defaults to tractor: only an explicit `ROLE=base` in a config that loads cleanly allows base reboots, so a missing or broken config never turns tractor reboots on. |
-| Tractor idle (D-PWR1) | Even with `TRACTOR_REBOOT_ENABLED=1`, a tractor reboots only after the H747 reports a live `idle` (engine stopped, every valve output off) through `/run/lifetrac/tractor_idle`, the supervisor writes a reboot request, and the H747 answers `locked <seq> <id>`: it holds motion off for that request until it resets or the request is withdrawn, so an orderly shutdown that takes minutes cannot end with the tractor moving. Liveness = the H747's `<seq>` token changes while the supervisor watches. Not idle, no answer within `TRACTOR_IDLE_WAIT_S` polls, or any path where the reboot does not happen: the request is withdrawn and the reboot blocked (`reboot_blocked=tractor_not_idle` / `tractor_lock`); the next pass with the fault asks again. The forced path runs only while the hold stands (or the link service was stopped by the shutdown, which leaves the hold in place). Never overridden, OTA probation included. No link service exists yet, so this blocks every tractor reboot until PWR-13. |
+| Tractor idle (D-PWR1) | Even with `TRACTOR_REBOOT_ENABLED=1`, a tractor reboots only after the H747 reports a live `idle` (engine stopped, every valve output off) through `/run/lifetrac/tractor_idle`, the supervisor writes a reboot request (`/run/lifetrac-supervisor/tractor_reboot_request`, a root-only directory), and the H747 answers `locked <seq> <id>`: it holds motion off for that request until it resets or the request is withdrawn, so an orderly shutdown that takes minutes cannot end with the tractor moving. Liveness = the H747's `<seq>` token changes while the supervisor watches. The request and the hold are checked once more right before `systemctl reboot`. Not idle, no answer within `TRACTOR_IDLE_WAIT_S` polls, or the hold gone at that last look: the request is withdrawn and the reboot blocked (`reboot_blocked=tractor_not_idle` / `tractor_lock`); the next pass with the fault asks again. Once the reboot is issued the request stays until the reset, whatever happens next, because systemd can still carry out an accepted reboot after the supervisor gives up on it (a person can remove the file to release it). The forced path runs only while the hold stands, or when the link service was stopped by the shutdown and its last line shows the hold. Never overridden, OTA probation included. No link service exists yet, so this blocks every tractor reboot until PWR-13. |
 | Grace | No reboot before 600 s uptime. |
 | Boot loop | Consecutive supervisor reboots persisted; at the cap (default 3) it enters HELD and stops rebooting until `clear-hold`, except during an OTA trial boot (next row). The count resets after 30 min of continuous health. |
 | Clock | No wall clock anywhere (no RTC; the tractor clock is not wall time): uptime and `boot_id` only. Heartbeat staleness = mtime unchanged for N seconds of uptime. |
@@ -331,7 +339,8 @@ carrier's input from outside the X8. Requirements:
    next key cycle; status reported in telemetry.
 7. **Key-off hold.** POWER_MANAGEMENT's self-holding relay must survive an
    H747 reset (an Opta OR leg, or a hardware hold timer); until then L3 and
-   L4 refuse to act while I1 is low.
+   L4 refuse to act while I1 is low. For L3 the H747 enforces this by
+   reporting busy while I1 is low (PWR-13), so the idle gate blocks.
 
 Where it lives:
 
