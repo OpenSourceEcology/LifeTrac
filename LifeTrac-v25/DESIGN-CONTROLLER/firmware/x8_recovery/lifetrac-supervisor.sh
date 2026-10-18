@@ -1136,8 +1136,8 @@ lock_still_held() {
   return 0
 }
 
-# reset_issued: did this boot issue a tractor reset (an accepted or timed-out
-# `systemctl reboot`, or the forced path)? Then the request stays until the
+# reset_issued: did this boot issue a tractor reset (an accepted, timed-out
+# or signal-killed `systemctl reboot`, or the forced path)? Then the request stays until the
 # reset. $RESET_FILE is on tmpfs, so it goes with the reboot; one naming
 # another boot (only where it is not tmpfs, e.g. the SIL tests) does not
 # count. An unreadable one does.
@@ -1160,8 +1160,8 @@ mark_reset_issued() {
 }
 
 # clear_reset_issued: the reset this rung was about to issue was not issued
-# (refused, or `systemctl reboot` failed outright, not a timeout, so systemd
-# queued nothing), and none was issued earlier in this boot.
+# (refused, or `systemctl reboot` failed outright, not a timeout or a
+# signal, so systemd queued nothing), and none was issued earlier in this boot.
 clear_reset_issued() {
   RESET_ISSUED=0
   rm -f "$RESET_FILE" 2>/dev/null
@@ -1376,10 +1376,11 @@ bootcount=$PROBATION_BC"
     log "ACTION reboot: systemctl reboot accepted; forced path if still alive after ${FORCE_REBOOT_AFTER_S}s"
     return 0
   fi
-  # rc 124: `systemctl reboot` timed out and systemd may still have queued
-  # the reboot, so a tractor keeps its reset record. Any other failure
-  # queued nothing.
-  if [ "$ROLE" = tractor ] && [ "$_rr_rc" -ne 124 ] && [ "$_rr_was" != 1 ]; then
+  # rc 124: `systemctl reboot` timed out; 128 and above: it was killed by a
+  # signal. Either way systemd may still have queued the reboot, so a
+  # tractor keeps its reset record. Any other failure (systemctl's own
+  # error, or it never ran) queued nothing.
+  if [ "$ROLE" = tractor ] && [ "$_rr_rc" -ne 124 ] && [ "$_rr_rc" -lt 128 ] && [ "$_rr_was" != 1 ]; then
     clear_reset_issued
   fi
   rc_note "$_rr_rc"
@@ -1481,6 +1482,8 @@ force_reboot() {  # REASON WHY
   fi
   kv_int "$STATE/consecutive_reboots" 0
   write_last_action force_reboot "$1" "$INT" "$2"
+  # The record's syncs take up to 20 s: look again before anything else.
+  force_hold_ok "$1" "$2" "before the forced reset" || return 0
   add_decision force_reboot
   log "ACTION force_reboot reason=$1 why=$2"
   if [ -e "$SYSRQ" ]; then
@@ -1488,6 +1491,9 @@ force_reboot() {  # REASON WHY
     sysrq_settle
     sysrq_write u
     sysrq_settle
+    # And after the settles, right before the reset itself (`reboot -ff`
+    # follows b at once).
+    force_hold_ok "$1" "$2" "before sysrq b" || return 0
     sysrq_write b
     log "ACTION force_reboot: still alive after sysrq b"
   else
@@ -1498,6 +1504,23 @@ force_reboot() {  # REASON WHY
   rc_note "$_fr_rc"
   log "ACTION force_reboot: still alive after systemctl reboot -ff rc=$_fr_rc$RCNOTE"
   abandon_reboot "$1" "forced_path_returned:$2"
+}
+
+# force_hold_ok REASON WHY WHERE: on a tractor, one more look
+# (lock_still_held) at the request and hold the forced path saw, at WHERE in
+# it: the record syncs and sysrq settles take seconds, and a person may
+# cancel the reboot and remove the request, or the hold may go, meanwhile.
+# Lost: the forced attempt is abandoned (BLOCKED gate=tractor_lock).
+force_hold_ok() {
+  [ "$ROLE" = tractor ] || return 0
+  if lock_still_held "$TF_ID"; then
+    return 0
+  fi
+  log "BLOCKED forced reboot gate=tractor_lock ($IDLE_WHY) $3: the motion hold for request $TF_ID is no longer shown"
+  add_decision force_blocked:tractor_lock_lost
+  BLOCKED=tractor_lock
+  abandon_reboot "$1" "force_blocked:tractor_lock_lost:$2"
+  return 1
 }
 
 # abandon_reboot REASON WHY: the reboot that last_action announces did not

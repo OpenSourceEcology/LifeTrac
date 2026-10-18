@@ -156,8 +156,8 @@ the board then stays up in that boot.
   `systemctl reboot`. Before that point every path where the reboot does
   not happen (refused, blocked) deletes the request, and a request left
   from an earlier run is deleted at start. Once the reset is issued
-  (`systemctl reboot` accepted or timed out, or the forced path) the
-  request stays until the reset, even when the supervisor abandons the
+  (`systemctl reboot` accepted, timed out or killed by a signal, or the
+  forced path) the request stays until the reset, even when the supervisor abandons the
   reboot: systemd can still carry out the reboot it accepted (a stop job
   that hangs, then upstream's 30 min `reboot-force`), and the tractor
   must not be movable when it lands. To release a kept hold by hand,
@@ -166,7 +166,9 @@ the board then stays up in that boot.
   look does not count toward the boot-loop cap. The forced path on a tractor runs only while the
   link still shows the hold, or when the link is no longer live (stopped
   by the shutdown) and its last line shows the hold; never when the
-  request or the idle file is gone or anything else is shown. No OTA
+  request or the idle file is gone or anything else is shown. It looks
+  again after writing its record and again after the sysrq settles, right
+  before `b`, and gives up if the hold is gone by then. No OTA
   probation override. The systemd-owned hardware watchdog (L2) is not
   installed on the tractor, because a watchdog reset cannot wait for idle,
   so a shutdown that hangs after the supervisor has stopped waits for
