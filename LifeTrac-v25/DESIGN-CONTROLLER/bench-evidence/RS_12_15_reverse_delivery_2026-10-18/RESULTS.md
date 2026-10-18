@@ -165,7 +165,7 @@ Each leg ran the same steps:
 
 [scripts/rs1215.sh](scripts/rs1215.sh) is the session helper used for these
 steps. [scripts/deltas.py](scripts/deltas.py) scores the brackets against the
-plan's criteria (see "Counter resets" below).
+plan's bracket criteria (see "Counter resets" below).
 
 The post step also tried to pull an RS-13 base capture (`rs13_cap_base`).
 This round never ran one, so every `leg*_post_transcript.txt` shows
@@ -448,16 +448,35 @@ Sources: [legX_faults.txt](legs/legX_faults.txt),
      restart at 0 and post − pre is meaningless. On W, for example, the tractor's
      `radio_tx_ok` went 955 → 1222, which reads as 267, but 1222 is the
      leg's own count.
-   - **How deltas.py handles it.** Counters only grow, so
-     [deltas.py](scripts/deltas.py) treats any counter that decreased as a
-     reset and then uses the post value. On W, W2 and X it caught the reset
-     through at least two counters. For W2 these were `radio_crc_err` 1 → 0
-     and `tx_done_to_rearm_max_us`; in the same leg `host_parse_ok` went
-     1368 → 1379 across 1239 TXs, which only a reset explains
-     ([legW2_pre_tractor.txt](legs/legW2_pre_tractor.txt),
-     [legW2_post_tractor.txt](legs/legW2_post_tractor.txt)). The rule
-     would miss a reset if every counter happened to end above its pre-leg
-     value.
+   - **How deltas.py handles it.** [deltas.py](scripts/deltas.py) takes the
+     post value when the brackets show a reset, and post − pre otherwise. It
+     has two tests for a reset:
+     - **A value that fell.** The event counters and the high-water marks
+       (`tx_deaf_max_us`, `tx_done_to_rearm_max_us`, `tx_stream_streak_max`)
+       never go down while an L072 stays up: `host_stats.c` only raises the
+       marks, and `host_stats_reset()` clears them together with the
+       counters. `radio_state` is a mode, not a counter, so it never counts
+       (PR #157 review).
+     - **More TXs than parsed host frames.** Every radio TX starts from a
+       parsed host frame, so without a reset d(`host_parse_ok`) ≥
+       d(`radio_tx_ok`).
+
+     W showed the reset through five pieces of evidence and X through four.
+     On W2 there were three: `radio_crc_err` 1 → 0,
+     `tx_done_to_rearm_max_us` 3542 → 3541, and 11 parsed frames
+     (`host_parse_ok` 1368 → 1379) against 17 TXs (`radio_tx_ok`
+     1222 → 1239) ([legW2_pre_tractor.txt](legs/legW2_pre_tractor.txt),
+     [legW2_post_tractor.txt](legs/legW2_post_tractor.txt)).
+
+     Both tests could still miss a reset, so deltas.py also cross-checks
+     the bracket delivery against the log counts in `leg<X>_gaps.txt` (base
+     sends on air, tractor decoded cmds). If they disagree, or the counts
+     are missing, delivery and each zero-delta criterion that would
+     otherwise pass become UNVERIFIED (a delta above 0 still fails), and a
+     STOP rule that has not tripped becomes UNDETERMINED (exit 1). All four
+     legs agree: 22/23, 27/27, 72/72 and 36/36. It refuses to score at all
+     (exit 2) when a bracket file is missing or empty, or when a counter the
+     criteria read is missing or `ABSENT`.
    - **Base.** The base's counters were never reset. They accumulated
      through all four legs (`radio_tx_ok` 0 → 23 → 50 → 122 → 158), so
      post − pre is the right delta there.
@@ -661,8 +680,8 @@ after 15:53.
   - `clear_retained`: the base broker cleared before the leg.
   - `pre_base`, `pre_tractor`, `post_base`, `post_tractor`: the rs115
     brackets.
-  - `deltas`: `deltas.py` scoring against the plan's criteria. Its
-    "criteria (DC/TODO.md RS-12.15 reverse-delivery PASS / STOP)" line means
+  - `deltas`: `deltas.py` scoring against the plan's bracket criteria. Its
+    "bracket criteria (DC/TODO.md RS-12.15 reverse-delivery PASS / STOP)" line means
     the TODO text as it was before the round (at `3c8ced60`; see the
     Status paragraph).
   - `report`: `rs12_leg_report.py` (W and X cut at 1 024 B).
@@ -684,7 +703,10 @@ after 15:53.
 `scripts/`
 
 - `rs1215.sh`: the session helper (health, brackets, clear, park, state).
-- `deltas.py`: reset-aware bracket scoring.
+- `deltas.py`: reset-aware bracket scoring that fails closed (incomplete
+  brackets are refused; delivery is cross-checked against the log counts);
+  `py -3 deltas.py --selftest` scores fixture legs to check the refusals,
+  both reset tests and the cross-check.
 - `inject_on_first_frame.sh`: the W2 trigger, which reads `rx_smoke`'s log.
 - `legX_watch.sh`: the X fault watcher and injector start.
 

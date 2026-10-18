@@ -1,5 +1,5 @@
 base: L072 counters not reset -> delta = post - pre
-tractor: L072 counters RESET during the leg (decreased: host_parse_ok, tx_deaf_max_us, tx_done_to_rearm_max_us, clk_demotion_kept) -> delta = post
+tractor: L072 counters RESET during the leg (evidence: host_parse_ok, clk_demotion_kept, tx_deaf_max_us, tx_done_to_rearm_max_us, d(host_parse_ok) < d(radio_tx_ok)) -> delta = post
 leg W: counter deltas (pre -> post)
   counter                                    base            tractor
   radio_tx_ok                       23->50 (d=27) 955->1222 (d=1222)
@@ -14,7 +14,9 @@ leg W: counter deltas (pre -> post)
   tx_first_anchor                      0->0 (d=0)         1->1 (d=1)
   tx_stream_streak_max                 1->1 (d=0) 954->1222 (d=1222)
 
-criteria (DC/TODO.md RS-12.15 reverse-delivery PASS / STOP):
+cross-check: brackets 27/27 vs logs: base sends on air=27, tractor decoded cmds=27 -> AGREE
+
+bracket criteria (DC/TODO.md RS-12.15 reverse-delivery PASS / STOP):
   [PASS] command delivery tractor d(radio_rx_ok)/base d(radio_tx_ok) = 27/27 = 100.0 % >= 60 %
   [PASS] tractor clk_demotion_reset delta = 0 (must be 0; STOP if > 0)
   [PASS] tractor tx_first_anchor post = 1 (must be 1; STOP if > 1)

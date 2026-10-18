@@ -3627,7 +3627,7 @@ explicit GO)
     harness does not check (it did not land on leg V, the first leg after
     the flash reboot: RESULTS Observation 3). Score with
     [`scripts/deltas.py`](bench-evidence/RS_12_15_reverse_delivery_2026-10-18/scripts/deltas.py):
-    post after a reset (any counter decreased), post minus pre otherwise.
+    post after a reset (a counter or high-water mark fell, or more TXs than parsed frames), else post minus pre; log cross-check.
     Still to find out: whether the pulse reaches the base L072's NRST at
     all, and whether the harness should check that the tractor's reset
     landed.
