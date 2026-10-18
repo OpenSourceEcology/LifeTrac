@@ -53,6 +53,10 @@ documenting, see:
 
 - [recovery/SOFT_RESET_INDEX.md](recovery/SOFT_RESET_INDEX.md)
 
+For the plan to build reboot and power-cycle recovery into the system
+(hardware watchdog, supervisor ladder, carrier power interrupt, remote
+restart), see [REBOOT_AND_POWER_CYCLE.md](REBOOT_AND_POWER_CYCLE.md).
+
 ## Conventions
 
 - **Pass/fail criteria** must be machine-checkable (string match, exit code, range).

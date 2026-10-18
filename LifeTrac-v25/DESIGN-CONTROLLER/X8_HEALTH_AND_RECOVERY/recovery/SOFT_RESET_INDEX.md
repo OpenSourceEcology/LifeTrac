@@ -67,10 +67,10 @@ Health Check (HC-xx).
 | 1.7 | GPIO sysfs unexport / re-export | `echo <n> > /sys/class/gpio/unexport`, `echo <n> > /sys/class/gpio/export` | one GPIO line's sysfs handle (does NOT alter the underlying pinmux) | used inside `prep_bridge.sh`, `manual_gpio_preflight.sh` | Frees module refcounts so `rmmod` can succeed. Has no effect on i.MX IOMUXC. |
 | 1.8 | `systemctl reboot` | `echo fio \| sudo -S systemctl reboot` | full Linux reboot, clean shutdown of services first | not currently in any Tier doc | Cleanest soft reboot. Should be tried before T1's watchdog-induced reboot when adbd is healthy. Documented 2026-09-12 as the flash pipeline's `REVIVE_MODE=reboot` step (FLASH_RUNBOOK.md); both boards came back in 12–24 s each time. |
 | 1.9 | `reboot` / `reboot -f` | `echo fio \| sudo -S reboot -f` | force-reboot bypassing systemd shutdown ordering | not currently in any Tier | Use when systemd is too sick to coordinate shutdown. **GAP.** |
-| 1.10 | SysRq trigger | `echo b > /proc/sysrq-trigger` (immediate reboot), `echo c` (panic+reboot if `kernel.panic` set), `echo s` (sync), `echo u` (remount RO) | kernel-level reboot independent of userspace | not currently in any Tier | Requires `kernel.sysrq != 0`; worth probing on this LmP image. **GAP.** |
+| 1.10 | SysRq trigger | `echo b > /proc/sysrq-trigger` (immediate reboot), `echo s` (sync), `echo u` (remount RO), `echo c` (deliberate crash) | kernel-level reboot independent of userspace | not in any Tier; `lifetrac-supervisor` uses `s`, `u`, `b` as its last rung (built, disarmed; [../REBOOT_AND_POWER_CYCLE.md](../REBOOT_AND_POWER_CYCLE.md) L3) | Needs `CONFIG_MAGIC_SYSRQ`. Corrected 2026-10-17: `kernel.sysrq` masks only the keyboard and `/proc/sysrq-trigger` for non-root; root can write any command whatever its value. `capture_board_state.sh` now records both. Never use `c` as recovery. |
 | 1.11 | `kill -9` of adbd | `pkill -9 adbd` (systemd respawns it) | one daemon | not currently in any Tier | Quicker than `systemctl restart adbd` when ADB just needs a kick and adbd is still pet-able. **GAP.** |
 | 1.12 | USB gadget soft-disconnect | `echo 0 > /sys/class/udc/<udc>/soft_connect; echo 1 > /sys/class/udc/<udc>/soft_connect` | forces host re-enumeration of the X8 composite without rebooting Linux | not currently in any Tier | Useful when Linux is healthy but Windows transport is wedged. **GAP — verify UDC name on this image.** |
-| 1.13 | Kill watchdog petter to force WDT reboot | `bash wdt_pet.sh stop` then stop kernel `[watchdogd]` somehow | i.MX2+ HW watchdog fires after 60 s → full reboot | helper exists (`wdt_pet.sh`) but explicitly listed under "What NOT to do" in `2026-05-12_X8_Board1_Recovery_Plan.md` | The kernel's `[watchdogd]` keeps petting it; can't be reliably triggered from the keyboard. |
+| 1.13 | Open and close the watchdog without the magic `'V'` | `sudo python3 -c 'import os; os.close(os.open("/dev/watchdog0", os.O_WRONLY))'` (not `wdt_pet.sh stop`, which writes `'V'` and hands the dog back to the kernel) | i.MX WDOG1 stays armed with no keepalive → PMIC power cycle after the current timeout (60 s from u-boot) | helper exists (`wdt_pet.sh`) but listed under "What NOT to do" in `AI NOTES/2026-05-12_X8_Board1_Recovery_Plan_Copilot_v1_0.md` | Corrected 2026-10-17: the kernel keepalive stops once userspace opens `/dev/watchdog0`, so the board power-cycles 60 s after the close (see 4.3). Once systemd owns the device (L2 drop-in armed, TODO PWR-2) the open fails with `EBUSY` (inferred; VERIFY under PWR-1): use `systemctl reboot` instead. |
 
 ---
 
@@ -92,7 +92,7 @@ Health Check (HC-xx).
 |---|---|---|---|---|---|
 | 3.1 | L072 reset via gpio163 (LoRa NRST through x8h7_gpio) | `echo 1 > /sys/class/gpio/gpio163/value; echo 0 > .../value; sleep 0.05; echo 1 > .../value` | NRST of the L072 (and indirectly SX1276 if it's wired off the L072) | implicit in `revive_bridge.sh` verify step [5/5] (writes gpio163 once); **GAP — no standalone Tier doc for "kick the LoRa modem"** | Requires healthy x8h7 bridge. Cheap when bridge works. |
 | 3.2 | L072 BOOT0/NRST sequence via openocd-on-H7 (BLS entry) | `openocd -f openocd_script-imx_gpio.cfg -f 08_boot_user_app.cfg` (release BOOT0 + pulse NRST), or any of the `30..33_boot_user_delay_*ms.cfg` variants | enters / exits AN3155 system bootloader on L072 | used by `boot_and_probe.sh`, `boot_then_at.sh`, the `run_stage1_standard_quant_end_to_end.ps1` pipeline | This is the **canonical** L072 reset path during firmware flashing. |
-| 3.3 | LoRa MAC layer reset (AT command) | `printf 'AT+REBOOT\r\n' > /dev/ttymxc3` (or `AT+FACT?`) | resets MKRWAN stack on L072 without re-flashing | used implicitly in `boot_then_at.sh` AT probe | Only works when current L072 firmware exposes the AT shell. |
+| 3.3 | L072 soft reset (`RESET_REQ`) | host frame `RESET_REQ` (0x03) over `/dev/ttymxc3`; the radio daemons send it at every link open | soft reset of the LifeTrac L072 firmware without re-flashing | `image_tx_daemon.py`, `image_rx_daemon.py` | Corrected 2026-10-17: there is no `AT+REBOOT` in the LifeTrac L072 firmware (the old MKRWAN AT shell is gone). Only one process may own `/dev/ttymxc3`; restart the owning daemon rather than writing to the port from a second opener. |
 
 ---
 
@@ -100,9 +100,9 @@ Health Check (HC-xx).
 
 | # | Mechanism | Command | Resets | Tier / file | Efficacy |
 |---|---|---|---|---|---|
-| 4.1 | Linux reboot (via 1.8 / 1.9 / 1.10) | see Layer 1 | full SoC re-boot from eMMC, **but NOT a power-on-reset** — IOMUXC retention behaviour applies | T1 (indirectly) | Does **not** clear post-camera IOMUXC drift on Board 1 (proven 2026-05-13 after overnight disconnect). |
-| 4.2 | `kexec` into a recovery kernel | `kexec -l <kernel> --initrd=<initrd> --command-line=...; kexec -e` | jumps to a fresh kernel without re-running U-Boot, mask-ROM, or hitting the i.MX reset controller | not currently used | UNTESTED on this LmP image; same IOMUXC-non-clearing limitation as 4.1. **GAP — research only.** |
-| 4.3 | i.MX `WDOG_B` self-reset via watchdog daemon stop | requires both `wdt_pet.sh stop` AND killing kernel `[watchdogd]` | full SoC reset including IOMUXC (POR-equivalent for most blocks) | NOT REACHABLE from soft path (kernel watchdogd is unkillable from userspace) | Theoretically the only soft path that resets IOMUXC. In practice: not achievable. |
+| 4.1 | Linux reboot (via 1.8 / 1.9 / 1.10) | see Layer 1 | full SoC re-boot. Corrected 2026-10-17: probably a PMIC power cycle too (PSCI `SYSTEM_RESET` → TF-A asserts `WDOG_B` → BD71847), inferred from source; **VERIFY** with `wdog_regs.py` (WRSR `POR=1` vs `SFTW=1`) | T1 (indirectly); flash pipeline `REVIVE_MODE=reboot` | Does **not** clear the Board 1 SWD wedge (2026-05-13, and it also survived T2 and a T3a reflash, so it is not IOMUXC retention). See [../REBOOT_AND_POWER_CYCLE.md](../REBOOT_AND_POWER_CYCLE.md) §2. |
+| 4.2 | `kexec` into a recovery kernel | `kexec -l <kernel> --initrd=<initrd> --command-line=...; kexec -e` | jumps to a fresh kernel without re-running U-Boot, mask-ROM, or the i.MX reset controller (a truly non-POR restart) | not used | UNTESTED; no rescue kernel exists. Not recommended as recovery ([../REBOOT_AND_POWER_CYCLE.md](../REBOOT_AND_POWER_CYCLE.md) §7). |
+| 4.3 | i.MX WDOG1 bite (`WDOG_B` → PMIC) | same command as 1.13: open `/dev/watchdog0`, close without `'V'` | PMIC power cycle of the X8 module (WRSR reads `POR`); carrier +5V and +3V8 stay up | **Reachable (corrected 2026-10-17):** WDOG1 fires 60 s after the close (tractor, 2026-09-12, see `wdt_pet.sh`). Once PID 1 has armed the L2 drop-in (at its next reload or boot after install; `systemctl show -p RuntimeWatchdogUSec` not `0`) the timeout is 30 s and the open returns `EBUSY` (inferred; VERIFY under PWR-1; TODO PWR-2). Installed but not yet armed, the trick still reboots the board 60 s later. | Soft path to a PMIC power cycle. It did not need killing `[watchdogd]`. It will not clear the Board 1 SWD wedge, which survived a full T2 cold cycle and a T3a reflash. See [../REBOOT_AND_POWER_CYCLE.md](../REBOOT_AND_POWER_CYCLE.md). |
 | 4.4 | SDP entry without DIP flip | requires asserting `BOOT_MODE` straps via the carrier's BMP firmware | i.MX mask-ROM SDP mode (Layer 5 below) | not implemented; would need carrier firmware change | **GAP — investigate whether the on-carrier J-Link can drive the BOOT_MODE pins.** Would convert T3a from a physical to a soft procedure. |
 
 ---
@@ -122,22 +122,22 @@ bench. See [T3a_sdp_uuu_reflash.md](T3a_sdp_uuu_reflash.md) and
 - 1.2, 1.4 → T1
 - 2.1 (script exists; only referenced as HC-03 follow-up)
 - 2.2, 3.1 (used inside `revive_bridge.sh`)
-- 3.2, 3.3 (entire Stage 1 pipeline depends on these)
+- 3.2 (entire Stage 1 pipeline depends on it)
 
 **Documentation gaps (worth promoting to standalone steps):**
 1. **`systemctl reboot`** (1.8) and **`reboot -f`** (1.9) — should be a documented "T0.5" between T0 and T1; tried before T1's watchdog-induced reboot.
-2. **SysRq triggers** (1.10) — verify `kernel.sysrq` setting; if enabled, `echo b` is the cleanest soft reboot when systemd is wedged.
+2. **SysRq triggers** (1.10) — root can use them whatever `kernel.sysrq` says; `s`, `u`, `b` is the cleanest forced reboot when systemd is wedged.
 3. **`pkill -9 adbd`** (1.11) — quicker variant of T0/1.3.
 4. **USB gadget `soft_connect` toggle** (1.12) — clears Windows-side transport without rebooting Linux. Needs UDC name discovery on this image.
 5. **`pulse_h7_nrst.sh` (2.1)** — script exists, used during HC-03; promote to its own **T0.7 — H7 NRST pulse** so future operators see it as a discrete option.
 6. **L072 `gpio163` NRST** (3.1) — currently buried inside `revive_bridge.sh`; deserves a one-liner doc as **T0.8 — L072 reset**.
-7. **`AT+REBOOT` over `/dev/ttymxc3`** (3.3) — non-destructive LoRa-stack reset; document as **T0.9**.
+7. **L072 `RESET_REQ`** (3.3) — non-destructive L072 soft reset, already sent by the radio daemons at every link open; restarting the owning daemon is the operator path. (Corrected 2026-10-17: `AT+REBOOT` does not exist in the LifeTrac L072 firmware.)
 8. **Single-module `modprobe -r x8h7_<mod>`** (1.6) — UNTESTED, document only after a bench attempt.
 9. **`kexec` recovery** (4.2) — research only; do not promote without a known-good rescue kernel.
 10. **Carrier BMP-driven BOOT_MODE strap** (4.4) — research item; would soft-ify T3a if feasible.
 
 **Cannot be made into soft resets (documented for "do not waste time on"):**
-- 1.13 / 4.3 (kill watchdog petter) — kernel `[watchdogd]` is unkillable.
+- ~~1.13 / 4.3 (kill watchdog petter) — kernel `[watchdogd]` is unkillable.~~ Corrected 2026-10-17: a userspace open + close without `'V'` does trip WDOG1 (see 4.3).
 - Any path that requires clearing i.MX IOMUXC pad-retention without POR — confirmed empirically on Board 1 across 4 soft attempts + 12 h overnight disconnect.
 
 ---
@@ -154,7 +154,7 @@ Linux services healthy?  ── no ──► Layer 1: try 1.8 (systemctl reboot)
 H7 / x8h7 bridge healthy (HC-02)? ── no ──► Layer 2: 2.2 (openocd reset run) or 2.1 (NRST pulse).
         │ yes
         ▼
-LoRa modem responding (AT)? ── no ──► Layer 3: 3.3 (AT+REBOOT) → 3.1 (gpio163 NRST) → 3.2 (BLS entry).
+LoRa modem responding?  ── no ──► Layer 3: 3.3 (RESET_REQ via daemon restart) → 3.1 (gpio163 NRST) → 3.2 (BLS entry).
         │ yes
         ▼
 Stage 1 still failing?  ── yes ──► IOMUXC drift suspected → Layer 4 (T2 cold cycle) — no soft path will fix it.
