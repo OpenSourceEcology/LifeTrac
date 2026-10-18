@@ -43,7 +43,8 @@ SIL tests, run from `base_station/` with `python -m pytest tests -q`:
    than `max_age` seconds of **uptime** (missing file: since the supervisor
    started watching it).
 4. A node-level fault (docker down, stale heartbeat, a container whose
-   restarts are used up) in `FAIL_THRESHOLD` passes in a row goes to the
+   restarts are used up or whose next restart cannot be recorded because the
+   state directory is not writable) in `FAIL_THRESHOLD` passes in a row goes to the
    reboot rung, through these gates in order:
 
 | Gate | Blocks the reboot when | Logged as |
@@ -184,11 +185,15 @@ next pass logs the change. Arming also arms the forced-reboot rung (sysrq
 can land mid-write on `/mnt/boot` (FAT, the only u-boot env copy), so arming
 any production node waits on TODO.md PWR-7 (crash-only storage) as well.
 
-The unit orders itself `After=docker.service` with no `Wants=` or
-`Requires=`: starting or restarting the supervisor never starts a stopped
-`docker.service` (which would start every container with a restart policy,
-radio daemons included), and stopping docker never stops the supervisor.
-LmP's `multi-user.target` already starts docker at boot.
+The unit has no dependency on `docker.service` at all (no `Requires=`,
+`Wants=` or `After=`): starting or restarting the supervisor never starts a
+stopped `docker.service` (which would start every container with a restart
+policy, radio daemons included), stopping docker never stops the
+supervisor, and a dockerd that hangs at boot before it reports ready
+(LmP's unit is `Type=notify` with `TimeoutSec=0`) cannot keep the
+supervisor from starting. The first passes may find docker still starting;
+the 600 s reboot grace covers that. LmP's `multi-user.target` already
+starts docker at boot.
 
 ### Open items
 
@@ -199,7 +204,7 @@ LmP's `multi-user.target` already starts docker at boot.
   shows both at 0, `bootlimit=5`, no `fiovb_rpmb`).
 - **Decided 2026-10-17 after review:** `ROLE` defaults to tractor, not
   base, so a missing or broken config can never turn tractor reboots on; and
-  the unit uses `After=docker.service` alone (see above).
+  the unit has no dependency on `docker.service` (see above).
 - An install step in provisioning (an `install_supervisor` script or part of
   X8OS-4), merging with OTA_STRATEGY.md's `lifetrac-health`, and publishing
   `last_reset_reason` in telemetry.

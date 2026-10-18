@@ -65,8 +65,9 @@
 #      container in the CONTAINERS allowlist. Unhealthy = not "running", or
 #      health "unhealthy", or missing. After FAIL_THRESHOLD bad passes in a
 #      row: `docker restart`, at most CONTAINER_RESTART_MAX times per
-#      container per boot. A container whose restarts are used up is a
-#      node-level fault. Docker resolves a name it cannot find as an ID
+#      container per boot. A container whose restarts are used up, or whose
+#      next restart cannot be recorded (state not writable), is a node-level
+#      fault and is not restarted. Docker resolves a name it cannot find as an ID
 #      prefix, so hex-only names are refused at config time and a container
 #      whose inspected Name is not "/<name>" is never restarted.
 #   3. HEARTBEATS (path:max_age_s): stale as described above. A missing file
@@ -735,7 +736,18 @@ check_container() {
     return 0
   fi
   _ct_n=$((_ct_n + 1))
-  kv_put "$_ct_cf" "$_ct_n"
+  # No restart that the per-boot budget cannot record (2026-10-17 review): on
+  # full or read-only storage the old count would stay on disk and every
+  # later pass would restart again, past CONTAINER_RESTART_MAX. Treat it like
+  # an exhausted budget; the reboot rung refuses too while it cannot persist
+  # its own counter. A disarmed run only logs, so it carries on (an unusable
+  # state dir already forces DISARMED).
+  if ! kv_put "$_ct_cf" "$_ct_n" && [ "$ARMED" = 1 ]; then
+    log "REFUSED restart container=$_ct: cannot record restart $_ct_n/$CONTAINER_RESTART_MAX in $_ct_cf (state not writable); nothing restarted -> node-level fault"
+    add_decision "restart_unrecorded:$_ct"
+    add_fault "container_unrecorded:$_ct"
+    return 0
+  fi
   kv_put "$RUN/c.$_ct.streak" 0
   if [ "$_ct_foreign" = 1 ]; then
     # Counted like a missing container, so the ladder ends the same way.

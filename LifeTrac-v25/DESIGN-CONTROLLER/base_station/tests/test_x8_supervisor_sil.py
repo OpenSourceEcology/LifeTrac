@@ -286,20 +286,23 @@ class X8SUP_A_Static(unittest.TestCase):
             "RestartSec=10",
             "WatchdogSec=300",
             "NotifyAccess=all",
-            "After=docker.service",
             "ExecStart=/opt/lifetrac/x8_recovery/lifetrac-supervisor.sh run",
         ):
             self.assertIn(want, body)
-        # After= only: Requires= would stop the supervisor with docker, and
-        # Wants= would start a stopped docker (and its radio containers) on
-        # every start of this unit.
-        self.assertFalse(any(ln.startswith(("Requires=", "Wants=")) for ln in body))
+        # No docker.service dependency: Requires= would stop the supervisor
+        # with docker, Wants= would start a stopped docker (and its radio
+        # containers) on every start of this unit, and After= would block the
+        # supervisor behind a dockerd that hangs before READY=1 (TimeoutSec=0).
+        self.assertFalse([ln for ln in body if ln.startswith(("Requires=", "Wants=", "After=", "BindsTo=", "Requisite="))
+                          and "docker" in ln])
         header = unit.split("[Unit]")[0]
         self.assertIn("/etc/systemd/system", header)
         self.assertIn("supervisor.armed", header)
         self.assertRegex(header, r"(?i)not installed by any script")
-        # The header has to say why there is no Wants=.
-        self.assertRegex(header, r"(?is)no Wants=.*start a stopped docker\.service")
+        # The header has to say why there is no docker dependency.
+        self.assertRegex(header, r"(?is)no Requires=, Wants= or\s+#\s+After=")
+        self.assertRegex(header, r"(?is)Wants= would start a stopped docker\.service")
+        self.assertRegex(header, r"(?is)TimeoutSec=0")
 
     def test_conf_example_ships_empty_allowlist_with_warnings(self) -> None:
         text = _CONF_EXAMPLE.read_text(encoding="utf-8")
@@ -626,6 +629,30 @@ class X8SUP_B_Supervisor(unittest.TestCase):
         self.set_boot(BOOT_B)
         self.passes(2)
         self.assertEqual(len(self.calls("docker restart")), 3)
+
+    def test_restart_refused_when_its_count_cannot_be_recorded(self) -> None:
+        # Copilot review on PR #153: on full or read-only storage the restart
+        # count stays at its old value, so every pass would restart again past
+        # CONTAINER_RESTART_MAX. A directory where the counter's temp file
+        # goes makes the write fail even for root.
+        self.arm()
+        self.write_conf(CONTAINERS="ctr", FAIL_THRESHOLD="1",
+                        CONTAINER_RESTART_MAX="1", REBOOT_GRACE_S="0")
+        self.set_container("ctr", "running healthy")
+        self.run_sv("once")  # sets up this boot's per-boot state
+        (self.state / "per_boot" / "c.ctr.restarts.tmp").mkdir()
+        self.set_container("ctr", "running unhealthy")
+        self.run_sv("once")
+        self.assertEqual(self.calls("docker restart"), [])
+        self.assertIn("REFUSED restart container=ctr: cannot record restart 1/1", self.sv_log())
+        self.assertIn("restart_unrecorded:ctr", self.state_kv("status")["decision"])
+        # Escalates like an exhausted budget: a node-level fault, so the
+        # reboot rung runs (its own counter is still writable here).
+        self.assertEqual(len(self.calls("systemctl reboot")), 1)
+        self.assertEqual(self.state_kv("last_action")["reason"], "container_unrecorded:ctr")
+        # Later passes in the same boot still restart nothing.
+        self.passes(2)
+        self.assertEqual(self.calls("docker restart"), [])
 
     def test_grace_blocks_reboot_until_uptime(self) -> None:
         self.arm()

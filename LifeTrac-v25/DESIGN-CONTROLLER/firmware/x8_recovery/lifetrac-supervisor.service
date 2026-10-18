@@ -26,14 +26,19 @@
 #
 # Why these settings:
 #   - Host service, not a container, so it keeps working when Docker does not.
-#   - After=docker.service only, no Wants= or Requires= (decided
-#     2026-10-17 after review). Requires= would stop the supervisor when
-#     docker stops, and docker being down is one of the faults it watches.
-#     Wants= would start a stopped docker.service, and every container with
-#     a restart policy (radio daemons open /dev/ttymxc3 and send the L072 a
-#     RESET_REQ), on every start of this unit, crash and watchdog restarts
-#     included. LmP's multi-user.target already wants docker.service at
-#     boot, and After= orders the first pass behind its start.
+#   - No dependency on docker.service at all: no Requires=, Wants= or
+#     After= (decided 2026-10-17 after review). Requires= would stop the
+#     supervisor when docker stops, and docker being down is one of the
+#     faults it watches. Wants= would start a stopped docker.service, and
+#     every container with a restart policy (radio daemons open /dev/ttymxc3
+#     and send the L072 a RESET_REQ), on every start of this unit, crash and
+#     watchdog restarts included. After= would hold this unit's start until
+#     docker's start job finishes, and LmP's docker.service is Type=notify
+#     with TimeoutSec=0 (bench-evidence/board_state_2026-10-04/base/
+#     12_unit_cat.txt), so a dockerd that hangs before READY=1 would keep
+#     the supervisor from ever starting (Copilot review, PR #153). Without
+#     it the first passes may find docker still starting; REBOOT_GRACE_S
+#     (600 s) covers that. LmP's multi-user.target already starts docker.
 #   - WatchdogSec=300 + NotifyAccess=all: the script sends WATCHDOG=1 through
 #     a child `systemd-notify` after every pass (and after each container
 #     restart, and before the reboot rung), so a supervisor stuck for 5 min
@@ -49,7 +54,6 @@
 #     /var/lib/lifetrac/supervisor, so a restart loses nothing.
 [Unit]
 Description=LifeTrac X8 host health supervisor (L3; disarmed unless /etc/lifetrac/supervisor.armed)
-After=docker.service
 
 [Service]
 Type=simple
