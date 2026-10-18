@@ -1493,7 +1493,17 @@ force_reboot() {  # REASON WHY
     # A reset can land at any moment from here, and the request stays until
     # it does, even if this path returns.
     if ! mark_reset_issued "$TF_ID"; then
-      log "ERROR cannot write $RESET_FILE: this process keeps the motion-hold request, a restarted one would not"
+      if [ "$_fr_was" != 1 ]; then
+        # Nothing else records a reset in this boot, so a restart or a
+        # second instance would withdraw the request while this path resets:
+        # refuse, as the rung does (Copilot review on #156).
+        clear_reset_issued
+        log "REFUSED forced reboot: cannot write $RESET_FILE, so a restart or a second instance could release the motion hold during the forced reset reason=$1"
+        add_decision force_refused:reset_marker
+        abandon_reboot "$1" "force_refused:reset_marker:$2"
+        return 0
+      fi
+      log "ERROR cannot rewrite $RESET_FILE: the record of the reset issued earlier in this boot still keeps the motion-hold request"
     fi
   fi
   kv_int "$STATE/consecutive_reboots" 0
@@ -1742,6 +1752,20 @@ usage() {
   printf '%s\n' "usage: $0 run|once|status|clear-hold" >&2
 }
 
+# on_stop SIGNAL: the process is being stopped (`systemctl stop`, the
+# shutdown, or a kill by hand). A motion-hold request with no reset issued
+# behind it must not outlive it: an explicit stop does not restart the
+# service, so the startup cleanup would not run and the H747 would keep
+# motion off (Copilot review on #156). withdraw_lock keeps the request when a
+# reset was issued in this boot, which covers the shutdown of a reboot this
+# process asked for. Then die of the same signal. Not SIGABRT (the unit
+# watchdog): Restart=on-failure restarts the service, and startup cleans up.
+on_stop() {
+  trap - "$1"
+  withdraw_lock "supervisor stopped by SIG$1"
+  kill -s "$1" "$$"
+}
+
 case ${1:-} in
   run|once) ;;
   status) cmd_status; exit $? ;;
@@ -1750,6 +1774,9 @@ case ${1:-} in
 esac
 
 startup
+trap 'on_stop TERM' TERM
+trap 'on_stop INT' INT
+trap 'on_stop HUP' HUP
 if [ "$1" = once ]; then
   pass
   notify_watchdog

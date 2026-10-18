@@ -172,7 +172,13 @@ the board then stays up in that boot.
   it goes ahead with `b`, one settle later), and, without sysrq, after a
   bounded sync right before `systemctl reboot -ff` (which syncs again
   before it resets). If the hold is gone by then it gives up, and if no
-  reset was issued earlier in this boot it withdraws the request. No OTA
+  reset was issued earlier in this boot it withdraws the request. It is
+  refused when its reset record cannot be written and no earlier reset in
+  this boot recorded one. Stopping the service (`systemctl stop`, a kill
+  by hand) withdraws a request that has no reset behind it, because an
+  explicit stop does not restart the service and the startup cleanup
+  would not run; a stop after the reset was issued, such as the shutdown
+  of that reboot, keeps it. No OTA
   probation override. The systemd-owned hardware watchdog (L2) is not
   installed on the tractor, because a watchdog reset cannot wait for idle,
   so a shutdown that hangs after the supervisor has stopped waits for

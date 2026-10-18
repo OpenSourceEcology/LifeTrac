@@ -138,6 +138,15 @@ fi
 if [ "$*" = reboot ] && [ -f "$FAKE_DIR/on_reboot_link_mode" ]; then
   cat "$FAKE_DIR/on_reboot_link_mode" > "$FAKE_DIR/link_mode"
 fi
+# The forced path's reset record cannot be written (Copilot review on #156).
+if [ "$*" = reboot ] && [ -f "$FAKE_DIR/on_reboot_block_reset_record" ]; then
+  mkdir -p "${FAKE_REQ%/*}/reset_issued.tmp"
+fi
+# The supervisor is stopped while systemd is being asked.
+if [ "$*" = reboot ] && [ -f "$FAKE_DIR/on_reboot_hang" ]; then
+  : > "$FAKE_DIR/reboot_hanging"
+  sleep 3
+fi
 # A slow rung: uptime has moved on by the time systemd takes the reboot.
 if [ "$*" = reboot ] && [ -f "$FAKE_DIR/uptime_at_accept" ]; then
   cat "$FAKE_DIR/uptime_at_accept" > "$FAKE_UPTIME"
@@ -200,6 +209,11 @@ if [ -f "$FAKE_DIR/on_sync_after_log" ]; then
   case $last in *"$needle"*) ;; *) only=skip ;; esac
 fi
 if [ -f "$FAKE_REQ" ] && [ "$only" != skip ]; then
+  # The supervisor is stopped during these record writes.
+  if [ -f "$FAKE_DIR/on_sync_hang" ]; then
+    : > "$FAKE_DIR/sync_hanging"
+    sleep 3
+  fi
   if [ -f "$FAKE_DIR/on_sync_rm_request" ]; then
     rm -f "$FAKE_REQ"
   fi
@@ -576,7 +590,9 @@ class X8SUP_B_Supervisor(unittest.TestCase):
             f.unlink()
         for name in ("link_mode", "on_reboot_link_mode", "on_sync_rm_request",
                      "on_sync_link_busy", "on_sync_link_stale_lock", "on_sync_only_for",
-                     "on_sync_after_log", "systemctl_reboot_rc"):
+                     "on_sync_after_log", "on_sync_hang", "sync_hanging",
+                     "on_reboot_hang", "reboot_hanging", "on_reboot_block_reset_record",
+                     "systemctl_reboot_rc"):
             (self.fake / name).unlink(missing_ok=True)
         shutil.rmtree(self.req_file.parent, ignore_errors=True)
         self.idle_file.unlink(missing_ok=True)
@@ -709,7 +725,11 @@ class X8SUP_B_Supervisor(unittest.TestCase):
         self.assertIsNone(self.run_proc.poll(), "the run loop exited by itself")
         os.killpg(self.run_proc.pid, signal.SIGTERM)
         self.run_proc.wait(timeout=10)
-        self.assertEqual(self.run_err.read_text(encoding="utf-8"), "")
+        # The stop trap lets the shell outlive the child the stop killed, so
+        # the shell reports it ("Terminated"); nothing else may be printed.
+        err = [ln for ln in self.run_err.read_text(encoding="utf-8").splitlines()
+               if not ln.rstrip().endswith("Terminated")]
+        self.assertEqual(err, [])
 
     def wait_for(self, cond, what: str, timeout: float = 20.0) -> None:
         deadline = time.monotonic() + timeout
@@ -2166,6 +2186,93 @@ class X8SUP_B_Supervisor(unittest.TestCase):
         self.assertIn("ERROR last_action could not be rewritten", log)
         self.assertNotIn("last_action rewritten", log)
         self.assertEqual(self.state_kv("last_action")["action"], "reboot")
+
+    def test_tractor_forced_path_refuses_without_its_reset_record(self) -> None:
+        # Copilot review on #156: after a `systemctl reboot` that failed
+        # outright, the forced path's own record is the only one; if it
+        # cannot be written, a restart could withdraw the request during the
+        # reset, so the forced path is refused, as the rung is.
+        self._tractor()
+        self.set_fake("systemctl_reboot_rc", "1")
+        self.set_fake("on_reboot_block_reset_record", "1")
+        link = self.start_link("grant")
+        self.run_sv("once")
+        log = self.sv_log()
+        self.assertIn("REFUSED forced reboot: cannot write", log)
+        self.assertEqual(self.sysrq_text(), "")
+        self.assertEqual(self.calls("systemctl reboot -ff"), [])
+        la = self.state_kv("last_action")
+        self.assertEqual((la["action"], la["detail"]),
+                         ("reboot_abandoned", "force_refused:reset_marker:systemctl_reboot_rc_1"))
+        self.assertIn("force_refused:reset_marker", self.state_kv("status")["decision"])
+        self.assertIsNone(self.request())
+        self.assertFalse(self.reset_file.exists())
+        # A restarted supervisor, the fault gone: nothing left to reset.
+        self.set_docker_info_rc(0)
+        self.set_uptime(1030)
+        self.run_sv("once")
+        link.stop()
+        self.assertIsNone(self.request())
+        self.assertEqual(self.sysrq_text(), "")
+        self.assertEqual(self.calls("systemctl reboot -ff"), [])
+
+    def test_tractor_forced_path_after_an_accepted_reboot_keeps_its_old_record(self) -> None:
+        # The other side: systemd took a reboot earlier in this boot and its
+        # record stands, so a failed rewrite does not stop the forced path.
+        self._accepted_reboot(ROLE="tractor", TRACTOR_REBOOT_ENABLED="1")
+        (self.req_file.parent / "reset_issued.tmp").mkdir()
+        self.set_uptime(1180)
+        self.run_sv("once")
+        log = self.sv_log()
+        self.assertIn("ERROR cannot rewrite", log)
+        self.assertNotIn("REFUSED forced reboot", log)
+        self.assertEqual(self.sysrq_text(), "sub")
+        self.assertEqual(self.request(), "aaaaaaaa-1000")
+        self.assertTrue(self.reset_file.exists())
+
+    def test_tractor_stop_withdraws_a_request_with_no_reset_behind_it(self) -> None:
+        # Copilot review on #156: a service stopped between writing the
+        # request and issuing the reset left the request behind, and an
+        # explicit stop does not restart the service, so the H747 kept
+        # motion off with no reboot coming. Stopped once a reset is issued
+        # (the shutdown of the reboot it asked for), it keeps the request.
+        cases = {
+            # waiting for the H747 to take the hold
+            "handshake": ("idle", {}, lambda: self.req_file.exists(), False),
+            # writing the records after the hold
+            "records": ("grant", {"on_sync_only_for": "reboot", "on_sync_hang": "1"},
+                        lambda: (self.fake / "sync_hanging").exists(), False),
+            # while systemd is being asked
+            "asking_systemd": ("grant", {"on_reboot_hang": "1"},
+                               lambda: (self.fake / "reboot_hanging").exists(), True),
+            # after systemd took the reboot
+            "accepted": ("grant", {}, lambda: self.pending_marker().exists(), True),
+        }
+        for case, (mode, fakes, ready, kept) in cases.items():
+            with self.subTest(case=case):
+                self.fresh()
+                self._tractor(TRACTOR_IDLE_WAIT_S="15")
+                for name, value in fakes.items():
+                    self.set_fake(name, value)
+                link = self.start_link(mode)
+                try:
+                    self.start_run()
+                    self.wait_for(ready, case)
+                    self.stop_run()
+                finally:
+                    link.stop()
+                self.assertEqual(self.run_proc.returncode, -signal.SIGTERM)
+                log = self.sv_log()
+                self.assertEqual(self.sysrq_text(), "")
+                self.assertEqual(self.calls("systemctl reboot -ff"), [])
+                if kept:
+                    self.assertEqual(self.request(), "aaaaaaaa-1000")
+                    self.assertIn("LOCK kept (supervisor stopped by SIGTERM)", log)
+                else:
+                    self.assertIsNone(self.request())
+                    self.assertIn("LOCK withdrawn (supervisor stopped by SIGTERM)", log)
+                    self.assertEqual(self.calls("systemctl"), [])
+                    self.assertFalse(self.reset_file.exists())
 
     def test_tractor_forced_path_giving_up_withdraws_when_nothing_was_issued(self) -> None:
         # Follow-up review: after a `systemctl reboot` that failed outright
