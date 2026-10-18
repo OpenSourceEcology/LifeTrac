@@ -592,6 +592,7 @@ class X8SUP_B_Supervisor(unittest.TestCase):
                      "on_sync_link_busy", "on_sync_link_stale_lock", "on_sync_only_for",
                      "on_sync_after_log", "on_sync_hang", "sync_hanging",
                      "on_reboot_hang", "reboot_hanging", "on_reboot_block_reset_record",
+                     "on_dd_hang", "dd_hanging",
                      "systemctl_reboot_rc"):
             (self.fake / name).unlink(missing_ok=True)
         shutil.rmtree(self.req_file.parent, ignore_errors=True)
@@ -721,14 +722,17 @@ class X8SUP_B_Supervisor(unittest.TestCase):
                 pass
             self.run_proc.wait(timeout=10)
 
-    def stop_run(self) -> None:
+    def stop_run(self, sig: signal.Signals = signal.SIGTERM) -> None:
         self.assertIsNone(self.run_proc.poll(), "the run loop exited by itself")
-        os.killpg(self.run_proc.pid, signal.SIGTERM)
+        os.killpg(self.run_proc.pid, sig)
         self.run_proc.wait(timeout=10)
         # The stop trap lets the shell outlive the child the stop killed, so
-        # the shell reports it ("Terminated"); nothing else may be printed.
+        # the shell may report it ("Terminated", "Interrupt", "Hangup");
+        # nothing else may be printed.
+        report = {signal.SIGTERM: "Terminated", signal.SIGINT: "Interrupt",
+                  signal.SIGHUP: "Hangup"}[sig]
         err = [ln for ln in self.run_err.read_text(encoding="utf-8").splitlines()
-               if not ln.rstrip().endswith("Terminated")]
+               if ln.strip() and not ln.rstrip().endswith(report)]
         self.assertEqual(err, [])
 
     def wait_for(self, cond, what: str, timeout: float = 20.0) -> None:
@@ -2230,48 +2234,86 @@ class X8SUP_B_Supervisor(unittest.TestCase):
         self.assertEqual(self.request(), "aaaaaaaa-1000")
         self.assertTrue(self.reset_file.exists())
 
+    def _dd_hangs_once_after_the_reset_record(self) -> None:
+        """A dd that stalls once, after the reset record is written: the
+        rung's last look, between the record and `systemctl reboot`."""
+        wrapper = self.bin / "dd"
+        wrapper.write_text(
+            "#!/bin/sh\n"
+            'if [ -f "$FAKE_DIR/on_dd_hang" ] && [ -f "${FAKE_REQ%/*}/reset_issued" ]; then\n'
+            '  rm -f "$FAKE_DIR/on_dd_hang"\n'
+            '  : > "$FAKE_DIR/dd_hanging"\n'
+            "  sleep 1\n"
+            "fi\n"
+            f'exec "{self.tools / "dd"}" "$@"\n', encoding="utf-8")
+        wrapper.chmod(0o755)
+        self.addCleanup(wrapper.unlink, missing_ok=True)
+        self.set_fake("on_dd_hang", "1")
+
     def test_tractor_stop_withdraws_a_request_with_no_reset_behind_it(self) -> None:
         # Copilot review on #156: a service stopped between writing the
-        # request and issuing the reset left the request behind, and an
+        # request and sending the reset left the request behind, and an
         # explicit stop does not restart the service, so the H747 kept
-        # motion off with no reboot coming. Stopped once a reset is issued
+        # motion off with no reboot coming. Stopped once a reset is sent
         # (the shutdown of the reboot it asked for), it keeps the request.
+        # (mode, fake files, conf, ready, kept, sysrq written, systemctl calls)
+        rc1 = {"systemctl_reboot_rc": "1"}
         cases = {
             # waiting for the H747 to take the hold
-            "handshake": ("idle", {}, lambda: self.req_file.exists(), False),
+            "handshake": ("idle", {}, {}, lambda: self.req_file.exists(), False, "", 0),
             # writing the records after the hold
-            "records": ("grant", {"on_sync_only_for": "reboot", "on_sync_hang": "1"},
-                        lambda: (self.fake / "sync_hanging").exists(), False),
+            "records": ("grant", {"on_sync_only_for": "reboot", "on_sync_hang": "1"}, {},
+                        lambda: (self.fake / "sync_hanging").exists(), False, "", 0),
+            # reset record written, last look running, systemctl not called
+            "last_look": ("grant", {}, {}, lambda: (self.fake / "dd_hanging").exists(),
+                          False, "", 0),
+            # forced path after a failed `systemctl reboot` (nothing queued):
+            # its record written, still writing last_action
+            "forced_record": ("grant", {**rc1, "on_sync_only_for": "force_reboot", "on_sync_hang": "1"},
+                              {}, lambda: (self.fake / "sync_hanging").exists(), False, "", 1),
+            # ... or in the sysrq s settle, before u
+            "forced_settle": ("grant", rc1, {"SYSRQ_SETTLE_S": "5"},
+                              lambda: self.sysrq_text() == "s", False, "s", 1),
             # while systemd is being asked
-            "asking_systemd": ("grant", {"on_reboot_hang": "1"},
-                               lambda: (self.fake / "reboot_hanging").exists(), True),
+            "asking_systemd": ("grant", {"on_reboot_hang": "1"}, {},
+                               lambda: (self.fake / "reboot_hanging").exists(), True, "", 1),
             # after systemd took the reboot
-            "accepted": ("grant", {}, lambda: self.pending_marker().exists(), True),
+            "accepted": ("grant", {}, {}, lambda: self.pending_marker().exists(), True, "", 1),
+            # after the forced path sent its resets and (the fakes) returned
+            "forced_returned": ("grant", rc1, {},
+                                lambda: "LOCK kept (reboot abandoned)" in self.sv_log(), True, "sub", 2),
         }
-        for case, (mode, fakes, ready, kept) in cases.items():
-            with self.subTest(case=case):
+        runs = [(case, signal.SIGTERM) for case in cases]
+        runs += [(case, sig) for case in ("handshake", "accepted")
+                 for sig in (signal.SIGINT, signal.SIGHUP)]
+        for case, sig in runs:
+            mode, fakes, conf, ready, kept, sysrq, n_systemctl = cases[case]
+            with self.subTest(case=case, sig=sig.name):
                 self.fresh()
-                self._tractor(TRACTOR_IDLE_WAIT_S="15")
+                self._tractor(TRACTOR_IDLE_WAIT_S="15", **conf)
                 for name, value in fakes.items():
                     self.set_fake(name, value)
+                if case == "last_look":
+                    self._dd_hangs_once_after_the_reset_record()
                 link = self.start_link(mode)
                 try:
                     self.start_run()
                     self.wait_for(ready, case)
-                    self.stop_run()
+                    self.stop_run(sig)
                 finally:
                     link.stop()
-                self.assertEqual(self.run_proc.returncode, -signal.SIGTERM)
+                    (self.bin / "dd").unlink(missing_ok=True)
+                self.assertEqual(self.run_proc.returncode, -sig)
                 log = self.sv_log()
-                self.assertEqual(self.sysrq_text(), "")
-                self.assertEqual(self.calls("systemctl reboot -ff"), [])
+                self.assertEqual(self.sysrq_text(), sysrq)
+                self.assertEqual(len(self.calls("systemctl reboot -ff")), 1 if sysrq == "sub" else 0)
+                self.assertEqual(len(self.calls("systemctl")), n_systemctl)
                 if kept:
                     self.assertEqual(self.request(), "aaaaaaaa-1000")
-                    self.assertIn("LOCK kept (supervisor stopped by SIGTERM)", log)
+                    self.assertIn(f"LOCK kept (supervisor stopped by {sig.name})", log)
                 else:
                     self.assertIsNone(self.request())
-                    self.assertIn("LOCK withdrawn (supervisor stopped by SIGTERM)", log)
-                    self.assertEqual(self.calls("systemctl"), [])
+                    self.assertIn(f"LOCK withdrawn (supervisor stopped by {sig.name})", log)
                     self.assertFalse(self.reset_file.exists())
 
     def test_tractor_forced_path_giving_up_withdraws_when_nothing_was_issued(self) -> None:

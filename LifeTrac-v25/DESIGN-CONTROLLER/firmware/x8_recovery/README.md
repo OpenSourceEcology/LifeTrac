@@ -177,8 +177,12 @@ the board then stays up in that boot.
   this boot recorded one. Stopping the service (`systemctl stop`, a kill
   by hand) withdraws a request that has no reset behind it, because an
   explicit stop does not restart the service and the startup cleanup
-  would not run; a stop after the reset was issued, such as the shutdown
-  of that reboot, keeps it. No OTA
+  would not run. That includes a stop after the reset record is written
+  but before the reset is sent (the last look, or the forced path's
+  record and `s` settle after a `systemctl reboot` that failed outright).
+  A stop once the reset was sent (`systemctl reboot` called, `reboot -ff`,
+  or an earlier reset in this boot), such as the shutdown of that reboot,
+  keeps it. No OTA
   probation override. The systemd-owned hardware watchdog (L2) is not
   installed on the tractor, because a watchdog reset cannot wait for idle,
   so a shutdown that hangs after the supervisor has stopped waits for

@@ -294,6 +294,9 @@ IDLE_RID=
 IDLE_SEEN=
 TF_ID=
 RESET_ISSUED=0
+# 1 while this process's own reset record is written but the reset it
+# announces is not sent yet: a stop then clears it (on_stop).
+RESET_PROV=0
 
 set_defaults() {
   ROLE=tractor   # fail-safe, see the header: only an explicit ROLE=base is base
@@ -1171,6 +1174,7 @@ mark_reset_issued() {
 # signal, so systemd queued nothing), and none was issued earlier in this boot.
 clear_reset_issued() {
   RESET_ISSUED=0
+  RESET_PROV=0
   rm -f "$RESET_FILE" 2>/dev/null
   if [ -e "$RESET_FILE" ]; then
     RESET_ISSUED=1
@@ -1345,6 +1349,7 @@ bootcount=$PROBATION_BC"
     fi
     # Recorded before systemd can take the reboot: from here on no path in
     # this boot, a restarted supervisor included, withdraws the request.
+    [ "$_rr_was" = 1 ] || RESET_PROV=1
     if ! mark_reset_issued "$_rr_id"; then
       if [ "$_rr_was" != 1 ]; then
         clear_reset_issued
@@ -1368,6 +1373,7 @@ bootcount=$PROBATION_BC"
     fi
   fi
   add_decision reboot
+  RESET_PROV=0
   timeout 30 systemctl reboot >/dev/null 2>&1
   _rr_rc=$?
   if [ "$_rr_rc" -eq 0 ]; then
@@ -1492,6 +1498,7 @@ force_reboot() {  # REASON WHY
     fi
     # A reset can land at any moment from here, and the request stays until
     # it does, even if this path returns.
+    [ "$_fr_was" = 1 ] || RESET_PROV=1
     if ! mark_reset_issued "$TF_ID"; then
       if [ "$_fr_was" != 1 ]; then
         # Nothing else records a reset in this boot, so a restart or a
@@ -1542,6 +1549,9 @@ force_reboot() {  # REASON WHY
     timeout 10 sync >/dev/null 2>&1
     force_hold_ok "$1" "$2" "before systemctl reboot -ff" || return 0
   fi
+  # Sent (b, if written, reset the board before this): a stop from here
+  # on keeps the request, like the reset record.
+  RESET_PROV=0
   timeout 30 systemctl reboot -ff >/dev/null 2>&1
   _fr_rc=$?
   rc_note "$_fr_rc"
@@ -1762,6 +1772,12 @@ usage() {
 # watchdog): Restart=on-failure restarts the service, and startup cleans up.
 on_stop() {
   trap - "$1"
+  # Stopped after writing its own reset record but before sending the reset
+  # (the record syncs, the sysrq s settle, the last looks): nothing is
+  # coming, so the record goes and the request with it.
+  if [ "$RESET_PROV" = 1 ]; then
+    clear_reset_issued
+  fi
   withdraw_lock "supervisor stopped by SIG$1"
   kill -s "$1" "$$"
 }
