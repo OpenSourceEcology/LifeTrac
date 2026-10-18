@@ -18,7 +18,7 @@
 #                        probe files only if they are missing.
 #   --no-park            stop the camera and read the state, but do not park
 #   --stop-leg-daemons   also stop leftover tx_smoke / rx_smoke / synth_pub /
-#                        camera_svc / rs13_cap* containers (a harness that was
+#                        camera_svc / rs13_cap* / bench_inject containers (a harness that was
 #                        interrupted leaves them running; tx_smoke can transmit).
 #                        Without it a board with one running is reported, not probed.
 #   --capture            after a board is handled, run the read-only
@@ -60,7 +60,7 @@ case $ONLY in ''|base|tractor) ;; *) die "--only base|tractor" ;; esac
 case $TIMEOUT_MIN in ''|*[!0-9]*) die "--timeout takes whole minutes" ;; esac
 ROLES="tractor base"; [ -n "$ONLY" ] && ROLES=$ONLY
 STAMP_LOG="$BENCH_SCRATCH/power_up_guard_$(date -u +%Y-%m-%d).log"
-LEG_DAEMONS='^(tx_smoke|rx_smoke|synth_pub|camera_svc|rs13_cap|rs13_cap_base)$'
+LEG_DAEMONS='^(tx_smoke|rx_smoke|synth_pub|camera_svc|rs13_cap|rs13_cap_base|bench_inject)$'
 
 radio_read() {   # $1 who, $2 image -> the RADIO_STATE / STATE_FAIL line
   board_sh "$1" "$SUDO $PROBE_RUN $2 -u /work/radio_state.py 2>&1 | tail -1"

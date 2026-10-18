@@ -7,7 +7,11 @@
 #
 # Usage:   bash step1_pass.sh <bw250|bw500> <scene> [--from-work] [--suffix S]
 #                             [--scene-min PCT] [--no-scene-check]
-#   bw250|bw500     one-fragment budget/profile (image_bw250 = 203 B, image_bw500 = 243 B)
+#   bw250|bw500     one-fragment budget/profile (image_bw250 = 203 B, image_bw500 = 243 B),
+#                   with the radio profile the harness gives camera_svc on those legs
+#                   (LIFETRAC_REG_PROFILE 1 = FHSS / 2 = DTS). Without it camera_service's
+#                   VECTOR cold-start clamp takes the smaller one-fragment payload of the
+#                   two (203 B): the 2026-10-14 bw500 passes encoded at 203 B.
 #   <scene>         name in the file tag, e.g. moving, landscape (scene and suffix:
 #                   letters, digits, '_', '.', '-' only)
 #   --from-work     run camera_service.py and x8_image_pipeline from the pushed
@@ -33,6 +37,13 @@
 #          leg daemon (tx_smoke / rx_smoke / synth_pub) runs on the tractor: a
 #          running tx daemon would put the camera frames on the air.
 #          LIFETRAC_USE_LORA_BRIDGE=1 publishes to the local broker only.
+# Exit:    0 pass done; 1 a refused option, profile or name, the tractor unreachable,
+#          no evidence dir; 2 missing arguments / the pass's capture file already exists;
+#          3 tractor not quiet / capture never subscribed; 4 scene check failed;
+#          6 camera_service held VECTOR below the profile's one-fragment budget (its
+#          'VECTOR budget ... until link_budget' line in the boot-log check): the
+#          pass ran to the end and its files are kept, but it is NOT a valid pass
+#          at that budget; 130 / 143 interrupted.
 # Origin:  bench-evidence/RS_13_vector_scene_2026-09-26/scripts/step1_pass.sh and
 #          step1_pass_fix.sh (historical copies, unchanged), merged.
 set -u
@@ -57,13 +68,15 @@ bench_check_name "scene name" "$SCENE"
 [ "$SUFFIX" = unset ] && { [ $FROM_WORK = 1 ] && SUFFIX=_work || SUFFIX=""; }
 [ -z "$SUFFIX" ] || bench_check_name "--suffix" "$SUFFIX"
 PROFILE="image_${BW}"; TAG="${BW}_${SCENE}${SUFFIX}"
+# camera_service's _REG_PROFILE_LINK_PHY: 1 -> image_bw250 (FHSS), 2 -> image_bw500 (DTS)
+case $BW in bw250) REGP=1; BUDGET=203 ;; bw500) REGP=2; BUDGET=243 ;; esac
 if [ -z "$SMIN" ]; then case $SCENE in *moving*|*yt*|*youtube*) SMIN=8 ;; *) SMIN=0 ;; esac; fi
 if [ $FROM_WORK = 1 ]; then WDIR=/work; SCRIPT=/work/camera_service.py; else WDIR=/app; SCRIPT=camera_service.py; fi
 L=$BOARD_STAGE/legs
 E=$(bench_evidence_dir) || die "cannot create $EVIDENCE_DIR"
 OUT="$BENCH_SCRATCH/step1_$TAG"
 
-stamp "== step-1 pass $TAG (profile $PROFILE, camera_service from $WDIR) from $(bench_git_desc)"
+stamp "== step-1 pass $TAG (profile $PROFILE, LIFETRAC_REG_PROFILE=$REGP, camera_service from $WDIR) from $(bench_git_desc)"
 board_present tractor || die "tractor ($TRACTOR_SERIAL) is not reachable via adb"
 # refuse to append onto an earlier pass (--out appends)
 if [ "$(board_sh tractor "ls $L/step1_tractor_$TAG.jsonl 2>/dev/null | wc -l" | tr -d ' ')" != "0" ]; then
@@ -130,14 +143,22 @@ board_sh tractor "$SUDO docker run -d --name camera_svc --network=host --device=
   -e LIFETRAC_MQTT_HOST=127.0.0.1 -e LIFETRAC_CAMERA_SOURCE=v4l2 -e LIFETRAC_CAMERA_DEVICE=/dev/video1 \
   -e LIFETRAC_CAMERA_FPS=2 -e LIFETRAC_USE_LORA_BRIDGE=1 \
   -e LIFETRAC_ENCODE_MODE=9 -e LIFETRAC_VECTOR_DETAIL=80 \
-  -e LIFETRAC_FRAGMENT_BUDGET=1 -e LIFETRAC_FRAGMENT_PROFILE=$PROFILE \
+  -e LIFETRAC_FRAGMENT_BUDGET=1 -e LIFETRAC_FRAGMENT_PROFILE=$PROFILE -e LIFETRAC_REG_PROFILE=$REGP \
   $TRACTOR_APP_IMAGE -u $SCRIPT" | cut -c1-12 | sed 's/^/camera_svc id /'
 stamp "camera_svc launched"
 
 sleep 15
-stamp "boot-log check (+15 s): expect byte_budget=$([ $BW = bw250 ] && echo 203 || echo 243) B, no 'link_budget: ->', no [lora_cmd]"
-board_sh tractor "$SUDO docker logs camera_svc 2>&1 | grep -E 'byte_budget|link_budget: ->|lora_cmd|encode_mode|clamp|Traceback|frame build failed' | head -8" \
+stamp "boot-log check (+15 s): expect byte_budget=$BUDGET B, no 'VECTOR budget ... until link_budget' line, no 'link_budget: ->', no [lora_cmd]"
+board_sh tractor "$SUDO docker logs camera_svc 2>&1 | grep -E 'byte_budget|VECTOR budget|link_budget: ->|lora_cmd|encode_mode|clamp|Traceback|frame build failed' | head -8" \
   | cut -c1-200 | tee "$E/step1_${TAG}_bootcheck.txt"
+# camera_service logs "VECTOR budget N B (one fragment) until link_budget arrives" only
+# when its cold-start clamp holds VECTOR below the $BUDGET B byte_budget. The pass
+# still runs to the end (teardown, files pulled) but exits 6 instead of "done".
+CLAMP=0
+if grep -q 'VECTOR budget' "$E/step1_${TAG}_bootcheck.txt"; then
+  CLAMP=1
+  stamp "WARNING: camera_service holds VECTOR below $BUDGET B (line above): this pass does not encode at the $PROFILE one-fragment limit"
+fi
 echo -n "vector_stats lines so far: "; board_sh tractor "$SUDO docker logs camera_svc 2>&1 | grep -c vector_stats"
 echo -n "encoder module in use: "
 board_sh tractor "$SUDO docker exec camera_svc python3 -c \"import x8_image_pipeline.encode_vector as ev; print(ev.__file__, hasattr(ev.VectorEncoder, '_tick_ttl'))\" 2>&1" \
@@ -159,4 +180,8 @@ cat "$OUT.tractorlog.out"
 for f in step1_tractor_$TAG.jsonl step1_tractor_$TAG.json step1_tractor_$TAG.txt step1_camera_service_$TAG.log step1_tractor_log_$TAG.txt; do
   board_pull tractor "$L/$f" "$E/$f" || echo "PULL FAILED $f"
 done
+if [ $CLAMP = 1 ]; then
+  stamp "== pass $TAG INVALID: camera_service held VECTOR below the $PROFILE budget of $BUDGET B (step1_${TAG}_bootcheck.txt); files kept (evidence: $E)"
+  exit 6
+fi
 stamp "== pass $TAG done (evidence: $E)"

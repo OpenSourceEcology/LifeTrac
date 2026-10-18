@@ -1,17 +1,25 @@
 #!/usr/bin/env bash
 # scene_check.sh -- before EVERY camera run (each step-1 pass, each leg): bring the
 # bench video window to the front (youtube_window.ps1 -Front), grab frames from the
-# tractor's /dev/video1 for ~10 s, report the share of pixels changed over
-# 1.9 / 5 / 10 s, and save the last frame and the numbers as evidence.
+# tractor's /dev/video1 until 10.5 s after its sixth frame (the one the 1.9 / 5 / 10 s
+# pairs are measured from; at most 20 s after the first frame), so a camera that is
+# slow to start, or whose first frames trickle in, no longer eats the window
+# (2026-10-15 preflight_moving reached only 7.2 s), report the share of pixels
+# changed over 1.9 / 5 / 10 s, and save the last frame and the numbers as evidence.
+# No first frame within 20 s of opening the camera, or fewer than 10 frames, fails
+# with a NO-FRAMES line instead of a missing number.
 #
 # Usage:   bash scene_check.sh <tag> [min_pct] [--no-front]
 #   <tag>       file tag: $EVIDENCE_DIR/<tag>_scene.{txt,jpg} (e.g. leg2a, step1_bw250_moving)
 #   min_pct     exit 4 when the 10 s change is below it (default 8 = moving content;
-#               pass 0 for a still scene, which only records -- RS13_VECTOR_LEG.md "Scene")
+#               pass 0 for a still scene, which only records -- RS13_VECTOR_LEG.md "Scene");
+#               exit 4 too when the camera gave no 10 s figure (NO-FRAMES, or no pair
+#               9 s or more apart)
 #   --no-front  do not touch the PC window (e.g. the still is shown some other way)
 # Inputs:  TRACTOR_SERIAL, TRACTOR_APP_IMAGE (has OpenCV), YOUTUBE_URL /
 #          FIREFOX_PROFILE_DIR (the window youtube_window.ps1 -Open started).
-# Writes:  $EVIDENCE_DIR/<tag>_scene.txt and <tag>_scene.jpg; tractor /tmp/scene_check.jpg.
+# Writes:  $EVIDENCE_DIR/<tag>_scene.txt and <tag>_scene.jpg; tractor /tmp/scene_check.jpg
+#          (removed first, so a failed check never pulls an earlier run's frame).
 # Boards:  tractor only: one `docker run --rm --device=/dev/video1` (camera node,
 #          nothing else). /dev/video1 must be free: no camera_svc, lifetrac-camera
 #          stopped. Exit 3 if the camera is busy.
@@ -19,7 +27,8 @@
 # Screen:  never kiosk / never a fullscreen the operator cannot leave: the window
 #          is a normal window, only the player is fullscreen (Esc leaves it).
 # Origin:  bench-evidence/RS_13_vector_scene_2026-09-26/scripts/scene_check.sh
-#          (historical copy, unchanged).
+#          (historical copy, unchanged). New here: the window counted from the
+#          reference (sixth) frame, the NO-FRAMES failures, the stale-frame removal.
 set -u
 . "$(dirname "${BASH_SOURCE[0]}")/../lib/bench_env.sh" || exit 1
 
@@ -53,17 +62,28 @@ if [ -n "$holders" ]; then
 fi
 
 out=$( { echo "# $TAG scene check, $(date -u +%Y-%m-%dT%H:%M:%SZ) PC clock (content: $YOUTUBE_URL, normal Firefox window, player fullscreen; min $MIN %)"
-  board_sh tractor "$SUDO docker run --rm --device=/dev/video1 -v /tmp:/tmp --entrypoint python3 $TRACTOR_APP_IMAGE -c \"
+  board_sh tractor "$SUDO rm -f /tmp/scene_check.jpg; $SUDO docker run --rm --device=/dev/video1 -v /tmp:/tmp --entrypoint python3 $TRACTOR_APP_IMAGE -c \"
 import cv2, time, numpy as np
 c = cv2.VideoCapture('/dev/video1', cv2.CAP_V4L2); fr = []
-t0 = time.time()
-while time.time() - t0 < 10.5:
+t_open = time.time()
+while not fr and time.time() - t_open < 20.0:
+    ok, f = c.read()
+    if ok: fr.append((time.time(), f))
+    else: time.sleep(0.05)
+if not fr:
+    c.release()
+    print('NO-FRAMES: no frame from /dev/video1 within 20 s of opening it')
+    raise SystemExit(1)
+t0 = fr[0][0]
+while time.time() - fr[min(5, len(fr) - 1)][0] < 10.5 and time.time() - t0 < 20.0:
     ok, f = c.read()
     if ok: fr.append((time.time(), f))
     time.sleep(0.05)
 c.release()
+print('camera: first frame %.1f s after opening /dev/video1; %d frames, the sixth %.1f s and the last %.1f s after the first' % (t0 - t_open, len(fr), fr[min(5, len(fr) - 1)][0] - t0, fr[-1][0] - t0))
 if len(fr) < 10:
-    raise SystemExit('only %d frames from /dev/video1' % len(fr))
+    print('NO-FRAMES: only %d frames from /dev/video1' % len(fr))
+    raise SystemExit(1)
 for gap in (1.9, 5.0, 10.0):
     a = fr[5]; b = min(fr, key=lambda x: abs((x[0] - a[0]) - gap))
     d = np.abs(a[1].astype(np.int16) - b[1].astype(np.int16))
@@ -74,8 +94,13 @@ cv2.imwrite('/tmp/scene_check.jpg', fr[-1][1])
 printf '%s\n' "$out" | tee "$E/${TAG}_scene.txt"
 board_pull tractor /tmp/scene_check.jpg "$E/${TAG}_scene.jpg" 2>/dev/null && echo "frame -> $E/${TAG}_scene.jpg"
 pct=$(printf '%s\n' "$out" | grep -E "^(9\.|10\.)[0-9] s apart" | grep -oE "[0-9.]+ %" | grep -oE "[0-9.]+" | head -1)
-if [ -z "$pct" ] || ! awk -v p="$pct" -v m="$MIN" 'BEGIN { exit !(p + 0 >= m + 0) }'; then
-  echo "SCENE-CHECK-FAIL: 10 s change ${pct:-?} % < $MIN % (paused / behind another window / ad card / camera aim) - look at ${TAG}_scene.jpg"
+if [ -z "$pct" ]; then
+  why=$(printf '%s\n' "$out" | sed -n 's/^NO-FRAMES: //p' | head -1)
+  echo "SCENE-CHECK-FAIL: no 10 s figure: ${why:-no frame pair 9 s or more apart (camera stalled, or the check itself failed)} - see ${TAG}_scene.txt"
+  exit 4
+fi
+if ! awk -v p="$pct" -v m="$MIN" 'BEGIN { exit !(p + 0 >= m + 0) }'; then
+  echo "SCENE-CHECK-FAIL: 10 s change $pct % < $MIN % (paused / behind another window / ad card / camera aim) - look at ${TAG}_scene.jpg"
   exit 4
 fi
 echo "SCENE-CHECK-OK: 10 s change $pct % (min $MIN %)"
