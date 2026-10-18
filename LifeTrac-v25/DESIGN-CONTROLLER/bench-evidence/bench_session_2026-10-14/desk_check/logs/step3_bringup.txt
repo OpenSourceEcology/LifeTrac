@@ -1,0 +1,58 @@
+## checks
+
+__UART_CHK_DONE__
+UNIT FILE STATE VENDOR PRESET
+
+0 unit files listed.
+design-controller-mosquitto-1	eclipse-mosquitto:2	Up 50 minutes
+rx_smoke	4623980c2dac	Exited (137) 10 days ago
+bench_mqtt	eclipse-mosquitto:2	Exited (1) 2 months ago
+f11_webui	c6ded786130c	Exited (0) 2 months ago
+-rw-rw-r--    1 fio fio   3919 Sep 15 22:28 docker-compose.video-test.yml.RETIRED-2026-10-14
+-rw-r--r--    1 fio fio   3919 May 27 20:22 docker-compose.video-test.yml.bak_20260527_152255
+-rw-rw-r--    1 fio fio   3518 Oct 14 23:55 docker-compose.yml
+## stop the bench broker
+2026-10-15T00:47:31Z
+design-controller-mosquitto-1
+netstat ran: 1883 and 8080 free
+## config --services
+mosquitto
+audit_tail
+web_ui
+## up mosquitto web_ui
+time="2026-10-15T00:47:33Z" level=warning msg="The \"LIFETRAC_MQTT_HOST\" variable is not set. Defaulting to a blank string."
+ Network lifetrac-desk_default  Creating
+ Network lifetrac-desk_default  Created
+ Volume "lifetrac-desk_lifetrac_logs"  Creating
+ Volume "lifetrac-desk_lifetrac_logs"  Created
+ Volume "lifetrac-desk_mosquitto_data"  Creating
+ Volume "lifetrac-desk_mosquitto_data"  Created
+ Volume "lifetrac-desk_mosquitto_logs"  Creating
+ Volume "lifetrac-desk_mosquitto_logs"  Created
+ Volume "lifetrac-desk_lifetrac_state"  Creating
+ Volume "lifetrac-desk_lifetrac_state"  Created
+ Container lifetrac-desk-mosquitto-1  Creating
+ Container lifetrac-desk-mosquitto-1  Created
+ Container lifetrac-desk-web_ui-1  Creating
+ Container lifetrac-desk-web_ui-1  Created
+ Container lifetrac-desk-mosquitto-1  Starting
+ Container lifetrac-desk-mosquitto-1  Started
+ Container lifetrac-desk-web_ui-1  Starting
+ Container lifetrac-desk-web_ui-1  Started
+time="2026-10-15T00:47:43Z" level=warning msg="The \"LIFETRAC_MQTT_HOST\" variable is not set. Defaulting to a blank string."
+NAME                        IMAGE                 COMMAND                  SERVICE             CREATED             STATUS              PORTS
+lifetrac-desk-mosquitto-1   eclipse-mosquitto:2   "/docker-entrypoint.…"   mosquitto           10 seconds ago      Up 9 seconds        127.0.0.1:1883->1883/tcp
+lifetrac-desk-web_ui-1      lifetrac-v25:latest   "uvicorn web_ui:app …"   web_ui              10 seconds ago      Up 8 seconds        0.0.0.0:8080->8080/tcp, :::8080->8080/tcp
+time="2026-10-15T00:47:44Z" level=warning msg="The \"LIFETRAC_MQTT_HOST\" variable is not set. Defaulting to a blank string."
+lifetrac-desk-web_ui-1  | INFO:     Started server process [1]
+lifetrac-desk-web_ui-1  | INFO:     Waiting for application startup.
+lifetrac-desk-web_ui-1  | INFO:     Application startup complete.
+lifetrac-desk-web_ui-1  | INFO:     Uvicorn running on http://0.0.0.0:8080 (Press CTRL+C to quit)
+## after
+lifetrac-desk-web_ui-1	lifetrac-v25:latest	0.0.0.0:8080->8080/tcp, :::8080->8080/tcp
+lifetrac-desk-mosquitto-1	eclipse-mosquitto:2	127.0.0.1:1883->1883/tcp
+tcp        0      0 0.0.0.0:8080            0.0.0.0:*               LISTEN     
+tcp        0      0 127.0.0.1:1883          0.0.0.0:*               LISTEN     
+tcp6       0      0 :::8080                 :::*                    LISTEN     
+
+__UART_CHK_DONE__

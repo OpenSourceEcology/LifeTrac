@@ -1,0 +1,39 @@
+## /tmp/rs13_2 after the reboot
+ls: cannot access '/tmp/rs13_2': No such file or directory
+## teardown by project name (the override file went with /tmp)
+2026-10-18T15:37:27Z
+ Container lifetrac-desk-web_ui-1  Stopping
+ Container lifetrac-desk-web_ui-1  Stopped
+ Container lifetrac-desk-web_ui-1  Removing
+ Container lifetrac-desk-web_ui-1  Removed
+ Container lifetrac-desk-mosquitto-1  Stopping
+ Container lifetrac-desk-mosquitto-1  Stopped
+ Container lifetrac-desk-mosquitto-1  Removing
+ Container lifetrac-desk-mosquitto-1  Removed
+ Volume lifetrac-desk_lifetrac_logs  Removing
+ Volume lifetrac-desk_lifetrac_state  Removing
+ Volume lifetrac-desk_mosquitto_data  Removing
+ Volume lifetrac-desk_mosquitto_logs  Removing
+ Volume lifetrac-desk_lifetrac_state  Removed
+ Network lifetrac-desk_default  Removing
+ Volume lifetrac-desk_mosquitto_logs  Removed
+ Volume lifetrac-desk_mosquitto_data  Removed
+ Volume lifetrac-desk_lifetrac_logs  Removed
+ Network lifetrac-desk_default  Removed
+## lifetrac-desk leftovers (expect none)
+(end)
+netstat ran: 1883 and 8080 free
+## start the bench broker
+2026-10-18T15:37:28Z
+design-controller-mosquitto-1
+design-controller-mosquitto-1	Up 3 seconds	127.0.0.1:1883->1883/tcp
+tcp        0      0 127.0.0.1:1883          0.0.0.0:*               LISTEN     
+## retained topics on the bench broker
+lifetrac/v25/control/link_airtime {"u_image": 0.0, "u_telemetry": 0.0, "u_total": 0.3004, "encode_mode": "Y_ONLY"}
+lifetrac/v25/control/encode_mode_override {"mode":"mono_g4"}
+lifetrac/v25/status/radio_profile/rx {"ok": false, "profile": 2, "ts": 1789505535.0, "error": "reverted: link silent"}
+lifetrac/v25/status/radio_profile/tx {"ok": true, "profile": 1, "via": "lora", "ts": 1789505488.8}
+lifetrac/v25/status/encode_mode {"requested": 6, "effective": 6, "effective_name": "mono_g4", "clamped": false, "codec": 1, "quality": 55, "source": "lora_cmd", "ts": 1789978043.2}
+(end retained)
+
+__UART_CHK_DONE__

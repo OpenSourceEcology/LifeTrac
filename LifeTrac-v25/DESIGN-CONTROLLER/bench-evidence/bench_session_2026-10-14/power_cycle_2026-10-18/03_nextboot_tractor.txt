@@ -1,0 +1,31 @@
+## date / uptime / boot
+2026-09-29T08:29:19Z
+ 08:29:19 up 9 min,  1 user,  load average: 0.09, 0.09, 0.07
+22bea84e-bf69-4bd5-87ef-aa61228aa35a
+  0 22bea84ebf694bd587efaa61228aa35a Thu 2022-04-28 17:42:26 UTC—Tue 2026-09-29 08:29:19 UTC
+## sudo docker ps
+x8-devel	hub.foundries.io/arduino/arduino-ootb-python-devel	Up 8 minutes
+x8-provisioning	hub.foundries.io/arduino/arduino-iot-cloud-provisioning	Up 8 minutes
+x8-webapp	hub.foundries.io/arduino/arduino-ootb-webapp	Up 8 minutes
+## sudo docker ps -a
+tractor-camera	lifetrac-tractor-x8:latest	Exited (137) 36 seconds ago
+bench_mqtt	eclipse-mosquitto:2	Exited (255) 8 minutes ago
+tx_smoke	hub.foundries.io/arduino/arduino-ootb-python-devel:738bc44	Exited (137) 8 days ago
+tractor-mosquitto	eclipse-mosquitto:2	Exited (0) 35 seconds ago
+lifetrac-camera-x8	hub.foundries.io/arduino/arduino-ootb-python-devel:738bc44	Exited (127) 4 months ago
+x8-devel	hub.foundries.io/arduino/arduino-ootb-python-devel	Up 8 minutes
+x8-provisioning	hub.foundries.io/arduino/arduino-iot-cloud-provisioning	Up 8 minutes
+x8-webapp	hub.foundries.io/arduino/arduino-ootb-webapp	Up 8 minutes
+## lifetrac units
+lifetrac-camera.service disabled disabled
+failed
+## systemctl --failed
+* lifetrac-camera.service loaded failed failed LifeTrac C2 camera service
+* psplash-start.service   loaded failed failed Start psplash boot splash screen
+## uart_chk
+
+__UART_CHK_DONE__
+## retired dir
+20261012T212515Z
+## journal of the retired units this boot (expect nothing)
+-- No entries --

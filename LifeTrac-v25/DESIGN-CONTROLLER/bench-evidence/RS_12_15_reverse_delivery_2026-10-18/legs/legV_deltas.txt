@@ -1,0 +1,24 @@
+base: L072 counters not reset -> delta = post - pre
+tractor: L072 counters not reset -> delta = post - pre
+leg V: counter deltas (pre -> post)
+  counter                                    base            tractor
+  radio_tx_ok                        0->23 (d=23)     0->955 (d=955)
+  radio_rx_ok                      0->947 (d=947)       0->22 (d=22)
+  radio_crc_err                        0->1 (d=1)         0->0 (d=0)
+  fhss_dec_aligned                 0->946 (d=946)       0->22 (d=22)
+  fhss_dec_snapped                     0->1 (d=1)         0->0 (d=0)
+  fhss_dec_rej_locked_out              0->0 (d=0)         0->0 (d=0)
+  fhss_dec_rej_epoch_drift             0->0 (d=0)         0->0 (d=0)
+  clk_demotion_reset                   0->1 (d=1)         0->0 (d=0)
+  clk_demotion_kept                    0->0 (d=0)       0->20 (d=20)
+  tx_first_anchor                      0->0 (d=0)         0->1 (d=1)
+  tx_stream_streak_max                 0->1 (d=1)     0->954 (d=954)
+
+criteria (DC/TODO.md RS-12.15 reverse-delivery PASS / STOP):
+  [PASS] command delivery tractor d(radio_rx_ok)/base d(radio_tx_ok) = 22/23 = 95.7 % >= 60 %
+  [PASS] tractor clk_demotion_reset delta = 0 (must be 0; STOP if > 0)
+  [PASS] tractor tx_first_anchor post = 1 (must be 1; STOP if > 1)
+  [PASS] tractor fhss_dec_snapped delta = 0 (must be 0)
+  [PASS] tractor fhss_dec_rej_epoch_drift delta = 0 (must be 0)
+  [PASS] base tx_stream_streak_max post = 1 (must be < 8)
+STOP RULE: not tripped

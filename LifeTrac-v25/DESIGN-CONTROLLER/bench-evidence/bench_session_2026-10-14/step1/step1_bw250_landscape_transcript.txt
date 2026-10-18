@@ -1,0 +1,48 @@
+00:40:07Z == step-1 pass bw250_landscape (profile image_bw250, camera_service from /app) from bench-session-2026-10-14 @ fb96439c
+retained after the recreate (must be 0): 0
+00:40:19Z capture subscribed after 3 s
+camera_svc id 5200313c8050
+00:40:19Z camera_svc launched
+00:40:35Z boot-log check (+15 s): expect byte_budget=203 B, no 'link_budget: ->', no [lora_cmd]
+2026-09-25 17:33:49,583 INFO camera_service: byte_budget=203 B/frame (LIFETRAC_FRAGMENT_BUDGET, phy=image_bw250)
+2026-09-25 17:33:50,627 INFO camera_service: encode_mode -> 9 (vector) [boot]
+vector_stats lines so far: 6
+encoder module in use: /app/x8_image_pipeline/encode_vector.py True
+00:42:29Z capture finished
+00:42:32Z == capture summary (/tmp/lifetrac_strict/legs/step1_tractor_bw250_landscape.txt, from '== vector dry run summary ==')
+== vector dry run summary ==
+profile image_bw250: one-fragment limit 203 B (epoch starts 202 B)
+frames: 251 total, 251 vector, 0 other, 0 unparseable; by codec {'vector': 251}
+wire bytes (vector): min 119 / p50 198 / p95 203 / max 203; over limit: 0
+epoch starts: 3 received, 3 applied
+arrival: 2.00 fps mean over 125.0 s; gap p50 0.50 s, p95 0.53 s, max 0.58 s; first applied at +0.00 s (0 frame(s) before it)
+store: applied 251, bad 0 , epoch_behind 0, orphans 0, digest 215 checked / 0 mismatched, epochs 3, handovers 2, ttl_dropped 0, resync 0 (0 ended by DIGEST), records 9179
+resync: none
+scene: epoch 2, level 0, badge 7, digest_ok None, horizon resid, L1=25 L2=0 L3=9 L4=0, cal_rev None, anchor age 149 ms
+checks:
+  [PASS] parse_ok       0 unparseable payload(s)
+  [PASS] all_vector     0 non-vector frame(s): {'vector': 251}
+  [PASS] one_fragment   0 over 203 B (epoch starts 202 B); max 203 B
+  [PASS] store_clean    frames_bad=0 
+  [PASS] no_orphans     orphans=0
+  [PASS] digest         215 checked, 0 mismatched, scene digest_ok=None
+  [PASS] epoch_seen     3 epoch start(s) applied of 3 received
+  [PASS] first_apply    0 frame(s) before the first apply
+  [PASS] applied_ratio  251/251 applied = 100.0% (need >= 90%)
+  [PASS] min_frames     251 vector frame(s), need >= 200
+RESULT: PASS
+json report -> /work/legs/step1_tractor_bw250_landscape.json
+00:42:32Z == tractor-log (/tmp/lifetrac_strict/legs/step1_tractor_log_bw250_landscape.txt)
+vector_stats lines: 58
+encoder ms_total: p50 225.3 / p95 248.3 / max 318.6
+stage p50 ms: resize=0.5 l0=18.8 l1=92.6 l3=42.6 temporal_pack=66.1
+frame bytes: p50 197 / max 203
+levels seen: {'0': 58}; lines with a pending epoch start: 0
+last: epoch 2 n_live 32 residual 3314.805 detail 80 epochs 3 trigger safety ttl_dropped 0 waiting 0
+counters to the last line (1 run): frames 253; epoch starts 3 = first 1 forced 0 horizon 0 safety 2 relabel 0; repair share 63 frames, 263 re-sends (20 repeat-once); carousel re-sends 243; DEL repeats 824; ttl_dropped 0
+/tmp/lifetrac_strict/legs/step1_tractor_bw250_landscape.jsonl: 1 file pulled, 0 skipped. 2.0 MB/s (113886 bytes in 0.054s)
+/tmp/lifetrac_strict/legs/step1_tractor_bw250_landscape.json: 1 file pulled, 0 skipped. 0.5 MB/s (2253 bytes in 0.004s)
+/tmp/lifetrac_strict/legs/step1_tractor_bw250_landscape.txt: 1 file pulled, 0 skipped. 1.7 MB/s (22449 bytes in 0.012s)
+/tmp/lifetrac_strict/legs/step1_camera_service_bw250_landscape.log: 1 file pulled, 0 skipped. 1.6 MB/s (26608 bytes in 0.016s)
+/tmp/lifetrac_strict/legs/step1_tractor_log_bw250_landscape.txt: 1 file pulled, 0 skipped. 0.1 MB/s (554 bytes in 0.004s)
+00:42:33Z == pass bw250_landscape done (evidence: C:/Users/dorkm/Documents/GitHub/LifeTrac-bench-main/LifeTrac-v25/DESIGN-CONTROLLER/bench-evidence/bench_session_2026-10-14/step1)
