@@ -4065,6 +4065,14 @@ which also needs PWR-12 and PWR-13.
   covers that fault with an idle-gated reboot (`CHECK_DOCKER=1`), and LmP
   ties it to OTA rollback, so a Docker-breaking update then rolls back only
   through the armed supervisor. Gates tractor arming.
+- [ ] **PWR-14 Finish a forced reset cut off after sysrq `u`** — a
+  supervisor killed outright (SIGKILL, the unit watchdog) in the seconds
+  between the forced path's `u` and `b` leaves the disks read-only with no
+  reset queued. The restarted supervisor keeps the motion hold (the reset
+  record is on tmpfs) but cannot write its state and runs disarmed, so the
+  X8 waits, motion held, for a person to cycle power. Record the `u` phase
+  on tmpfs and finish the reset at startup after one more look at the hold
+  (Copilot review on #156). Bench check with PWR-1.
 
 ---
 

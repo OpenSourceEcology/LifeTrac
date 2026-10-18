@@ -189,7 +189,10 @@ the board then stays up in that boot.
   or an earlier reset in this boot), such as the shutdown of that reboot,
   keeps it. Once the forced path has written `u` (the disks are read-only
   from then on), a stop waits until `b` and `reboot -ff` are sent, then
-  keeps the request. No OTA
+  keeps the request. Not handled yet (TODO PWR-14): a supervisor killed
+  outright between `u` and `b` leaves the disks read-only with no reset
+  queued; the restart keeps the motion hold but runs disarmed, so the X8
+  waits for a person to cycle power. No OTA
   probation override. The systemd-owned hardware watchdog (L2) is not
   installed on the tractor, because a watchdog reset cannot wait for idle,
   so a shutdown that hangs after the supervisor has stopped waits for
