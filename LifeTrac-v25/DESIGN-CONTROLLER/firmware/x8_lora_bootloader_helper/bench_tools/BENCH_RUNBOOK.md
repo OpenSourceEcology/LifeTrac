@@ -89,8 +89,14 @@ the harness (`run_live_radio_monitor.ps1`) live one directory up. Leg reports:
   `lifetrac-tractor-x8:latest` for the camera feed (it ships `/usr/bin/ffmpeg`;
   the host has none — a wiped `/tmp/ffmpeg` does not matter).
 * Bench firmware is byte-reproducible.
-  - `mingw32-make bench` on `main` gives `0c1bb0a9` (re-checked 2026-10-04).
-    That is the RS-12.15 v2 build on both boards since 09-15.
+  - Both boards run `e083ae46` since 2026-10-18: the RS-12.15
+    reverse-delivery bench build of `13f20aa1` (#152, merged as `main`
+    `3c8ced60` with the L072 source unchanged; production twin `148de24e`).
+    Flash record and a copy of the image:
+    `bench-evidence/RS_12_15_reverse_delivery_2026-10-18/firmware_flash/`.
+  - The previous bench build, `0c1bb0a9` (RS-12.15 v2, on both boards
+    2026-09-15 → 2026-10-18), comes from `main` before #152 (re-checked at
+    `f6e4b463` on 2026-10-14). It is the rollback image.
   - The old RS-12.10 build `e8ad8424` comes from `main` `3a0cb524` (`e02ab86e`).
   - Copies of these and of the other surviving bench builds (`5a160e4a`,
     `8c112e6f`) are in `bench-evidence/RS_13_vector_scene_2026-09-26/firmware/`,
@@ -156,9 +162,20 @@ profile-2 leg without it, and `-AllowDefaultCarrier` is only for a deliberate
 `legs/leg_prep.sh` writes the complete line ([legs/README.md](legs/README.md)).
 
 On the first `published frame_id` line start the injector on the base
-(`kf_inject.py 15 20` or `dual_inject.py 250`). After `archived to ...`:
+(`kf_inject.py 15 20` or `dual_inject.py 250`). Read that line from the base
+daemon's own log (`docker logs rx_smoke`), not from the harness console: the
+harness prints only the last 2 lines of each daemon every 5 s, and a trigger
+on that tail started leg W (2026-10-18) 2 min 41 s late.
+`bench-evidence/RS_12_15_reverse_delivery_2026-10-18/scripts/inject_on_first_frame.sh`
+does it right; the harness itself has no injector hook yet (TODO, RS-13
+bench-kit follow-ups). After `archived to ...`:
 post-brackets both boards, `rs12_leg_report.py`, `frag_gap_report.py`,
 copy brackets/injector/report transcripts into the evidence `legs/` dir.
+Counter deltas: the harness resets the tractor's L072 at leg start (SWD), so
+its counters restart at 0 and its delta is the post value. The base's L072
+counters are **not** reset by the harness's gpio163 pulse and accumulate
+across legs (2026-10-18), so its delta is post minus pre.
+`RS_12_15_reverse_delivery_2026-10-18/scripts/deltas.py` handles both.
 Then `radio_park.py` both → `PARK_OK` with both readbacks `0x80`. Do it
 after the post-brackets and reports, i.e. a couple of minutes after the
 daemons stopped, so the firmware's scan SM has already failed out and has
