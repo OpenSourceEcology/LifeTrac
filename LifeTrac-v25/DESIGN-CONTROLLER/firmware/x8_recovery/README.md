@@ -167,8 +167,12 @@ the board then stays up in that boot.
   link still shows the hold, or when the link is no longer live (stopped
   by the shutdown) and its last line shows the hold; never when the
   request or the idle file is gone or anything else is shown. It looks
-  again after writing its record and again after the sysrq settles, right
-  before `b`, and gives up if the hold is gone by then. No OTA
+  again after writing its record, again after the `s` settle (before `u`,
+  which remounts the disks read-only and cannot be undone, so from `u` on
+  it goes ahead with `b`, one settle later), and, without sysrq, after a
+  bounded sync right before `systemctl reboot -ff` (which syncs again
+  before it resets). If the hold is gone by then it gives up, and if no
+  reset was issued earlier in this boot it withdraws the request. No OTA
   probation override. The systemd-owned hardware watchdog (L2) is not
   installed on the tractor, because a watchdog reset cannot wait for idle,
   so a shutdown that hangs after the supervisor has stopped waits for

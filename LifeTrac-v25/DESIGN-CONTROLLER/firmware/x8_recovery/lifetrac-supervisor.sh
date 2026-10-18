@@ -189,7 +189,13 @@
 # line is that same "locked <seq> <id>" (the H747 keeps the hold until it
 # resets). It does not force when the request file is gone, the idle file is
 # missing, the live link does not show the hold, or the frozen last line is
-# anything else (busy, idle, a hold for another request).
+# anything else (busy, idle, a hold for another request). It looks again
+# (request still ours, idle file still showing that hold) after writing
+# last_action, after the s settle (before u, which remounts the disks
+# read-only and cannot be undone, so from u on it goes ahead), and without
+# sysrq after a bounded sync right before `systemctl reboot -ff`, which syncs
+# again before it resets. If the hold is gone it gives up; when no reset was
+# issued earlier in this boot, the request is withdrawn.
 #
 # Reset reason (no telemetry route exists yet; a container can read the file):
 # at startup in a new boot, if $STATE/last_action names the boot id stored in
@@ -385,7 +391,7 @@ kv_put() {
 
 # write_record FILE CONTENT: a record that must survive the reboot it
 # precedes. Tmp file, best-effort sync, rename, then sync again so the rename
-# itself is on disk (the `systemctl reboot -ff` fallback does not sync).
+# itself is on disk (`systemctl reboot -ff` syncs too, but a sysrq b does not).
 # `timeout 10 sync` bounds a slow sync, not one stuck in uninterruptible I/O
 # on wedged storage (see the header).
 write_record() {
@@ -597,7 +603,8 @@ validate_config() {
   # with three allowlisted containers, + 20 s when a dropped pending reboot
   # rewrites last_action), or the reboot rung on its own after its own ping
   # (three fw_printenv, five synced records, `systemctl reboot`, the forced
-  # path with 2 x SYSRQ_SETTLE_S and `reboot -ff`: ~210 s), not counting file
+  # path with 2 x SYSRQ_SETTLE_S, or a 10 s sync without sysrq, and
+  # `reboot -ff`: ~210 s), not counting file
   # writes on wedged storage (see the header). A tractor adds up to two
   # TRACTOR_IDLE_WAIT_S probes before the rung pings again, and one more
   # inside the forced path.
@@ -1455,9 +1462,10 @@ sysrq_write() {
   # regular test file records the order.
   if printf '%s' "$1" 2>/dev/null >> "$SYSRQ"; then
     log "SYSRQ wrote '$1'"
-  else
-    log "SYSRQ write '$1' to $SYSRQ failed"
+    return 0
   fi
+  log "SYSRQ write '$1' to $SYSRQ failed"
+  return 1
 }
 
 sysrq_settle() {
@@ -1474,6 +1482,13 @@ force_reboot() {  # REASON WHY
       abandon_reboot "$1" "force_blocked:tractor_lock:$2"
       return 0
     fi
+    # Was a reset already issued in this boot (an accepted, timed-out or
+    # killed `systemctl reboot`)? If not, and this path gives up before its
+    # own reset, force_hold_ok clears the record again.
+    _fr_was=0
+    if reset_issued; then
+      _fr_was=1
+    fi
     # A reset can land at any moment from here, and the request stays until
     # it does, even if this path returns.
     if ! mark_reset_issued "$TF_ID"; then
@@ -1486,18 +1501,28 @@ force_reboot() {  # REASON WHY
   force_hold_ok "$1" "$2" "before the forced reset" || return 0
   add_decision force_reboot
   log "ACTION force_reboot reason=$1 why=$2"
+  _fr_u=0
   if [ -e "$SYSRQ" ]; then
     sysrq_write s
     sysrq_settle
-    sysrq_write u
+    # Last look, after the s settle and before u: u remounts every
+    # block-device filesystem read-only and cannot be undone, so once it is
+    # written this path goes on to b (one settle later) and `reboot -ff`.
+    force_hold_ok "$1" "$2" "before sysrq u" || return 0
+    if sysrq_write u; then
+      _fr_u=1
+    fi
     sysrq_settle
-    # And after the settles, right before the reset itself (`reboot -ff`
-    # follows b at once).
-    force_hold_ok "$1" "$2" "before sysrq b" || return 0
     sysrq_write b
     log "ACTION force_reboot: still alive after sysrq b"
   else
     log "ACTION force_reboot: $SYSRQ missing, skipping sysrq"
+  fi
+  if [ "$_fr_u" != 1 ]; then
+    # `systemctl reboot -ff` syncs before it resets: flush now (bounded),
+    # then look once more, so its own sync has little left to do.
+    timeout 10 sync >/dev/null 2>&1
+    force_hold_ok "$1" "$2" "before systemctl reboot -ff" || return 0
   fi
   timeout 30 systemctl reboot -ff >/dev/null 2>&1
   _fr_rc=$?
@@ -1510,7 +1535,10 @@ force_reboot() {  # REASON WHY
 # (lock_still_held) at the request and hold the forced path saw, at WHERE in
 # it: the record syncs and sysrq settles take seconds, and a person may
 # cancel the reboot and remove the request, or the hold may go, meanwhile.
-# Lost: the forced attempt is abandoned (BLOCKED gate=tractor_lock).
+# Lost: the forced attempt is abandoned (BLOCKED gate=tractor_lock). Only
+# called before the forced path's own reset (and before sysrq u), so if no
+# reset was issued earlier in this boot the record is cleared and the
+# request withdrawn.
 force_hold_ok() {
   [ "$ROLE" = tractor ] || return 0
   if lock_still_held "$TF_ID"; then
@@ -1519,6 +1547,9 @@ force_hold_ok() {
   log "BLOCKED forced reboot gate=tractor_lock ($IDLE_WHY) $3: the motion hold for request $TF_ID is no longer shown"
   add_decision force_blocked:tractor_lock_lost
   BLOCKED=tractor_lock
+  if [ "$_fr_was" != 1 ]; then
+    clear_reset_issued
+  fi
   abandon_reboot "$1" "force_blocked:tractor_lock_lost:$2"
   return 1
 }
@@ -1533,8 +1564,11 @@ force_hold_ok() {
 # was issued (withdraw_lock).
 abandon_reboot() {
   kv_int "$STATE/consecutive_reboots" 0
-  write_last_action reboot_abandoned "$1" "$INT" "$2"
-  log "ABANDONED reboot reason=$1 why=$2: last_action rewritten, so a later reset in this boot is not read as a supervisor reboot"
+  if write_last_action reboot_abandoned "$1" "$INT" "$2"; then
+    log "ABANDONED reboot reason=$1 why=$2: last_action rewritten, so a later reset in this boot is not read as a supervisor reboot"
+  else
+    log "ABANDONED reboot reason=$1 why=$2: ERROR last_action could not be rewritten, so a later reset in this boot may be read as the supervisor reboot it still names"
+  fi
   withdraw_lock "reboot abandoned"
 }
 
