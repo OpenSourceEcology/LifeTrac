@@ -26,7 +26,12 @@ per-session reference and the trap list. The rest of the bench kit:
 | `clear_retained.py` / `clear_retained_host.py <host>` | base (container) / PC | clear the retained control topics (`encode_mode_override`, `req_keyframe`, `radio_profile`) on the base broker / on another broker. A stale retained pin has flipped the camera and re-commanded a profile mid-leg; clear before EVERY leg. |
 | `kf_inject.py <period_s> <count>` | base (container) | REQ_KEYFRAME storm; the unacked retries at 0.4/0.8 s make the 2–3-command bursts that LOCK the tractor's scan machine (the RS-12.15 trigger). |
 | `dual_inject.py <duration_s>` | base (container) | two-opcode contention (encode_mode every 0.7 s + req_keyframe every 5 s) for the shared-gate legs; gets ~50 commands into the tractor per 5-min leg vs ~3 for kf_inject alone. |
+| `inject_watch.sh` | base (pushed and driven by the harness) | the harness's `-InjectCmd` trigger. It waits on the base for rx_smoke's first `published frame_id`, or the PC tells it to start on a tractor FAULT. It runs the injector in `lifetrac-v25:latest` as container `bench_inject` and logs `INJECT_*` markers plus the injector's output to `/tmp/lifetrac_strict/bench_inject.log`. Not run by hand. |
+| `test_run_live_radio_monitor.ps1` | PC | offline tests of the harness's parsers: adb `\r\r\n` output, `-InjectOn` specs, the injector log, the openocd reset log. No board. `powershell -NoProfile -File bench_tools\test_run_live_radio_monitor.ps1`. |
 | `frag_gap_report.py <archive>` | PC | lock-loss episodes from the base's fragment-arrival timeline (needs `-LogFragArrivals 1`). Gaps > 3 s are lock losses; healthy links never exceed ~1 s. |
+| `rs13_rf_extract.py <archive> [...]` | PC | received level per leg from the base's `rx_rf:` windows (median of the window medians, minimums, n) and crc_dumps; R0 over the 0 dB legs with the −65 to −75 dBm check; checks the FRF read-back of both boards at the pick (an abort condition) and flags 915 MHz by params or read-back. `--leak`, `--r0 --step [--floor]` (tracking rule), `--r0 --closing`, `--lines`. Exit 1 when the windows cannot stand for the leg (stats thread crashed, RS-12.17), 2 on garbled input. |
+| `rs13_probe_score.py <archive> [...]` | PC | base→tractor command delivery (tractor `LoRa cmd: PROBE` seqs that the base sent / base `PROBE TX`). Pools VECTOR against `mono_g4` from params.txt with a two-sided Fisher exact test. Exit 2 on an empty or error-only daemon log (a failed `docker logs`), counter skips, or logs from different legs; exit 1 when a leg fired no probe. |
+| `rs13_digest_trace.py <leg>_base.jsonl [...]` | PC | the A16 confirmation table and per-row DIGEST trace (encoder n_live against the base's live count) of a VECTOR capture, replayed through this checkout's store (run it at the base image's SHA); flags `!! A16 shape` in not-scored episodes. |
 | [`RS13_VECTOR_LEG.md`](RS13_VECTOR_LEG.md) + [`RS13_RESULTS_TEMPLATE.md`](RS13_RESULTS_TEMPLATE.md) | PC | RS-13.1 VECTOR (codec 6) legs: image smoke, camera-only dry run, radio legs with pass criteria, and the `RESULTS.md` skeleton. Adds `-CamExtraEnv` to the harness (env for the `camera_svc` container) and archives `camera_service.log`. |
 | [`RS13_RANGE_EDGE_LEG.md`](RS13_RANGE_EDGE_LEG.md) | PC | the next radio session after RS-13.1 (not flown; radios only on an explicit GO per round): conducted SMA-attenuator path, leakage check, 0 dB step with VECTOR / mono_g4 interleaved and `-ReactiveFire 1 -ProbeEcho 0` (the `VECTOR_SCENE.md` §8.6 command-delivery row, the A16-fix confirmation), then the 3 dB walk-down at both profiles, stop rules and its own RESULTS template. |
 | `../../../tools/vector_dry_run.py capture\|replay\|tractor-log` | both boards (daemon container) / PC | captures `cmd/image_frame` (tractor) or `video/tile_delta` (base) payloads to JSONL, replays them through the base station's own parser + `VectorSceneStore`, and prints per-frame size vs the one-fragment limit, store verdict, orphans, DIGEST, arrival timing and PASS/FAIL checks (`--strict` exits 1). `tractor-log` summarises camera_service's `vector_stats` lines (encoder ms per stage) and totals their cumulative counters on a `counters` line: frames, epoch starts per cause, and the A16 repair's share frames, re-sends, carousel re-sends and DEL repeats. |
@@ -73,7 +78,7 @@ the harness (`run_live_radio_monitor.ps1`) live one directory up. Leg reports:
   radio. **Check the staging before trusting a flash:** `flash_l072.sh`
   re-stages the pipeline and `run_flash_bench.sh` now refuses to run on an
   incomplete `/tmp/lifetrac_p0c` (preflight); for legs, `ls /tmp/lifetrac_strict |
-  wc -l` ≥ 19 (`legs/stage_boards.sh` re-stages it).
+  wc -l` ≥ 19, 23 on a fresh full staging (`legs/stage_boards.sh` re-stages it).
 * The L072 boots into RXCONT (`sx1276_rx_arm()`), so a flash brings the
   receiver up — a flash IS a radio-on event. A probe HostLink connect also
   auto-wakes it.
@@ -132,11 +137,12 @@ the harness (`run_live_radio_monitor.ps1`) live one directory up. Leg reports:
    "Video player configuration error / Error 153"; two pre-roll ads (~40 s)
    play first; the window drops behind any app the operator clicks, so bring
    it to the front and verify **before every leg** with frames from
-   `/dev/video1` (RS-13.1 `scripts/scene_check.sh`: ≥ 8 % of pixels change
-   over 10 s, frame saved). A static scene makes every keyframe fit one
+   `/dev/video1` (`legs/scene_check.sh`: ≥ 8 % of pixels change over 10 s,
+   frame saved). A static scene makes every keyframe fit one
    fragment and does not exercise the break.
 8. DTS (profile 2) legs: run a same-day receive-only channel spot-check with
-   the tractor parked (`../channel_survey_sniff.py` or `../hunt_sniff.ps1`,
+   the tractor parked (`../channel_survey_sniff.py`, which
+   `legs/stage_boards.sh` stages, on the base; or `../hunt_sniff.ps1`;
    then `tools/survey_compare.py`). Put the pick in `bench.env`
    (`DTS_CARRIER_HZ`, `DTS_CARRIER_DATE`) and pass `-ForceFrfHz <the pick>`
    on every profile-2 leg; the harness refuses a profile-2 leg without it.
@@ -152,7 +158,8 @@ the harness (`run_live_radio_monitor.ps1`) live one directory up. Leg reports:
 .\run_live_radio_monitor.ps1 -TxAdbSerial <TRACTOR_SERIAL> -RxAdbSerial <BASE_SERIAL> -HostIp <PC_HOST> `
    -TxFeed camera|local -RegProfile 1|2 [-ForceFrfHz <DTS_CARRIER_HZ>: profile 2 only, prep 8] -DurationS 300 `
    [-SynthFps 2 -SynthBudgetB 3000] -KfRequestDisable 0 -ProbeEcho 0 `
-   -NoParkLast 0 -LogFragArrivals 1 -IdleDrainQuietS 1.5 -CmdStreamMinGapS 1.0 -Archive
+   -NoParkLast 0 -LogFragArrivals 1 -IdleDrainQuietS 1.5 -CmdStreamMinGapS 1.0 `
+   [-InjectCmd "<injector.py> <args>" [-InjectOn first_frame|fault:<code>[:<sub>|:final]]] -Archive
 ```
 The `<...>` values come from `bench.env`; without them the harness falls
 back to the original bench's serials and PC address. `-ForceFrfHz <the pick>`
@@ -161,22 +168,52 @@ profile-2 leg without it, and `-AllowDefaultCarrier` is only for a deliberate
 915 MHz control. Leave it out with `-RegProfile 1`. For an RS-13 leg,
 `legs/leg_prep.sh` writes the complete line ([legs/README.md](legs/README.md)).
 
-On the first `published frame_id` line start the injector on the base
-(`kf_inject.py 15 20` or `dual_inject.py 250`). Read that line from the base
-daemon's own log (`docker logs rx_smoke`), not from the harness console: the
-harness prints only the last 2 lines of each daemon every 5 s, and a trigger
-on that tail started leg W (2026-10-18) 2 min 41 s late.
-`bench-evidence/RS_12_15_reverse_delivery_2026-10-18/scripts/inject_on_first_frame.sh`
-does it right; the harness itself has no injector hook yet (TODO, RS-13
-bench-kit follow-ups). After `archived to ...`:
+Command injectors: add `-InjectCmd "kf_inject.py 15 20"` or
+`-InjectCmd "dual_inject.py 250"` to the harness line. With the default
+`-InjectOn first_frame`, the harness starts the injector on the base the
+moment the base rx daemon logs its first `published frame_id`. It reads that
+line on the base from rx_smoke's own log (`inject_watch.sh`), not from the
+console tail that started leg W (2026-10-18) 2 min 41 s late.
+`-InjectOn fault:0x0D:final` starts it at the tractor's final
+RX_SCAN_FAILED (leg X); `fault:<code>` and `fault:<code>:<sub>` also work
+(the PC polls the tractor's tx_smoke log about every 2 s). At leg end the
+harness stops the injector if it is still running, prints
+`INJECT <status> ... trigger: ...`, and archives `inject.log` (trigger,
+injector output, exit) and `inject_trigger.txt` (PC-side timeline). Not yet
+flown. After `archived to ...`:
 post-brackets both boards, `rs12_leg_report.py`, `frag_gap_report.py`,
-copy brackets/injector/report transcripts into the evidence `legs/` dir.
+copy the brackets, the report transcripts and the archive's `inject.log`,
+`inject_trigger.txt` and `tractor_ocd_reset.log` into the evidence `legs/`
+dir.
 Counter deltas: the harness fires an SWD reset of the tractor's L072 at leg
-start and does not check it. It usually lands and the counters restart at
-0, but not always: it did not on the first leg after a flash reboot
-(2026-10-18 leg V, RESULTS Observation 3; legs R, T and U of 09-14/15 too).
-The base's L072 counters are **not** reset by the harness's gpio163 pulse
-and accumulate across legs (2026-10-18). Score with
+start. At leg end it judges that reset from its openocd log:
+`TRACTOR_L072_RESET landed|failed|unknown (...)` in the `=== LEG CHECKS ===`
+block, `tractor_l072_reset=` in params.txt, and the log itself archived as
+`tractor_ocd_reset.log`. `landed` means openocd read PF4 (the L072 NRST net)
+back low, then high; the log must also start with this leg's
+`OCD_LEG=<UTC stamp>` tag (repeated as `tractor_ocd_tag=` in params.txt). An
+earlier leg's log, left behind when this leg's spawn never ran (adb
+`error: closed`, sudo failure), therefore reads `failed (... not this leg's
+...)` and never `landed`; the harness also warns at leg start when the spawn
+does not print `swd_reset_spawned`. An `OCD_EXIT` of 128 or more is a
+signal: 129 = SIGHUP, the adb/sudo session hangup reaching nohup before
+nohup ignored HUP; if the log has no `Open On-Chip Debugger` banner, openocd
+never started. The brackets stay the final word. The reset did not land on
+the first leg after a flash reboot (2026-10-18 leg V, RESULTS Observation 3;
+legs O, Q, R, S, T and U of 09-14/15 too: their FAULT-URC uptimes put the
+L072 boot at the flash reboot, 120–631 s before the TX daemon opened). It did
+land on 09-14 legs P and Q2, the two legs there flown without a flash before
+them: the L072 booted 3.6 s and 3.4 s before the TX daemon opened. On Q2,
+post − pre would read 250 TXs for a leg of 1136
+(`bench-evidence/RS_12_15_clock_authority_2026-09-14/ERRATA.md` §1). When it
+matters: a FAULT URC's last u32 (payload bytes 20–23) is the L072's uptime
+in ms, so log time minus uptime gives the boot time. The cause of the
+first-leg misses is unknown because that log was never kept (candidates in
+"L072 resets at leg start", below). The base's L072 is pulsed on gpio163
+but not reset (from 2026-08-02 on, and on 2026-10-18): the harness prints
+`BASE_L072_RESET unverified` and archives the pulse output as
+`base_gpio163_output=`. Base counters accumulate across legs: score them
+post − pre. Score with
 `RS_12_15_reverse_delivery_2026-10-18/scripts/deltas.py`. It takes the post
 value after a reset and post minus pre otherwise. It counts a reset when a
 counter or high-water mark fell, or when there were more TXs than parsed host
@@ -195,6 +232,71 @@ post-leg park has held for hours this way (both boards `0x80` an hour after
 leg V), but that is because of the timing above, not because the write is
 authoritative. RXCONT is receive-only — the TX path only fires on a host
 request, and there is none with the daemons down.
+
+### L072 resets at leg start
+
+Analysis of 2026-10-18 (no board access). The harness reports both resets
+in its `=== LEG CHECKS ===` block (above); nothing here changes how either
+board is reset.
+
+**Base: the gpio163 pulse does not reset the L072.**
+- gpio163 is not an i.MX pin. It is line 3 of the x8h7 GPIO chip
+  (gpiochip5), so a write reaches the L072's NRST only through a working
+  x8h7 bridge and H7 firmware that drives PF4 for that line.
+- It has not reset the base L072 since at least 2026-08-02 (RS-11.4
+  RESULTS: the counters survived about 8 launches), nor on 2026-10-18. The
+  2026-05-25 sweep neither confirms nor rules it out: 0 boot URCs in 9
+  pulse-only attempts, but the host slept 1.5 s after each pulse before
+  opening the port, so a boot URC would probably have been missed.
+- openocd driving PF4 over SWD did reset the base L072 (RS-11.4 §10 leg E),
+  so the PF4-to-NRST wiring is intact. The fault lies between gpio163 and
+  PF4: the driver, the bridge, or the line mapping in the base's newer x8h7
+  firmware (0.0.5 from 2025-03, against the tractor's 0.0.2 from 2022-10).
+- Next steps, in order:
+  1. Read-only, no radio: on the base, list `/sys/class/gpio/gpiochip*`
+     (label, base, ngpio), `/sys/kernel/debug/gpio` if it is mounted (is
+     163 x8h7 line 3? does a kernel consumer hold it?), and
+     `cat /sys/kernel/x8h7_firmware/version`.
+  2. On a GO, because an NRST boots the L072 into RXCONT: read
+     `base_gpio163_output=` after the next leg (failed sysfs writes show
+     there), or pulse once with rs115 brackets around it (counters at 0
+     after = landed).
+  3. If it does not land: give the base reset to the daemon's own RESET_REQ
+     (`LIFETRAC_SKIP_RESET_REQ=0` on rx_smoke, gpio163 pulse removed; the
+     2026-05-25 double-reset race applies only when the NRST really fires)
+     and confirm with brackets. Fallback: the tractor's openocd path. It
+     worked on the base on 2026-08-02, but it halts the base H7 and stalls
+     x8h7 until a reboot; never re-insmod x8h7 on the base's 6.1 kernel.
+
+**Tractor: the SWD reset misses on the first leg after a flash reboot**
+(2026-10-18 leg V; legs O, Q, R, S, T and U of 09-14/15). It landed on
+09-14 legs P and Q2, the two legs there flown without a flash before them.
+The cause is unknown: no leg has kept the openocd log yet (leg V's stayed
+on the tractor's tmpfs and was overwritten; the harness archives it as
+`tractor_ocd_reset.log` from the 2026-10-18 bench-kit change on, not yet
+flown).
+Candidates, none verified:
+- (a) A SWD attach failure: the DPIDR / sysfs-mmap race (FLASH_RUNBOOK and
+  README_P0C TT-1).
+- (b) An openocd hang (RS-5.2), cleared by the next leg's `pkill -9 openocd`.
+- (c) A SIGHUP race on a cold page cache. The adb/sudo session hangup
+  reaches the forked `nohup` before it ignores HUP: the subshell's `trap :`
+  is reset in its children, and the new wrapper (bench kit 2026-10-18, not
+  yet flown) starts nohup one fork later than the code that flew legs O–X. It shows as `OCD_EXIT=129` with no openocd banner
+  (verdict `killed by SIGHUP ... openocd never started`). If confirmed, run
+  the reset from a pushed LF-only script with `trap '' HUP` (an ignored
+  disposition survives exec) or under setsid. `trap '' HUP` cannot be
+  written inside the harness's single-quoted `sh -c`.
+- (d) `08_boot_user_app.cfg` does `init; halt` and never resumes the H7 (it
+  ends with `shutdown`). Only the first leg after a boot halts an H7 that is
+  serving a live x8h7 bridge; later legs attach to an H7 the previous leg
+  left halted. The flash pipeline runs `prep_bridge.sh` before openocd for
+  this reason (in-flight SPI requests time out and wedge the x8h7 driver). It
+  shows as an attach or halt error, or a hang, in that leg's log.
+
+`tractor_ocd_reset.log` from the first leg after the next flash reboot tells
+(a) to (d) apart. Do not change the reset launch (`trap :` → `trap ''` or
+setsid) until such a log has shown which one it is.
 
 ## Bench web UI on the base (optional)
 
