@@ -1132,8 +1132,11 @@ class X8SUP_B_Supervisor(unittest.TestCase):
         self.assertEqual(la["action"], "reboot_abandoned")
         self.assertEqual(la["detail"], "forced_path_returned:systemctl_reboot_rc_1")
         log = self.sv_log()
-        self.assertLess(log.index("SYSRQ wrote 's'"), log.index("SYSRQ wrote 'u'"))
-        self.assertLess(log.index("SYSRQ wrote 'u'"), log.index("SYSRQ wrote 'b'"))
+        # The write order is the sysrq file's text ("sub"); u is logged
+        # after b, so nothing but the settle sits between the last look and b.
+        self.assertLess(log.index("SYSRQ wrote 's'"), log.index("SYSRQ wrote 'b'"))
+        self.assertLess(log.index("SYSRQ wrote 'b'"), log.index("SYSRQ wrote 'u' (logged after b)"))
+        self.assertNotIn("SYSRQ wrote 'u'", log[:log.index("SYSRQ wrote 'b'")])
         self.assertIn("ABANDONED reboot reason=docker_down", log)
         # A forced reboot that did happen: the next boot finds the record as
         # it was at the `reboot -ff` call.
@@ -1152,10 +1155,28 @@ class X8SUP_B_Supervisor(unittest.TestCase):
         self.set_docker_info_rc(1)
         self.set_fake("systemctl_reboot_rc", "1")
         self.sysrq.write_text("", encoding="utf-8")
-        t0 = time.monotonic()
-        self.run_sv("once")
-        self.assertGreaterEqual(time.monotonic() - t0, 1.9)
+        seen: dict[str, float] = {}
+        done = threading.Event()
+
+        def watch() -> None:
+            while not done.is_set() and len(seen) < 3:
+                text = self.sysrq.read_text(encoding="utf-8")
+                if text in ("s", "su", "sub") and text not in seen:
+                    seen[text] = time.monotonic()
+                time.sleep(0.002)
+
+        watcher = threading.Thread(target=watch, daemon=True)
+        watcher.start()
+        try:
+            self.run_sv("once")
+        finally:
+            done.set()
+            watcher.join(timeout=10)
         self.assertEqual(self.sysrq_text(), "sub")
+        self.assertEqual(sorted(seen), ["s", "su", "sub"])
+        # Each pair is one settle apart (u needs its settle before b).
+        self.assertGreaterEqual(seen["su"] - seen["s"], 0.9)
+        self.assertGreaterEqual(seen["sub"] - seen["su"], 0.9)
 
     def test_forced_path_without_sysrq_file_uses_reboot_ff(self) -> None:
         self.arm()
@@ -2063,6 +2084,9 @@ class X8SUP_B_Supervisor(unittest.TestCase):
                     self.assertEqual(self.sysrq_text(), "sub")
                     self.assertEqual(len(self.calls("systemctl reboot -ff")), 1)
                     self.assertNotIn("BLOCKED forced reboot", log)
+                    # The removal after u really landed, before the reset.
+                    self.assertIsNone(self.request())
+                    self.assertFalse((self.fake / "request.at_reboot_ff").exists())
                     continue
                 self.assertEqual(self.sysrq_text(), "s")
                 self.assertIn(f"gate=tractor_lock ({why}) before sysrq u: the motion hold for request "
@@ -2204,8 +2228,9 @@ class X8SUP_B_Supervisor(unittest.TestCase):
         self.set_fake("on_sync_link_busy", "1")
         link = self.start_link("grant")
         for up in (1000, 1030, 1060, 1090, 1120):
-            (self.fake / "link_mode").unlink(missing_ok=True)
-            link.mode = "grant"
+            # Through the mode file, not link.mode: the link thread may have
+            # read the file's old "busy" just before, and would set it back.
+            self.set_fake("link_mode", "grant")
             link.shows("idle ")
             self.set_uptime(up)
             self.run_sv("once")

@@ -1457,14 +1457,15 @@ check_pending_reboot() {
   return 1
 }
 
-sysrq_write() {
+sysrq_write() {  # KEY [quiet]
   # Append, one character per open: the kernel acts on each write, and a
-  # regular test file records the order.
+  # regular test file records the order. quiet: no log line (the caller
+  # logs the outcome later).
   if printf '%s' "$1" 2>/dev/null >> "$SYSRQ"; then
-    log "SYSRQ wrote '$1'"
+    [ "${2:-}" = quiet ] || log "SYSRQ wrote '$1'"
     return 0
   fi
-  log "SYSRQ write '$1' to $SYSRQ failed"
+  [ "${2:-}" = quiet ] || log "SYSRQ write '$1' to $SYSRQ failed"
   return 1
 }
 
@@ -1509,11 +1510,18 @@ force_reboot() {  # REASON WHY
     # block-device filesystem read-only and cannot be undone, so once it is
     # written this path goes on to b (one settle later) and `reboot -ff`.
     force_hold_ok "$1" "$2" "before sysrq u" || return 0
-    if sysrq_write u; then
+    # Nothing but the settle from this look to b: u is logged after b, as
+    # an append to the log on the eMMC can block while u's remount runs.
+    if sysrq_write u quiet; then
       _fr_u=1
     fi
     sysrq_settle
     sysrq_write b
+    if [ "$_fr_u" = 1 ]; then
+      log "SYSRQ wrote 'u' (logged after b)"
+    else
+      log "SYSRQ write 'u' to $SYSRQ failed"
+    fi
     log "ACTION force_reboot: still alive after sysrq b"
   else
     log "ACTION force_reboot: $SYSRQ missing, skipping sysrq"
