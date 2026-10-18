@@ -192,7 +192,8 @@
 # anything else (busy, idle, a hold for another request). It looks again
 # (request still ours, idle file still showing that hold) after writing
 # last_action, after the s settle (before u, which remounts the disks
-# read-only and cannot be undone, so from u on it goes ahead), and without
+# read-only and cannot be undone, so from u on it goes ahead, and a stop
+# waits until b and `reboot -ff` are sent), and without
 # sysrq after a bounded sync right before `systemctl reboot -ff`, which syncs
 # again before it resets. If the hold is gone it gives up; when no reset was
 # issued earlier in this boot, the request is withdrawn.
@@ -297,6 +298,10 @@ RESET_ISSUED=0
 # 1 while this process's own reset record is written but the reset it
 # announces is not sent yet: a stop then clears it (on_stop).
 RESET_PROV=0
+# 1 from the forced path's sysrq u on: a stop is noted in STOP_SIG and
+# carried out once the resets are sent (defer_stop, resume_stop).
+STOP_DEFER=0
+STOP_SIG=
 
 set_defaults() {
   ROLE=tractor   # fail-safe, see the header: only an explicit ROLE=base is base
@@ -1490,27 +1495,12 @@ force_reboot() {  # REASON WHY
       return 0
     fi
     # Was a reset already issued in this boot (an accepted, timed-out or
-    # killed `systemctl reboot`)? If not, and this path gives up before its
-    # own reset, force_hold_ok clears the record again.
+    # killed `systemctl reboot`)? If not, this path records its own right
+    # before its last look (force_mark), and clears it again if it gives up
+    # before the reset (force_hold_ok).
     _fr_was=0
     if reset_issued; then
       _fr_was=1
-    fi
-    # A reset can land at any moment from here, and the request stays until
-    # it does, even if this path returns.
-    [ "$_fr_was" = 1 ] || RESET_PROV=1
-    if ! mark_reset_issued "$TF_ID"; then
-      if [ "$_fr_was" != 1 ]; then
-        # Nothing else records a reset in this boot, so a restart or a
-        # second instance would withdraw the request while this path resets:
-        # refuse, as the rung does (Copilot review on #156).
-        clear_reset_issued
-        log "REFUSED forced reboot: cannot write $RESET_FILE, so a restart or a second instance could release the motion hold during the forced reset reason=$1"
-        add_decision force_refused:reset_marker
-        abandon_reboot "$1" "force_refused:reset_marker:$2"
-        return 0
-      fi
-      log "ERROR cannot rewrite $RESET_FILE: the record of the reset issued earlier in this boot still keeps the motion-hold request"
     fi
   fi
   kv_int "$STATE/consecutive_reboots" 0
@@ -1523,14 +1513,21 @@ force_reboot() {  # REASON WHY
   if [ -e "$SYSRQ" ]; then
     sysrq_write s
     sysrq_settle
+    force_mark "$1" "$2" || return 0
     # Last look, after the s settle and before u: u remounts every
     # block-device filesystem read-only and cannot be undone, so once it is
     # written this path goes on to b (one settle later) and `reboot -ff`.
     force_hold_ok "$1" "$2" "before sysrq u" || return 0
+    # A stop from here waits for b and `reboot -ff`: one after u would leave
+    # the disks read-only with nothing queued (Copilot review on #156).
+    defer_stop
     # Nothing but the settle from this look to b: u is logged after b, as
     # an append to the log on the eMMC can block while u's remount runs.
     if sysrq_write u quiet; then
       _fr_u=1
+    else
+      # u failed: the disks are still writable, so a stop goes ahead.
+      resume_stop
     fi
     sysrq_settle
     sysrq_write b
@@ -1547,6 +1544,7 @@ force_reboot() {  # REASON WHY
     # `systemctl reboot -ff` syncs before it resets: flush now (bounded),
     # then look once more, so its own sync has little left to do.
     timeout 10 sync >/dev/null 2>&1
+    force_mark "$1" "$2" || return 0
     force_hold_ok "$1" "$2" "before systemctl reboot -ff" || return 0
   fi
   # Sent (b, if written, reset the board before this): a stop from here
@@ -1557,6 +1555,30 @@ force_reboot() {  # REASON WHY
   rc_note "$_fr_rc"
   log "ACTION force_reboot: still alive after systemctl reboot -ff rc=$_fr_rc$RCNOTE"
   abandon_reboot "$1" "forced_path_returned:$2"
+  resume_stop
+}
+
+# force_mark REASON WHY: on a tractor, record the forced reset in this boot
+# ($RESET_FILE) right before the last look ahead of it, not before the
+# record syncs and settles: a supervisor killed outright meanwhile (the unit
+# watchdog, SIGKILL) leaves no record, so the restart withdraws the request,
+# as nothing was sent (2026-10-18 review). Refused when it cannot be written
+# and no reset was recorded earlier in this boot: a restart or a second
+# instance would then withdraw the request while this path resets (Copilot
+# review on #156).
+force_mark() {
+  [ "$ROLE" = tractor ] || return 0
+  [ "$_fr_was" = 1 ] || RESET_PROV=1
+  mark_reset_issued "$TF_ID" && return 0
+  if [ "$_fr_was" = 1 ]; then
+    log "ERROR cannot rewrite $RESET_FILE: the record of the reset issued earlier in this boot still keeps the motion-hold request"
+    return 0
+  fi
+  clear_reset_issued
+  log "REFUSED forced reboot: cannot write $RESET_FILE, so a restart or a second instance could release the motion hold during the forced reset reason=$1"
+  add_decision force_refused:reset_marker
+  abandon_reboot "$1" "force_refused:reset_marker:$2"
+  return 1
 }
 
 # force_hold_ok REASON WHY WHERE: on a tractor, one more look
@@ -1769,7 +1791,9 @@ usage() {
 # motion off (Copilot review on #156). withdraw_lock keeps the request when a
 # reset was issued in this boot, which covers the shutdown of a reboot this
 # process asked for. Then die of the same signal. Not SIGABRT (the unit
-# watchdog): Restart=on-failure restarts the service, and startup cleans up.
+# watchdog): Restart=on-failure restarts the service, and startup cleans up
+# (no reset record is written until right before the last look ahead of the
+# reset, so a kill in the record syncs or settles leaves none behind).
 on_stop() {
   trap - "$1"
   # Stopped after writing its own reset record but before sending the reset
@@ -1782,6 +1806,35 @@ on_stop() {
   kill -s "$1" "$$"
 }
 
+arm_stop_traps() {
+  trap 'on_stop TERM' TERM
+  trap 'on_stop INT' INT
+  trap 'on_stop HUP' HUP
+}
+
+# defer_stop / resume_stop: from the forced path's sysrq u until its resets
+# are sent, a stop is only noted. The noting trap still lets the stop end
+# the settle `sleep` (systemd signals the whole cgroup), so b follows at
+# once. resume_stop then carries the stop out; RESET_PROV is 0 by then, so
+# the request stays for the reset that was sent.
+defer_stop() {
+  STOP_DEFER=1
+  STOP_SIG=
+  trap 'STOP_SIG=TERM' TERM
+  trap 'STOP_SIG=INT' INT
+  trap 'STOP_SIG=HUP' HUP
+}
+
+resume_stop() {
+  [ "$STOP_DEFER" = 1 ] || return 0
+  STOP_DEFER=0
+  arm_stop_traps
+  if [ -n "$STOP_SIG" ]; then
+    log "STOP SIG$STOP_SIG was held from sysrq u until now"
+    on_stop "$STOP_SIG"
+  fi
+}
+
 case ${1:-} in
   run|once) ;;
   status) cmd_status; exit $? ;;
@@ -1790,9 +1843,7 @@ case ${1:-} in
 esac
 
 startup
-trap 'on_stop TERM' TERM
-trap 'on_stop INT' INT
-trap 'on_stop HUP' HUP
+arm_stop_traps
 if [ "$1" = once ]; then
   pass
   notify_watchdog
