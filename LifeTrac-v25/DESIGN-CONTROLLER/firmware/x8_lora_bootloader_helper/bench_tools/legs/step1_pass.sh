@@ -41,7 +41,9 @@
 #          no evidence dir; 2 missing arguments / the pass's capture file already exists;
 #          3 tractor not quiet / capture never subscribed; 4 scene check failed;
 #          6 camera_service held VECTOR below the profile's one-fragment budget (its
-#          'VECTOR budget ... until link_budget' line in the boot-log check): the
+#          'VECTOR budget ... until link_budget' line in the boot-log check or the
+#          full camera log), or no camera log from this pass with camera_service's
+#          byte_budget=<B> B/frame line came back: the
 #          pass ran to the end and its files are kept, but it is NOT a valid pass
 #          at that budget; 130 / 143 interrupted.
 # Origin:  bench-evidence/RS_13_vector_scene_2026-09-26/scripts/step1_pass.sh and
@@ -177,11 +179,27 @@ stamp "== capture summary ($L/step1_tractor_$TAG.txt, from '== vector dry run su
 board_sh tractor "sed -n '/== vector dry run summary ==/,\$p' $L/step1_tractor_$TAG.txt"
 stamp "== tractor-log ($L/step1_tractor_log_$TAG.txt)"
 cat "$OUT.tractorlog.out"
-for f in step1_tractor_$TAG.jsonl step1_tractor_$TAG.json step1_tractor_$TAG.txt step1_camera_service_$TAG.log step1_tractor_log_$TAG.txt; do
-  board_pull tractor "$L/$f" "$E/$f" || echo "PULL FAILED $f"
+CAMLOG=step1_camera_service_$TAG.log; CAMLOG_PULLED=0
+for f in step1_tractor_$TAG.jsonl step1_tractor_$TAG.json step1_tractor_$TAG.txt $CAMLOG step1_tractor_log_$TAG.txt; do
+  if board_pull tractor "$L/$f" "$E/$f"; then
+    [ "$f" = "$CAMLOG" ] && CAMLOG_PULLED=1
+  else
+    echo "PULL FAILED $f"
+  fi
 done
+# A slow start can log the clamp line after the +15 s sample: check the whole
+# camera log too (only THIS pass's copy: a failed pull leaves an earlier one).
+if [ $CLAMP = 0 ] && [ $CAMLOG_PULLED = 1 ] && grep -q 'VECTOR budget' "$E/$CAMLOG"; then
+  CLAMP=1
+  stamp "WARNING: camera_service logged the VECTOR clamp after the boot-log check: $(grep -m1 'VECTOR budget' "$E/$CAMLOG" | cut -c1-160)"
+fi
 if [ $CLAMP = 1 ]; then
-  stamp "== pass $TAG INVALID: camera_service held VECTOR below the $PROFILE budget of $BUDGET B (step1_${TAG}_bootcheck.txt); files kept (evidence: $E)"
+  stamp "== pass $TAG INVALID: camera_service held VECTOR below the $PROFILE budget of $BUDGET B (step1_${TAG}_bootcheck.txt, $CAMLOG); files kept (evidence: $E)"
+  exit 6
+fi
+# No valid pass without camera_service's own budget line from this pass.
+if [ $CAMLOG_PULLED = 0 ] || ! grep -q "byte_budget=$BUDGET B/frame" "$E/$CAMLOG"; then
+  stamp "== pass $TAG INVALID: no camera_service log with 'byte_budget=$BUDGET B/frame' came back (pull failed, empty, or camera_service never logged it), so the $BUDGET B budget is unverified; files kept (evidence: $E)"
   exit 6
 fi
 stamp "== pass $TAG done (evidence: $E)"

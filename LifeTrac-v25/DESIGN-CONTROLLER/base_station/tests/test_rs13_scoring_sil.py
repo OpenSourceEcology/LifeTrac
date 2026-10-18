@@ -364,12 +364,13 @@ class RfExtractTests(unittest.TestCase):
         self.assertIn("an abort condition", out)
 
     def test_leak_check(self) -> None:
+        frf = "  FRF readback: 0xE4C000 = 915.000 MHz (OK)\n"     # the DTS pick (915 by default)
         with tempfile.TemporaryDirectory() as root:
-            quiet = (f"{_ts(0)} INFO image_rx_daemon: started\n"
-                     f"{_ts(10)} INFO image_rx_daemon: stats: rx_frames=0 frames_published=0\n"
+            quiet = (f"{_ts(0)} INFO image_rx_daemon: started\n" + frf
+                     + f"{_ts(10)} INFO image_rx_daemon: stats: rx_frames=0 frames_published=0\n"
                      f"{_ts(12)} WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=9 snr=-14.0 "
                      f"rssi=-121 dump=00\n")
-            a = _archive(root, "leak_dts", {"reg_profile": 2}, quiet, "")
+            a = _archive(root, "leak_dts", {"reg_profile": 2}, quiet, frf)
             rc, out = _run(rf.main, ["--leak", a])
             self.assertEqual(rc, 0, out)
             self.assertIn("leakage check: PASS", out)
@@ -378,6 +379,43 @@ class RfExtractTests(unittest.TestCase):
             rc, out = _run(rf.main, ["--leak", heard])
             self.assertEqual(rc, 1)
             self.assertIn("leakage check: FAIL", out)
+            # Nothing decoded is evidence only while the receiver ran, its stats thread
+            # reported to the end and across the leg, and a DTS leg sat on the pick.
+            long_quiet = (f"{_ts(0)} INFO image_rx_daemon: started\n" + frf + "".join(
+                f"{_ts(10 * i)} INFO image_rx_daemon: stats: rx_frames=0 frames_published=0\n"
+                for i in range(1, 13)))
+            for name, params, rx, tx, why in (
+                    ("no_stats", {"reg_profile": 2},
+                     f"{_ts(0)} INFO image_rx_daemon: started\n"
+                     f"{_ts(1)} ERROR image_rx_daemon: HostLink init failed\n", frf,
+                     "no `rx_frames=` stats line"),
+                    ("crashed", {"reg_profile": 2}, quiet + "Exception in thread image-rx-stats:\n",
+                     frf, "crashed"),
+                    ("stopped", {"reg_profile": 2},
+                     quiet + f"{_ts(60)} INFO image_rx_daemon: still running\n", frf,
+                     "the stats thread stopped"),
+                    # radio_monitor_20260724_170132's shape: one stats line, then the daemon dies.
+                    ("fatal", {"reg_profile": 1, "duration_s": 60},
+                     f"{_ts(0)} INFO image_rx_daemon: started\n"
+                     f"{_ts(1)} INFO image_rx_daemon: stats: rx_frames=0 frames_published=0\n"
+                     f"{_ts(1.6)} ERROR image_rx_daemon: fatal: cannot open L072 HostLink: timeout\n"
+                     f"{_ts(2.1)} INFO image_rx_daemon: image_rx_daemon exit\n", "",
+                     "never opened its L072 HostLink"),
+                    ("short", {"reg_profile": 1, "duration_s": 300}, quiet, "",
+                     "cover 10 s of a 300 s leg"),
+                    ("off_pick", {"reg_profile": 2, "force_frf_hz": 927500000, "duration_s": 120},
+                     long_quiet.replace("915.000 MHz (OK)", "915.000 MHz (**MISMATCH**)"),
+                     "  FRF readback: 0xE7E000 = 927.500 MHz (OK)\n",
+                     "did not read back (OK) at the pick")):
+                rc, out = _run(rf.main, ["--leak", _archive(root, name, params, rx, tx)])
+                self.assertEqual(rc, 1, (name, out))
+                self.assertIn("leakage check: NOT SCORED", out)
+                self.assertIn(why, out)
+                self.assertNotIn("leakage check: PASS", out)
+            ok = {"reg_profile": 1, "duration_s": 120}
+            rc, out = _run(rf.main, ["--leak", _archive(root, "full_leg", ok, long_quiet, "")])
+            self.assertEqual(rc, 0, out)                         # 120 s of stats for a 120 s leg
+            self.assertIn("leakage check: PASS", out)
 
     def test_tracking_rule(self) -> None:
         line = rf.tracking(-77.5, 5.0, -67.0, 9.0, -114.0, None, None)[0]
@@ -468,6 +506,22 @@ class DigestTraceLoadTests(unittest.TestCase):
             dt.load_capture(self._write([meta]))
         with self.assertRaisesRegex(dt.TraceError, "missing"):
             dt.load_capture(os.path.join(tempfile.gettempdir(), "no_such_capture.jsonl"))
+
+    def test_replay_errors_fail_closed(self) -> None:
+        meta = json.dumps({"meta": {"profile": "image_bw500"}})
+        # A valid JSON row whose payload is truncated: the replay cannot parse it.
+        p = self._write([meta, json.dumps({"ts": 1.0, "hex": "01"})])
+        with self.assertRaisesRegex(dt.TraceError, "1 payload\\(s\\) the replay cannot parse"):
+            dt.analyse(p, None, 25, 25, 10.0)
+        rc, out = _run(dt.main, [p])
+        self.assertEqual(rc, 2, out)
+        self.assertIn("CANNOT TRACE", out)
+        # A VECTOR body the store rejects.
+        store = mock.Mock(stats={"frames_bad": 1, "bad_reasons": {"bad body": 1}})
+        with mock.patch.object(dt, "replay", return_value=(mock.Mock(parse_errors=0, store=store),
+                                                           [])):
+            with self.assertRaisesRegex(dt.TraceError, "1 VECTOR body\\(ies\\) the store rejected"):
+                dt.analyse(p, None, 25, 25, 10.0)
 
 
 class LossRowTests(unittest.TestCase):
@@ -565,6 +619,30 @@ class A16RuleTests(unittest.TestCase):
         eps = dt.score_episodes(rows, [_ep(42, None)], [(40, 1)])
         self.assertEqual(eps[0]["status"], "FAIL")          # open 39 rows after the loss
         self.assertIn("still in resync", eps[0]["reasons"][0])
+
+    def test_a_burst_is_not_isolated(self) -> None:
+        # Two frames lost in one gap: the rule bounds the recovery from ONE lost frame.
+        rows = _rows(80, key_rows=(5,))
+        res = dt.score_episodes(rows, [_ep(12, 20)], [(10, 2)])[0]
+        self.assertEqual((res["status"], res["isolated"], res["burst"], res["back_row"]),
+                         ("not scored", False, 2, None))
+        self.assertIn("2 frames lost in one gap", res["reasons"][0])
+        self.assertIsNotNone(res["window"])                  # still traced
+        res = dt.score_episodes(rows, [_ep(12, 20)], [(10, 3), (20, 1)])[0]
+        self.assertIn("3 frames lost in one gap", res["reasons"][0])
+        self.assertIn("another loss at row 20", res["reasons"][0])
+        self.assertEqual(dt.score_episodes(rows, [_ep(12, 20)], [(10, 1)])[0]["status"], "PASS")
+        # The RESULTS cells RS13_RANGE_EDGE_LEG.md quotes.
+        for gaps, back, iso in (([(10, 2)], "n/a (burst of 2 frames)", "no (burst of 2 frames)"),
+                                ([(10, 3), (20, 1)], "n/a (burst of 3 frames, next loss at row 20)",
+                                 "no (burst of 3 frames, row 20)")):
+            eps = dt.score_episodes(rows, [_ep(12, 20)], gaps)
+            res = {"path": "legX_base.jsonl", "leg": "X", "profile": "image_bw500", "rows": rows,
+                   "dr": _StubDryRun([_ep(12, 20)]), "gaps": gaps, "jumps": 0,
+                   "seq": rep.seq_gap_loss([(r["t"], r["codec"], r["seq"]) for r in rows]),
+                   "loss_pct": 0.0, "episodes": eps, "runs": [], "vector": len(rows)}
+            row = next(ln for ln in dt.report(res, 25, None) if ln.startswith("| X | 10 |"))
+            self.assertIn(f"| {back} | {iso} |", row)
 
     def test_reentry_from_the_same_loss(self) -> None:
         rows = _rows(80)
@@ -710,6 +788,25 @@ class DigestTraceEndToEndTests(unittest.TestCase):
         rc, out = _run(dt.main, [path, "--horizon", "20", "--strict"])
         self.assertEqual(rc, 1)
         self.assertIn("FAIL (re-opens A16)", out)
+
+    def test_a_body_the_store_rejects_withholds_the_trace(self) -> None:
+        # Frame 5 with a bad version bit (the store tests' trick): a real store rejection.
+        path = self._capture()
+        lines = open(path, encoding="utf-8").read().splitlines()
+        row = json.loads(lines[1 + 5])
+        tdf = bytes.fromhex(row["hex"])
+        _tr, frames = scenario(1, n_frames=80)
+        key, epoch, recs = frames[5]
+        b = vs_body(key, epoch, recs)
+        row["hex"] = _wire(bytes([b[0] | 0x40]) + b[1:], key, 6).hex()
+        self.assertNotEqual(row["hex"], tdf.hex())
+        lines[1 + 5] = json.dumps(row)
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write("\n".join(lines) + "\n")
+        rc, out = _run(dt.main, [path])
+        self.assertEqual(rc, 2, out)
+        self.assertIn("CANNOT TRACE", out)
+        self.assertIn("1 VECTOR body(ies) the store rejected {'bad_version': 1}", out)
 
     def test_second_loss_inside_the_horizon_is_not_scored(self) -> None:
         res = dt.analyse(self._capture(drops={3, 10}), None, 25, 25, 10.0)

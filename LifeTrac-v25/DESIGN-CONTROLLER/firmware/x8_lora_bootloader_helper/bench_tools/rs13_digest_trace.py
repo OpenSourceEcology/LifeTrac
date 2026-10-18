@@ -16,8 +16,10 @@ count at the check (RS13_RANGE_EDGE_LEG.md, Round A "A16 confirmation"):
   or before that anchor, within --horizon rows -- the same measure as the
   mismatch runs' P1 check below. An episode anchored before the first epoch
   start in the capture is the base's join;
-* the loss is isolated when no other loss falls within --horizon rows
-  after it;
+* the loss is isolated when it is one lost frame (a seq gap of one) and no
+  other loss falls within --horizon rows after it; a gap of two or more
+  frames is a burst, which the rule's single-loss recovery bound does not
+  cover, so its episode is not scored;
 * an isolated episode PASSES when it ends by DIGEST within --horizon rows of
   its loss, counted in capture rows from the seq gap to the episode's end,
   and its trace shows the base's live count back at the encoder's DIGEST
@@ -34,8 +36,8 @@ count at the check (RS13_RANGE_EDGE_LEG.md, Round A "A16 confirmation"):
   across the next loss), and it is flagged when it has the RS-13.1 A16
   shape: an epoch start ended it more than --horizon rows after the loss,
   or the encoder still counts more live shapes than the base after the last
-  equal count before its end. Its back-in-step cell reads n/a: the next loss
-  inside the horizon makes the count meaningless.
+  equal count before its end. Its back-in-step cell reads n/a when a burst,
+  or the next loss inside the horizon, makes the count meaningless.
 
     py -3 rs13_digest_trace.py <leg>_base.jsonl [<leg>_base.jsonl ...]
                               [--profile image_bw500] [--horizon 25] [--tail 25]
@@ -59,8 +61,9 @@ VECTOR frame, or with --strict when an episode fails, or an episode or a
 DIGEST mismatch run has no loss before it (an A16 shape in a not-scored
 episode is flagged, not scored, so it does not set the exit code); 2 on
 missing or garbled input (any capture line that is not JSON with a ts and
-hex, unknown or conflicting profile), which also withholds the verdict over
-the captures.
+hex, unknown or conflicting profile, a payload the replay cannot parse, or a
+VECTOR body the store rejects), which also withholds the verdict over the
+captures.
 """
 from __future__ import annotations
 
@@ -253,6 +256,7 @@ def score_episodes(rows: list[dict], episodes: list[dict], gaps: list, *,
     the horizon (the rule's first sentence asks for a DIGEST end; its second
     fails only an epoch start past the horizon)."""
     loss = [g[0] for g in gaps]
+    lost = dict(gaps)                                 # row -> frames lost in its gap
     last_row = rows[-1]["idx"]
     first_key = next((r["idx"] for r in rows if r["vector"] and r["kind"] == FRAME_KIND_KEY), None)
     if runs is None:
@@ -261,7 +265,8 @@ def score_episodes(rows: list[dict], episodes: list[dict], gaps: list, *,
     out, prev_loss = [], None
     for e in episodes:
         res = dict(e, anchor=None, loss_row=None, isolated=None, next_loss=None, window=None,
-                   back_row=None, a16_shape=None, reasons=[], reentry=False, letter_only=False)
+                   back_row=None, a16_shape=None, reasons=[], reentry=False, letter_only=False,
+                   burst=None, near_loss=False)
         out.append(res)
         anchor = next((a for a, b, _ in runs if a <= e["start"] <= b), e["start"])
         res["anchor"] = anchor
@@ -283,8 +288,11 @@ def score_episodes(rows: list[dict], episodes: list[dict], gaps: list, *,
             continue
         L = prior[-1]
         nxt = next((x for x in loss if x > L), None)
-        isolated = nxt is None or nxt - L > horizon
-        res.update(loss_row=L, next_loss=nxt, isolated=isolated, reentry=prev_loss == L)
+        burst = lost.get(L, 1) if lost.get(L, 1) > 1 else None
+        near = nxt is not None and nxt - L <= horizon
+        isolated = burst is None and not near
+        res.update(loss_row=L, next_loss=nxt, isolated=isolated, burst=burst, near_loss=near,
+                   reentry=prev_loss == L)
         prev_loss = L
         end = e["end"] if e["end"] is not None else last_row
         trace_end = min(last_row, max(end, L + horizon) + tail)
@@ -315,8 +323,13 @@ def score_episodes(rows: list[dict], episodes: list[dict], gaps: list, *,
             continue
         if not res["isolated"]:
             res["status"] = "not scored"
-            res["reasons"].append(f"not isolated: another loss at row {nxt}, "
-                                  f"{nxt - L} rows after it")
+            why = []
+            if burst:
+                why.append(f"{burst} frames lost in one gap (a burst; the rule bounds the "
+                           f"recovery from one lost frame)")
+            if near:
+                why.append(f"another loss at row {nxt}, {nxt - L} rows after it")
+            res["reasons"].append("not isolated: " + "; ".join(why))
             continue
         if e["end"] is None and last_row - L <= horizon:
             res["status"] = "not scored"
@@ -411,6 +424,13 @@ def analyse(path: str, profile_arg: str | None, horizon: int, tail: int,
     if profile not in vdr.PROFILE_CHOICES:
         raise TraceError(f"unknown profile {profile!r} (one of {', '.join(vdr.PROFILE_CHOICES)})")
     dr, rows = replay(frames, profile)
+    bad = dr.store.stats["frames_bad"]
+    if dr.parse_errors or bad:
+        why = dr.store.stats.get("bad_reasons")
+        why = f" {why}" if why else ""
+        raise TraceError(f"{path}: {dr.parse_errors} payload(s) the replay cannot parse, {bad} "
+                         f"VECTOR body(ies) the store rejected{why}: a corrupt capture, or a "
+                         f"store at another SHA than the base image that flew the leg; not scored")
     gaps, jumps = loss_rows(rows)
     seq = rep.seq_gap_loss([(r["t"], r["codec"], r["seq"]) for r in rows])
     if sum(n for _, n in gaps) != seq["lost"]:      # the two must count the same frames
@@ -454,12 +474,16 @@ def report(res: dict, horizon: int, rows_range: tuple[int, int] | None) -> list[
     out.append("|---|---|---|---|---|---|---|")
     for e in eps:
         L = e["loss_row"]
+        burst = [f"burst of {e['burst']} frames"] if e["burst"] else []
         back = ("-" if e["window"] is None
-                else f"n/a (next loss at row {e['next_loss']})" if not e["isolated"]
+                else "n/a (" + ", ".join(burst + ([f"next loss at row {e['next_loss']}"]
+                                                  if e["near_loss"] else [])) + ")"
+                if not e["isolated"]
                 else "never" if e["back_row"] is None
                 else f"#{e['back_row']} (+{e['back_row'] - L})")
         iso = ("-" if e["isolated"] is None else "yes" if e["isolated"]
-               else f"no (row {e['next_loss']})")
+               else "no (" + ", ".join(burst + ([f"row {e['next_loss']}"] if e["near_loss"]
+                                                else [])) + ")")
         ended = e["ended_by"] or "open"
         out.append(f"| {res['leg']} | {L if L is not None else '-'} | {_episode_cell(e)}"
                    f"{' re-entry' if e['reentry'] else ''} | {ended} | {back} | {iso} | "

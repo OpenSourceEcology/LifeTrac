@@ -29,14 +29,18 @@ RSSI tracking rule: within +/-3 dB of R0 - step while the median is >= 10 dB
 above --floor (the pick's survey floor); below that, the median SNR must
 fall 3 +/- 2 dB per 3 dB step from --prev-snr at --prev-step. --leak scores
 the leakage check instead: no frame decoded (no `published frame_id`, no
-fragment, no rx_rf window, rx_frames 0), and the crc_dump RSSI is the
-leakage level.
+fragment, no rx_rf window, rx_frames 0, with the stats thread reporting
+`rx_frames=` to the end of the log), and the crc_dump RSSI is the leakage
+level.
 
 Exit 0 when every archive gave its figures (a tracking or R0-range miss is a
 result, printed, not an error); 1 when an archive cannot give them (no rx_rf
 window although frames were published, the stats thread crashed, or the
-windows stop before the frames do -- RS-12.17) or, with --leak, when a frame
-was decoded; 2 on missing or garbled input. Only rx_daemon.log (one clock)
+windows stop before the frames do -- RS-12.17; with --leak, no `rx_frames=`
+line, a crashed stats thread or receiver, stats lines that stop before the
+log does or cover less than the leg's duration_s, or a DTS leg without the
+FRF read-back at the pick) or, with --leak, when a frame was decoded; 2 on
+missing or garbled input. Only rx_daemon.log (one clock)
 is read for timing.
 """
 from __future__ import annotations
@@ -91,11 +95,13 @@ def parse_rx_log(text: str) -> dict:
     whose fields contradict each other: a partial extract would be a wrong
     one."""
     windows, dumps, published, frags, rx_frames = [], [], [], 0, []
-    t_first = None
+    t_first = t_last = t_rx_last = None
     for n, line in enumerate(text.splitlines(), 1):
         t = _ts(line)
         if t is not None and t_first is None:
             t_first = t
+        if t is not None:
+            t_last = t
         if "rx_rf:" in line:
             m = _RXRF.search(line)
             if not m or t is None:
@@ -122,11 +128,42 @@ def parse_rx_log(text: str) -> dict:
         m = re.search(r"\brx_frames=(\d+)", line)
         if m:
             rx_frames.append(int(m.group(1)))
+            if t is not None:
+                t_rx_last = t
     if t_first is None:
         raise ExtractError("rx_daemon.log has no timestamped line")
     return {"windows": windows, "dumps": dumps, "published": published, "frags": frags,
             "rx_frames_max": max(rx_frames) if rx_frames else None, "t_first": t_first,
-            "stats_crashed": "Exception in thread image-rx-stats" in text}
+            "t_last": t_last, "t_rx_last": t_rx_last,
+            "stats_crashed": "Exception in thread image-rx-stats" in text,
+            "rx_fatal": "fatal: cannot open L072 HostLink" in text}
+
+
+def leak_unscorable(log: dict, params: dict | None = None) -> str | None:
+    """Why a leg with nothing decoded still cannot PASS the leakage check, or None.
+
+    No frame decoded is evidence only while the receiver ran and its stats
+    thread reported rx_frames to the end of the log and across the leg."""
+    if log["stats_crashed"]:
+        return "the stats thread crashed (`Exception in thread image-rx-stats`)"
+    if log["rx_fatal"]:
+        return "the receiver never opened its L072 HostLink (`fatal: cannot open L072 HostLink`)"
+    if log["rx_frames_max"] is None:
+        return "no `rx_frames=` stats line: the receiver's counters never reported"
+    gap = log["t_last"] - log["t_rx_last"] if log["t_rx_last"] is not None else None
+    if gap is None or gap > TAIL_SLACK_S:
+        return (f"the last `rx_frames=` stats line is {gap:.0f} s before the log ends "
+                f"(> {TAIL_SLACK_S:.0f} s): the stats thread stopped (RS-12.17)"
+                if gap is not None else "no timestamped `rx_frames=` stats line")
+    try:
+        dur = float((params or {}).get("duration_s") or 0)
+    except ValueError:
+        dur = 0.0
+    span = log["t_rx_last"] - log["t_first"]
+    if dur and span < dur - TAIL_SLACK_S:
+        return (f"the `rx_frames=` stats lines cover {span:.0f} s of a {dur:.0f} s leg: the "
+                f"receiver stopped early")
+    return None
 
 
 def _axis(windows: list, key: str, ncol: str) -> dict | None:
@@ -369,6 +406,17 @@ def main(argv: list[str] | None = None) -> int:
             if any(decoded):
                 print(f"  leakage check: FAIL -- decoded: published {decoded[0]}, frag_arrival "
                       f"{decoded[1]}, rx_rf windows {decoded[2]}, rx_frames {decoded[3]}")
+                rc = max(rc, 1)
+            elif leak_unscorable(log, params):
+                print(f"  leakage check: NOT SCORED -- nothing decoded, but "
+                      f"{leak_unscorable(log, params)}")
+                rc = max(rc, 1)
+            elif any("abort condition" in ln for ln in frf_check(
+                    params, frf_readbacks(rx_text),
+                    frf_readbacks(tx_text) if tx_text is not None else None)):
+                print("  leakage check: NOT SCORED -- nothing decoded, but the boards did not "
+                      "read back (OK) at the pick (the !! line above): the base may have "
+                      "listened off the leg's carrier")
                 rc = max(rc, 1)
             else:
                 lvl = (f"leakage level (crc_dump RSSI) med/max {s['crc_rssi'][0]:.0f}/"

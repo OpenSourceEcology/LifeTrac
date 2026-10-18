@@ -57,10 +57,12 @@ the whole output kept in `legs/leg<X>_health_{base,tractor}.txt`>.
 Before each pass: scene check <moving: x % over 10 s (≥ 8 %); landscape: y %>
 (`legs/step1_<bw>_<scene>_scene.{txt,jpg}`); tractor `bench_mqtt` recreated,
 retained messages after the recreate: <0> (`legs/step1_bench_mqtt_reset.txt`, A12).
-Boot-log check per pass (`legs/step1_<bw>_<scene>_bootcheck.txt`): `byte_budget=<203 | 243> B`
-and no `VECTOR budget … until link_budget` line; `legs/step1_pass.sh` ended `done`
-(exit 0). Exit 6 = camera_service held VECTOR at the cold-start clamp: not a valid pass at
-the profile's budget, re-run it.
+Boot-log check per pass (`legs/step1_<bw>_<scene>_bootcheck.txt`) and the pulled
+`legs/step1_camera_service_<bw>_<scene>.log`: `byte_budget=<203 | 243> B` and no
+`VECTOR budget … until link_budget` line; `legs/step1_pass.sh` ended `done` (exit 0).
+Exit 6 = camera_service held VECTOR at the cold-start clamp, or its camera log with its
+byte_budget line did not come back: not a valid pass at the profile's budget, re-run it
+with a new `--suffix`.
 
 Final `scene:` lines (from `legs/step1_tractor_*.txt`):
 

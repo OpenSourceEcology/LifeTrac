@@ -76,7 +76,7 @@ overrides the file for one run of these `legs/` scripts, for example
 | `push_fix_to_board.sh` | Pushes this checkout's `camera_service.py`, encoder, store and `vector_dry_run.py`, md5-checked, then runs an import smoke without any device. | one | none |
 | `youtube_window.ps1` | `-Open` / `-Front` / `-Close` the bench video window (its own Firefox profile, muted). `-Url`, `-ProfileDir`, `-FirefoxExe`. | none | none |
 | `scene_check.sh` | Before every camera run: window to the front, then frames from `/dev/video1` until 10.5 s after the camera's sixth frame (at most 20 s after its first). Needs ≥ 8 % of pixels changed over 10 s (0 = record only, for a still). No frame within 20 s, or fewer than 10 frames, fails with a `NO-FRAMES` reason (exit 4). | tractor camera | none |
-| `step1_pass.sh` | One camera-only step-1 pass: fresh `bench_mqtt`, capture, then `camera_svc` with the profile's `LIFETRAC_REG_PROFILE`. `--from-work` runs the pushed tree. Refuses to run while a leg daemon is up. Exit 6 = camera_service's VECTOR cold-start clamp was seen: the pass is not valid at the profile's budget. | tractor | none (camera only) |
+| `step1_pass.sh` | One camera-only step-1 pass: fresh `bench_mqtt`, capture, then `camera_svc` with the profile's `LIFETRAC_REG_PROFILE`. `--from-work` runs the pushed tree. Refuses to run while a leg daemon is up. Exit 6 = camera_service's VECTOR cold-start clamp was seen (boot-log check or the pulled camera log), or no camera log from this pass with its `byte_budget` line came back: the pass is not valid at the profile's budget. | tractor | none (camera only) |
 | `leg_prep.sh` | Scene check, UART-holder check, health probes, `clear_retained`, pre-brackets, detached base capture. Writes the harness command. Knows the RS-13.1 tags and the range-edge leg names. | both | wakes the receivers (RXCONT); does not transmit |
 | `link_sample.sh` | During a leg: the first `link_stats` message that has frames (P7). | base broker | none |
 | `leg2d_switch.sh` | Leg 2d only: the override publishes at T+60 s and T+180 s, plus the acks. | base broker | **the base transmits** (0x63 commands) |
@@ -262,11 +262,14 @@ bash step1_pass.sh bw500 landscape --from-work
 (bw500), as the harness does on those legs, so a bw500 pass encodes at
 243 B instead of the 203 B cold-start clamp (the 2026-10-14 bw500 passes
 ran without it). The boot-log check greps camera_service's
-`VECTOR budget … until link_budget` line. If it appears, the pass prints a
-WARNING, still tears down and pulls its files, then ends
-`== pass <tag> INVALID: …` and exits 6: the pass did not encode at the
-profile's one-fragment budget, so re-run it (with a new `--suffix`) once the
-cause is fixed.
+`VECTOR budget … until link_budget` line, and the full camera log pulled at
+the end is checked for it too (a slow start can log it after the +15 s
+sample). If it appears, the pass prints a WARNING, still tears down and
+pulls its files, then ends `== pass <tag> INVALID: …` and exits 6: the pass
+did not encode at the profile's one-fragment budget, so re-run it (with a
+new `--suffix`) once the cause is fixed. A pass whose camera log does not
+come back, or whose log lacks camera_service's `byte_budget=<203|243> B/frame`
+line, also ends INVALID (exit 6): its budget is unverified.
 
 - `--from-work` runs the pushed tree. The files get a `_work` suffix (RS-13.1
   used `_fix`).
