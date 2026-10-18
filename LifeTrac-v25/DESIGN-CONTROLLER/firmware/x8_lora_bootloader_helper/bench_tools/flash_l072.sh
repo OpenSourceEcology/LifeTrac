@@ -86,8 +86,10 @@ MD5=$(md5sum "$IMG" | cut -d' ' -f1)
 # 192 KB flash, of which the last 8 KB is the CFG region (include/memory_map.h).
 [ "$SIZE" -le $((184 * 1024)) ] || die "$IMGNAME is $SIZE B, larger than the 184 KB APP region"
 case "$MD5" in
-  0c1bb0a9573f813137f941dfa47177d0) KIND="bench build on both boards since 2026-09-15 (RS-12.15 v2)" ;;
-  589c120323c2d5e7ef9f459d7a4ba42d) KIND="PRODUCTION build (main bb4a2071): refuses diag register writes, so -ForceFrfHz and channel_survey_sniff.py fail on it -- bench boards normally run the bench build" ;;
+  e083ae46a64686031b39866eca42e094) KIND="bench build on both boards since 2026-10-18 (RS-12.15 reverse delivery, #152)" ;;
+  148de24e1f9acce417c46c2c69a5be6b) KIND="PRODUCTION build (main 3c8ced60): refuses diag register writes, so -ForceFrfHz and channel_survey_sniff.py fail on it -- bench boards normally run the bench build" ;;
+  0c1bb0a9573f813137f941dfa47177d0) KIND="previous bench build, on both boards 2026-09-15 -> 2026-10-18 (RS-12.15 v2; the rollback image)" ;;
+  589c120323c2d5e7ef9f459d7a4ba42d) KIND="previous PRODUCTION build (main bb4a2071): refuses diag register writes, so -ForceFrfHz and channel_survey_sniff.py fail on it -- bench boards normally run the bench build" ;;
   e8ad842489d5acfc09f204c7807e4661) KIND="RS-12.10 bench build (pre-clock-authority A/B control)" ;;
   5a160e4a8c9296c7d2e49727bdfb8880) KIND="RS-12.15 v2 bench build as flown in legs R and T" ;;
   8c112e6f8b42109aab38a69f2b0aa147) KIND="first RS-12.10 build -- STATS-tail serializer bug, do not fly" ;;

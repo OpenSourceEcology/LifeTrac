@@ -1,0 +1,291 @@
+﻿branch head: 13f20aa18042089a77a2fd84c7162615122f353a
+committed firmware.bin md5 (before): 589c120323c2d5e7ef9f459d7a4ba42d
+=== mingw32-make
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP  -c startup.c -o build/startup.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP  -c main.c -o build/main.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP  -c boot/safe_mode.c -o build/boot/safe_mode.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP  -c hal/platform.c -o build/hal/platform.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP  -c host/host_cfg.c -o build/host/host_cfg.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP  -c host/host_rx_wire.c -o build/host/host_rx_wire.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP  -c host/host_reg_gate.c -o build/host/host_reg_gate.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP  -c host/host_cfg_profile.c -o build/host/host_cfg_profile.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP  -c host/host_cfg_wire.c -o build/host/host_cfg_wire.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP  -c host/host_cmd.c -o build/host/host_cmd.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP  -c host/host_rfco.c -o build/host/host_rfco.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP  -c host/host_rfco_summary.c -o build/host/host_rfco_summary.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP  -c host/host_rfco_summary_emit.c -o build/host/host_rfco_summary_emit.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP  -c host/host_stats.c -o build/host/host_stats.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP  -c host/host_rx_urc_lost.c -o build/host/host_rx_urc_lost.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP  -c host/host_uart.c -o build/host/host_uart.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP  -c radio/sx1276_airtime.c -o build/radio/sx1276_airtime.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP  -c radio/sx1276_cad.c -o build/radio/sx1276_cad.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP  -c radio/lora_pkt_hdr.c -o build/radio/lora_pkt_hdr.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP  -c radio/lora_frames_per_dwell.c -o build/radio/lora_frames_per_dwell.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP  -c radio/sx1276_fhss_chantab.c -o build/radio/sx1276_fhss_chantab.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP  -c radio/sx1276_fhss.c -o build/radio/sx1276_fhss.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP  -c radio/sx1276_fhss_clock.c -o build/radio/sx1276_fhss_clock.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP  -c radio/sx1276_fhss_authority.c -o build/radio/sx1276_fhss_authority.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP  -c radio/sx1276_rx_grid_policy.c -o build/radio/sx1276_rx_grid_policy.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP  -c radio/sx1276_lbt.c -o build/radio/sx1276_lbt.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP  -c radio/sx1276_legal_dwell.c -o build/radio/sx1276_legal_dwell.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP  -c radio/sx1276_modes.c -o build/radio/sx1276_modes.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP  -c radio/sx1276_rx.c -o build/radio/sx1276_rx.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP  -c radio/sx1276_rx_fifo_track.c -o build/radio/sx1276_rx_fifo_track.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP  -c radio/sx1276_rx_counters.c -o build/radio/sx1276_rx_counters.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP  -c radio/sx1276_rx_retune_policy.c -o build/radio/sx1276_rx_retune_policy.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP  -c radio/sx1276_rx_retune_counters.c -o build/radio/sx1276_rx_retune_counters.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP  -c radio/sx1276_rx_scan_policy.c -o build/radio/sx1276_rx_scan_policy.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP  -c radio/sx1276_rx_scan_counters.c -o build/radio/sx1276_rx_scan_counters.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP  -c radio/sx1276_rx_scan_fail.c -o build/radio/sx1276_rx_scan_fail.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP  -c radio/sx1276_rx_scan_walker.c -o build/radio/sx1276_rx_scan_walker.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP  -c radio/sx1276_tx.c -o build/radio/sx1276_tx.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP  -c radio/sx1276.c -o build/radio/sx1276.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP  -c include/static_asserts.c -o build/include/static_asserts.o
+arm-none-eabi-cpp -P -nostdinc -undef -Iinclude -x c ld/stm32l072cz_flash.ld -o build/firmware.ld
+arm-none-eabi-gcc build/startup.o build/main.o build/boot/safe_mode.o build/hal/platform.o build/host/host_cfg.o build/host/host_rx_wire.o build/host/host_reg_gate.o build/host/host_cfg_profile.o build/host/host_cfg_wire.o build/host/host_cmd.o build/host/host_rfco.o build/host/host_rfco_summary.o build/host/host_rfco_summary_emit.o build/host/host_stats.o build/host/host_rx_urc_lost.o build/host/host_uart.o build/radio/sx1276_airtime.o build/radio/sx1276_cad.o build/radio/lora_pkt_hdr.o build/radio/lora_frames_per_dwell.o build/radio/sx1276_fhss_chantab.o build/radio/sx1276_fhss.o build/radio/sx1276_fhss_clock.o build/radio/sx1276_fhss_authority.o build/radio/sx1276_rx_grid_policy.o build/radio/sx1276_lbt.o build/radio/sx1276_legal_dwell.o build/radio/sx1276_modes.o build/radio/sx1276_rx.o build/radio/sx1276_rx_fifo_track.o build/radio/sx1276_rx_counters.o build/radio/sx1276_rx_retune_policy.o build/radio/sx1276_rx_retune_counters.o build/radio/sx1276_rx_scan_policy.o build/radio/sx1276_rx_scan_counters.o build/radio/sx1276_rx_scan_fail.o build/radio/sx1276_rx_scan_walker.o build/radio/sx1276_tx.o build/radio/sx1276.o build/include/static_asserts.o -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Tbuild/firmware.ld -nostartfiles -Wl,--gc-sections  -Wl,-Map=build/firmware.map -specs=nano.specs -specs=nosys.specs -o build/firmware.elf
+arm-none-eabi-objcopy -O binary build/firmware.elf build/firmware.bin
+arm-none-eabi-objcopy -O ihex build/firmware.elf build/firmware.hex
+ECHO is off.
+"Section sizes:"
+build/firmware.elf  :
+section            size        addr
+.isr_vector         196   134217728
+.boot_rodata         20   134217924
+.text             24204   134217944
+.boot_text          524   134242148
+.ARM                  8   134242672
+.data                20   536870912
+.noinit              24   536870932
+.bss               6696   536870960
+._user_heap           0   536877656
+.stack_check          0   536877656
+.cfg_reserved      8192   134406144
+.ARM.attributes      42           0
+.debug_line_str     476           0
+.debug_frame        208           0
+Total             40610
+
+
+ECHO is off.
+"Region budgets (from include/memory_map.h):"
+"  APP = 184 KB (unified; boot merged, RS-5.8)    CFG = 8 KB    Total = 192 KB"
+"  RAM   = 20 KB    Stack reserved = 2.5 KB"
+all exit=0
+=== mingw32-make check
+"[1/2] Preprocessing memory_map.h ..."
+"      -> build/memory_map.preproc"
+"[2/2] Compiling include/static_asserts.c (host) ..."
+"[FHSS] Building chantab golden-vector test ..."
+"[FHSS] Running chantab golden-vector test ..."
+[OK] sx1276_fhss_chantab: all checks passed (count=50, span=902750000..927250000 Hz)
+"[FHSS] Building scheduler golden-vector test ..."
+"[FHSS] Running scheduler golden-vector test ..."
+[PASS] fhss_scheduler_vectors: 23 cases
+"[FHCLK] Building fhss-clock test ..."
+"[FHCLK] Running fhss-clock test ..."
+[PASS] fhss_clock: 34 base + F6 age/refresh + RS-12.15 leads
+"[FHAUT] Building fhss-authority test ..."
+"[FHAUT] Running fhss-authority test ..."
+[PASS] fhss_authority: 7 test fns (strict gap, decay, post-demotion single TX)
+"[RXGRD] Building rx-grid-policy test (real consider_remote) ..."
+"[RXGRD] Running rx-grid-policy test ..."
+[PASS] rx_grid_policy: 11 sequences incl. demotion->TX->RX recovery, the forged-epoch drift barrier and the RS-13 switch gap (1.038 s adopts the follower, 0.99 s refuses it), against the real consider_remote
+"[RXREV] Building rx-reverse-delivery SIL test (real sx1276_rx.c/sx1276_tx.c) ..."
+"[RXREV] Running rx-reverse-delivery SIL test ..."
+[PASS] rx_reverse_delivery: 10 SIL sequences against the real sx1276_rx.c/sx1276_tx.c -- reverse delivery between trains, follower path unchanged, self-follow bounded by authority
+"[AIRTIME] Building airtime-invariant test ..."
+"[AIRTIME] Running airtime-invariant test ..."
+[PASS] airtime_invariant: 12 cases
+"[TXLEN] Building tx-len-guard test ..."
+"[TXLEN] Running tx-len-guard test ..."
+PASS tx_len_guard
+"[DWELL] Building legal-dwell test ..."
+"[DWELL] Running legal-dwell test ..."
+[PASS] legal_dwell: 15 cases
+"[FPD  ] Building frames_per_dwell parity test ..."
+"[FPD  ] Running frames_per_dwell parity test ..."
+[OK] frames_per_dwell parity (14 cases + 4 constants)
+"[RFCO ] Building per-TX RFCO test ..."
+"[RFCO ] Running per-TX RFCO test ..."
+[PASS] rfco_pertx: 11 cases
+"[SUMC ] Building RFCO summary counters test ..."
+"[SUMC ] Running RFCO summary counters test ..."
+mingw32-make : [CASE] fhss: record then snapshot returns counts then zeroes
+At line:1 char:1038
++ ... Out-File $log -Append -Encoding utf8; mingw32-make check 2>&1 | Out-F ...
++                                           ~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ([CASE] fhss: re...nts then zeroes:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[CASE] fhss: in-memory >0xFF saturates to 0xFFU on wire
+[CASE] fhss: in-memory counter saturates at UINT16_MAX, never wraps
+[CASE] fhss: out-of-range idx is no-op
+[CASE] fhss: NULL out preserves counters
+[CASE] fhss: per-channel independence
+[CASE] dwell: successful reserve updates peak == used_before + pessimistic
+[CASE] dwell: smaller subsequent reserve does NOT lower the peak
+[CASE] dwell: OVER_BUDGET / BAD_CH / BAD_RESERVE do NOT update peak
+[CASE] dwell: snapshot_and_clear zeroes peaks; second snapshot is all zero
+[CASE] dwell: NULL out preserves peaks
+[CASE] blocked: per-reason slot mapping (1..6 direct, 0xFF -> slot 7)
+[CASE] blocked: OK is never recorded (slot 0 stays 0)
+[CASE] blocked: unallocated reason value is dropped
+[CASE] blocked: counter saturates at UINT16_MAX
+[CASE] blocked: snapshot zeroes counters; second snapshot is all zero
+[CASE] blocked: NULL out preserves counters
+[PASS] rfco_summary_counters: 17 cases
+"[SUMP ] Building RFCO summary pack test ..."
+"[SUMP ] Running RFCO summary pack test ..."
+[CASE] CRC-16/CCITT-FALSE KAT: crc("123456789") == 0x29B1
+[CASE] NULL in rejected, out buffer untouched
+[CASE] NULL out rejected
+[CASE] HOST_RFCO_SUMMARY_PAYLOAD_LEN == 191
+[CASE] schema byte (off 0) hard-pinned to SCHEMA_VER even when struct differs
+[CASE] pertx_schema_ver_at_emit (off 1) stamps caller value
+[CASE] _reserved_align (off 6..7) hard-zeroed even when struct field is 0xDEAD
+[CASE] all-zero snapshot: only schema byte + CRC are non-zero
+[CASE] u32 LE: uptime_ms / summary_seq / window_elapsed_ms
+[CASE] per_channel_hop_count[50] round-trips byte-for-byte; 0xFF passes through
+[CASE] per_channel_dwell_max_ms[50] u16 LE; 0xFFFF passes through
+[CASE] blocked_attempts_by_reason[8] u16 LE; 0xFFFF passes through
+[CASE] tail bytes (off 186/187/188) round-trip
+[CASE] flags FIRST_SINCE_BOOT bit round-trips
+[CASE] CRC at offsets 189..190 is little-endian
+[CASE] flipping any byte in [0..188] changes the CRC
+[PASS] rfco_summary: 17 cases
+[CASE] pack always overwrites CRC bytes (caller-poisoned input ignored)
+"[SUME ] Building RFCO summary emit test ..."
+"[SUME ] Running RFCO summary emit test ..."
+[PASS] rfco_summary_emit: 9 cases
+"[SUMI ] Building RFCO summary integration test ..."
+"[SUMI ] Running RFCO summary integration test ..."
+[PASS] rfco_summary_integration: 8 cases
+"[CFGP ] Building cfg-profile test ..."
+"[CFGP ] Running cfg-profile test ..."
+[PASS] cfg_profile: 27 cases
+"[CFGPW] Building cfg-profile-wire test ..."
+"[CFGPW] Running cfg-profile-wire test ..."
+[PASS] cfg_profile_wire: 17 cases
+"[CFGF ] Building cfg-clamp-fuzz test ..."
+"[CFGF ] Running cfg-clamp-fuzz test ..."
+[PASS] cfg_clamp_fuzz: cases=12096 legal=1180 reject=10916
+  bucket NONE=1180 BAD_PROFILE=6048 ANTENNA=2592 NO_HEADROOM=696 UNROUTED=960 MASK_POP=460 MASK_OOT=160
+"[HDR  ] Building lora-pkt-hdr test ..."
+"[HDR  ] Running lora-pkt-hdr test ..."
+[PASS] lora_pkt_hdr: 11 cases
+"[RXCT ] Building rx-counters test ..."
+"[RXCT ] Running rx-counters test ..."
+[PASS] rx_counters: 10 cases
+"[RXRT ] Building rx-retune-policy test ..."
+"[RXRT ] Running rx-retune-policy test ..."
+[PASS] rx_retune_policy: 14 cases
+"[RXRTC] Building rx-retune-counters test ..."
+"[RXRTC] Running rx-retune-counters test ..."
+[PASS] rx_retune_counters: 10 cases
+"[RXSCN] Building rx-scan-policy test ..."
+"[RXSCN] Running rx-scan-policy test ..."
+[PASS] rx_scan_policy: 20 cases
+"[RXSCC] Building rx-scan-counters test ..."
+"[RXSCC] Running rx-scan-counters test ..."
+[PASS] rx_scan_counters: 14 cases
+"[RXSCF] Building rx-scan-fail test ..."
+"[RXSCF] Running rx-scan-fail test ..."
+[PASS] rx_scan_fail: 12 cases
+"[RXSCW] Building rx-scan-walker test ..."
+"[RXSCW] Running rx-scan-walker test ..."
+rx_scan_walker: all golden vectors PASS
+"[RXURC] Building rx-frame-urc wire test ..."
+"[RXURC] Running rx-frame-urc wire test ..."
+[PASS] rx_frame_urc: 4 test fns, 27 checks
+"[RGATE] Building reg-write-gate test ..."
+"[RGATE] Running reg-write-gate test ..."
+[PASS] reg_write_gate: 3 test fns, 65536-point property
+"[RXURL] Building rx-urc-lost test ..."
+"[RXURL] Running rx-urc-lost test ..."
+[PASS] rx_urc_lost: 12 cases
+"[RXFIF] Building rx-fifo-track test ..."
+"[RXFIF] Running rx-fifo-track test ..."
+[PASS] rx_fifo_track: 12 cases
+"[STLAY] Building stats-layout test ..."
+"[STLAY] Running stats-layout test ..."
+[PASS] stats_layout: 29 cases
+"[OK] memory map invariants hold"
+check exit=0
+=== mingw32-make bench
+C:/Users/dorkm/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/bin/mingw32-make.exe CROSS="arm-none-eabi-" TARGET=firmware BUILD=build_bench EXTRA_CFLAGS=" -DHOST_ALLOW_REG_WRITE_DIAG=1" all
+mingw32-make[1]: Entering directory 'C:/Users/dorkm/Documents/GitHub/LifeTrac-l072-152/LifeTrac-v25/DESIGN-CONTROLLER/firmware/murata_l072'
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP -DHOST_ALLOW_REG_WRITE_DIAG=1 -c startup.c -o build_bench/startup.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP -DHOST_ALLOW_REG_WRITE_DIAG=1 -c main.c -o build_bench/main.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP -DHOST_ALLOW_REG_WRITE_DIAG=1 -c boot/safe_mode.c -o build_bench/boot/safe_mode.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP -DHOST_ALLOW_REG_WRITE_DIAG=1 -c hal/platform.c -o build_bench/hal/platform.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP -DHOST_ALLOW_REG_WRITE_DIAG=1 -c host/host_cfg.c -o build_bench/host/host_cfg.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP -DHOST_ALLOW_REG_WRITE_DIAG=1 -c host/host_rx_wire.c -o build_bench/host/host_rx_wire.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP -DHOST_ALLOW_REG_WRITE_DIAG=1 -c host/host_reg_gate.c -o build_bench/host/host_reg_gate.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP -DHOST_ALLOW_REG_WRITE_DIAG=1 -c host/host_cfg_profile.c -o build_bench/host/host_cfg_profile.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP -DHOST_ALLOW_REG_WRITE_DIAG=1 -c host/host_cfg_wire.c -o build_bench/host/host_cfg_wire.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP -DHOST_ALLOW_REG_WRITE_DIAG=1 -c host/host_cmd.c -o build_bench/host/host_cmd.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP -DHOST_ALLOW_REG_WRITE_DIAG=1 -c host/host_rfco.c -o build_bench/host/host_rfco.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP -DHOST_ALLOW_REG_WRITE_DIAG=1 -c host/host_rfco_summary.c -o build_bench/host/host_rfco_summary.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP -DHOST_ALLOW_REG_WRITE_DIAG=1 -c host/host_rfco_summary_emit.c -o build_bench/host/host_rfco_summary_emit.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP -DHOST_ALLOW_REG_WRITE_DIAG=1 -c host/host_stats.c -o build_bench/host/host_stats.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP -DHOST_ALLOW_REG_WRITE_DIAG=1 -c host/host_rx_urc_lost.c -o build_bench/host/host_rx_urc_lost.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP -DHOST_ALLOW_REG_WRITE_DIAG=1 -c host/host_uart.c -o build_bench/host/host_uart.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP -DHOST_ALLOW_REG_WRITE_DIAG=1 -c radio/sx1276_airtime.c -o build_bench/radio/sx1276_airtime.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP -DHOST_ALLOW_REG_WRITE_DIAG=1 -c radio/sx1276_cad.c -o build_bench/radio/sx1276_cad.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP -DHOST_ALLOW_REG_WRITE_DIAG=1 -c radio/lora_pkt_hdr.c -o build_bench/radio/lora_pkt_hdr.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP -DHOST_ALLOW_REG_WRITE_DIAG=1 -c radio/lora_frames_per_dwell.c -o build_bench/radio/lora_frames_per_dwell.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP -DHOST_ALLOW_REG_WRITE_DIAG=1 -c radio/sx1276_fhss_chantab.c -o build_bench/radio/sx1276_fhss_chantab.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP -DHOST_ALLOW_REG_WRITE_DIAG=1 -c radio/sx1276_fhss.c -o build_bench/radio/sx1276_fhss.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP -DHOST_ALLOW_REG_WRITE_DIAG=1 -c radio/sx1276_fhss_clock.c -o build_bench/radio/sx1276_fhss_clock.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP -DHOST_ALLOW_REG_WRITE_DIAG=1 -c radio/sx1276_fhss_authority.c -o build_bench/radio/sx1276_fhss_authority.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP -DHOST_ALLOW_REG_WRITE_DIAG=1 -c radio/sx1276_rx_grid_policy.c -o build_bench/radio/sx1276_rx_grid_policy.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP -DHOST_ALLOW_REG_WRITE_DIAG=1 -c radio/sx1276_lbt.c -o build_bench/radio/sx1276_lbt.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP -DHOST_ALLOW_REG_WRITE_DIAG=1 -c radio/sx1276_legal_dwell.c -o build_bench/radio/sx1276_legal_dwell.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP -DHOST_ALLOW_REG_WRITE_DIAG=1 -c radio/sx1276_modes.c -o build_bench/radio/sx1276_modes.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP -DHOST_ALLOW_REG_WRITE_DIAG=1 -c radio/sx1276_rx.c -o build_bench/radio/sx1276_rx.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP -DHOST_ALLOW_REG_WRITE_DIAG=1 -c radio/sx1276_rx_fifo_track.c -o build_bench/radio/sx1276_rx_fifo_track.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP -DHOST_ALLOW_REG_WRITE_DIAG=1 -c radio/sx1276_rx_counters.c -o build_bench/radio/sx1276_rx_counters.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP -DHOST_ALLOW_REG_WRITE_DIAG=1 -c radio/sx1276_rx_retune_policy.c -o build_bench/radio/sx1276_rx_retune_policy.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP -DHOST_ALLOW_REG_WRITE_DIAG=1 -c radio/sx1276_rx_retune_counters.c -o build_bench/radio/sx1276_rx_retune_counters.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP -DHOST_ALLOW_REG_WRITE_DIAG=1 -c radio/sx1276_rx_scan_policy.c -o build_bench/radio/sx1276_rx_scan_policy.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP -DHOST_ALLOW_REG_WRITE_DIAG=1 -c radio/sx1276_rx_scan_counters.c -o build_bench/radio/sx1276_rx_scan_counters.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP -DHOST_ALLOW_REG_WRITE_DIAG=1 -c radio/sx1276_rx_scan_fail.c -o build_bench/radio/sx1276_rx_scan_fail.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP -DHOST_ALLOW_REG_WRITE_DIAG=1 -c radio/sx1276_rx_scan_walker.c -o build_bench/radio/sx1276_rx_scan_walker.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP -DHOST_ALLOW_REG_WRITE_DIAG=1 -c radio/sx1276_tx.c -o build_bench/radio/sx1276_tx.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP -DHOST_ALLOW_REG_WRITE_DIAG=1 -c radio/sx1276.c -o build_bench/radio/sx1276.o
+arm-none-eabi-gcc -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Os -ffunction-sections -fdata-sections -std=gnu11 -Iinclude -I. -DLIFETRAC_FHSS_TX_ROUTED=1 -fno-common -fno-builtin -MMD -MP -DHOST_ALLOW_REG_WRITE_DIAG=1 -c include/static_asserts.c -o build_bench/include/static_asserts.o
+arm-none-eabi-cpp -P -nostdinc -undef -Iinclude -x c ld/stm32l072cz_flash.ld -o build_bench/firmware.ld
+arm-none-eabi-gcc build_bench/startup.o build_bench/main.o build_bench/boot/safe_mode.o build_bench/hal/platform.o build_bench/host/host_cfg.o build_bench/host/host_rx_wire.o build_bench/host/host_reg_gate.o build_bench/host/host_cfg_profile.o build_bench/host/host_cfg_wire.o build_bench/host/host_cmd.o build_bench/host/host_rfco.o build_bench/host/host_rfco_summary.o build_bench/host/host_rfco_summary_emit.o build_bench/host/host_stats.o build_bench/host/host_rx_urc_lost.o build_bench/host/host_uart.o build_bench/radio/sx1276_airtime.o build_bench/radio/sx1276_cad.o build_bench/radio/lora_pkt_hdr.o build_bench/radio/lora_frames_per_dwell.o build_bench/radio/sx1276_fhss_chantab.o build_bench/radio/sx1276_fhss.o build_bench/radio/sx1276_fhss_clock.o build_bench/radio/sx1276_fhss_authority.o build_bench/radio/sx1276_rx_grid_policy.o build_bench/radio/sx1276_lbt.o build_bench/radio/sx1276_legal_dwell.o build_bench/radio/sx1276_modes.o build_bench/radio/sx1276_rx.o build_bench/radio/sx1276_rx_fifo_track.o build_bench/radio/sx1276_rx_counters.o build_bench/radio/sx1276_rx_retune_policy.o build_bench/radio/sx1276_rx_retune_counters.o build_bench/radio/sx1276_rx_scan_policy.o build_bench/radio/sx1276_rx_scan_counters.o build_bench/radio/sx1276_rx_scan_fail.o build_bench/radio/sx1276_rx_scan_walker.o build_bench/radio/sx1276_tx.o build_bench/radio/sx1276.o build_bench/include/static_asserts.o -mcpu=cortex-m0plus -mthumb -mfloat-abi=soft -Tbuild_bench/firmware.ld -nostartfiles -Wl,--gc-sections  -Wl,-Map=build_bench/firmware.map -specs=nano.specs -specs=nosys.specs -o build_bench/firmware.elf
+arm-none-eabi-objcopy -O binary build_bench/firmware.elf build_bench/firmware.bin
+arm-none-eabi-objcopy -O ihex build_bench/firmware.elf build_bench/firmware.hex
+ECHO is off.
+"Section sizes:"
+build_bench/firmware.elf  :
+section            size        addr
+.isr_vector         196   134217728
+.boot_rodata         20   134217924
+.text             24204   134217944
+.boot_text          524   134242148
+.ARM                  8   134242672
+.data                20   536870912
+.noinit              24   536870932
+.bss               6696   536870960
+._user_heap           0   536877656
+.stack_check          0   536877656
+.cfg_reserved      8192   134406144
+.ARM.attributes      42           0
+.debug_line_str     476           0
+.debug_frame        208           0
+Total             40610
+
+
+ECHO is off.
+"Region budgets (from include/memory_map.h):"
+"  APP = 184 KB (unified; boot merged, RS-5.8)    CFG = 8 KB    Total = 192 KB"
+"  RAM   = 20 KB    Stack reserved = 2.5 KB"
+mingw32-make[1]: Leaving directory 'C:/Users/dorkm/Documents/GitHub/LifeTrac-l072-152/LifeTrac-v25/DESIGN-CONTROLLER/firmware/murata_l072'
+arm-none-eabi-objcopy -O binary build_bench/firmware.elf build/firmware_bench_diag.bin
+"[BENCH] build/firmware_bench_diag.bin (HOST_ALLOW_REG_WRITE_DIAG=1; NOT the production binary)"
+bench exit=0
+prod  md5 148de24e1f9acce417c46c2c69a5be6b size 24972
+bench md5 e083ae46a64686031b39866eca42e094 size 24972

@@ -113,12 +113,16 @@ and the default flags:
 
 | image | md5 | size |
 |---|---|---|
-| `build/firmware_bench_diag.bin` (bench; not flashed yet) | `e083ae46a64686031b39866eca42e094` | 24 972 B |
+| `build/firmware_bench_diag.bin` (bench; on both boards since 2026-10-18) | `e083ae46a64686031b39866eca42e094` | 24 972 B |
 | `build/firmware.bin` (production, committed) | `148de24e1f9acce417c46c2c69a5be6b` | 24 972 B |
 
-Both bench boards still run the previous bench build, `0c1bb0a9573f813137f941dfa47177d0`
-(production twin `589c120323c2d5e7ef9f459d7a4ba42d`, 24 860 B, from `main`
-`bb4a2071`). The same toolchain reproduced both at `main` `f6e4b463` on
+Both bench boards run `e083ae46` since 2026-10-18, flashed for the RS-12.15
+reverse-delivery round (Verify OK, `flash_rc=0` on both;
+[`RS_12_15_reverse_delivery_2026-10-18/`](../../bench-evidence/RS_12_15_reverse_delivery_2026-10-18/),
+with a copy of the image in `firmware_flash/`). Before that they ran the
+previous bench build, `0c1bb0a9573f813137f941dfa47177d0` (production twin
+`589c120323c2d5e7ef9f459d7a4ba42d`, 24 860 B, from `main` `bb4a2071`), from
+2026-09-15. The same toolchain reproduced both at `main` `f6e4b463` on
 2026-10-14, before this pair was built.
 
 Check with `certutil -hashfile build\firmware_bench_diag.bin MD5`

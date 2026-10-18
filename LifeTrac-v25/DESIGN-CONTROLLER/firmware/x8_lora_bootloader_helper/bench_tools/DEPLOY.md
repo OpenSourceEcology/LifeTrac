@@ -402,12 +402,18 @@ file the script saved and update the header.
   that step fails and changes nothing. It reports leftover containers and
   never removes them. The full rule is in
   [BENCH_BOARDS.md](BENCH_BOARDS.md#retired-boot-units-2026-10-12).
-- **The base's video-test compose file is armed until the next deploy.**
-  `docker-compose.video-test.yml` is still in the base's deployed tree. Since
-  2026-10-14 `deploy_base.sh` no longer ships it and renames that copy to
-  `docker-compose.video-test.yml.RETIRED-<PC UTC date>` (step 2 of the
-  board-side list above), as on the tractor; until that run it is armed.
-  Its `image_rx` maps `/dev/ttymxc3`, sends a soft RESET_REQ that un-parks
+- **The base's video-test compose file (disarmed 2026-10-14).** Since
+  2026-10-14 `deploy_base.sh` no longer ships
+  `docker-compose.video-test.yml` and renames the copy in the deployed tree
+  to `docker-compose.video-test.yml.RETIRED-<PC UTC date>` (step 2 of the
+  board-side list above), as on the tractor. Its first real run, at
+  `f6e4b463`, renamed the original base's copy to
+  `docker-compose.video-test.yml.RETIRED-2026-10-14`
+  ([log](../../../bench-evidence/bench_session_2026-10-14/boot_deploy_images/12_deploy_base.txt)).
+  The May backup `docker-compose.video-test.yml.bak_20260527_152255` is
+  still in that tree; compose uses it only if it is named with `-f`. On a
+  base that has not been deployed with the script, the file is still armed:
+  its `image_rx` maps `/dev/ttymxc3`, sends a soft RESET_REQ that un-parks
   the L072, and has `restart: unless-stopped`, so after one successful `up`
   it comes back at every boot until the container is removed. The only
   thing that makes a manual `up` of it fail is a broker holding

@@ -1,0 +1,21 @@
+2026-09-29T08:28:33Z
+## before
+/tractor-camera started=2026-09-29T08:20:29.03736175Z image=lifetrac-tractor-x8:latest
+/tractor-mosquitto started=2026-09-29T08:20:27.62503125Z image=eclipse-mosquitto:2
+## stop
+tractor-camera
+## after
+failed
+x8-devel	Up 8 minutes
+x8-provisioning	Up 8 minutes
+x8-webapp	Up 8 minutes
+
+__UART_CHK_DONE__
+## tractor-camera log (last 30)
+2026-09-29 08:20:30,306 WARNING camera_service: libcamera unavailable (No module named 'picamera2') — trying v4l2/ffmpeg
+2026-09-29 08:20:30,346 INFO camera_service: v4l2/ffmpeg pid=11 device=/dev/video1 1920x1080@15fps -> 384x256 rgb24
+2026-09-29 08:20:31,313 INFO camera_service: vector encoder prebuilt (import+build 731 ms, warm-up 209 ms)
+/app/camera_service.py:1774: DeprecationWarning: Callback API version 1 is deprecated, update to latest version
+  client = mqtt.Client(client_id="camera_service")
+2026-09-29 08:20:31,689 INFO camera_service: encode_mode -> 0 (full) [boot]
+2026-09-29 08:20:31,719 INFO camera_service: VECTOR budget 40 B (one fragment) until link_budget arrives (provisional None B)

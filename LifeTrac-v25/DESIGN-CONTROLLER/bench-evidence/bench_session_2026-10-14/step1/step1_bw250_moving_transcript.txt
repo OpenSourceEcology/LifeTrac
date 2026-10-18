@@ -1,0 +1,56 @@
+00:33:19Z == step-1 pass bw250_moving (profile image_bw250, camera_service from /app) from bench-session-2026-10-14 @ fb96439c
+window pid 17052 'Front view of Colorado's STUNNING Royal Gorge Route Railroad - YouTube - Mozilla Firefox' player fullscreen: True
+# step1_bw250_moving scene check, 2026-10-15T00:33:22Z PC clock (content: https://www.youtube.com/watch?v=B1yUQwpNhJA, normal Firefox window, player fullscreen; min 8 %)
+1.9 s apart: mean abs diff 16.81  pct pixels diff>25: 21.57 %
+5.0 s apart: mean abs diff 19.97  pct pixels diff>25: 25.52 %
+9.7 s apart: mean abs diff 22.86  pct pixels diff>25: 29.26 %
+mean luma 108.8
+frame -> C:/Users/dorkm/Documents/GitHub/LifeTrac-bench-main/LifeTrac-v25/DESIGN-CONTROLLER/bench-evidence/bench_session_2026-10-14/step1/step1_bw250_moving_scene.jpg
+SCENE-CHECK-OK: 10 s change 29.26 % (min 8 %)
+retained after the recreate (must be 0): 0
+00:33:44Z capture subscribed after 2 s
+camera_svc id 0576aadc66d7
+00:33:45Z camera_svc launched
+00:34:00Z boot-log check (+15 s): expect byte_budget=203 B, no 'link_budget: ->', no [lora_cmd]
+2026-09-25 17:27:15,280 INFO camera_service: byte_budget=203 B/frame (LIFETRAC_FRAGMENT_BUDGET, phy=image_bw250)
+2026-09-25 17:27:16,313 INFO camera_service: encode_mode -> 9 (vector) [boot]
+vector_stats lines so far: 6
+encoder module in use: /app/x8_image_pipeline/encode_vector.py True
+00:35:55Z capture finished
+00:35:58Z == capture summary (/tmp/lifetrac_strict/legs/step1_tractor_bw250_moving.txt, from '== vector dry run summary ==')
+== vector dry run summary ==
+profile image_bw250: one-fragment limit 203 B (epoch starts 202 B)
+frames: 250 total, 250 vector, 0 other, 0 unparseable; by codec {'vector': 250}
+wire bytes (vector): min 102 / p50 200 / p95 203 / max 203; over limit: 0
+epoch starts: 3 received, 3 applied
+arrival: 2.00 fps mean over 124.4 s; gap p50 0.50 s, p95 0.54 s, max 0.63 s; first applied at +0.00 s (0 frame(s) before it)
+store: applied 250, bad 0 , epoch_behind 0, orphans 0, digest 215 checked / 0 mismatched, epochs 3, handovers 2, ttl_dropped 0, resync 0 (0 ended by DIGEST), records 9324
+resync: none
+scene: epoch 2, level 0, badge 7, digest_ok None, horizon none, L1=28 L2=0 L3=5 L4=0, cal_rev None, anchor age 3162 ms
+checks:
+  [PASS] parse_ok       0 unparseable payload(s)
+  [PASS] all_vector     0 non-vector frame(s): {'vector': 250}
+  [PASS] one_fragment   0 over 203 B (epoch starts 202 B); max 203 B
+  [PASS] store_clean    frames_bad=0 
+  [PASS] no_orphans     orphans=0
+  [PASS] digest         215 checked, 0 mismatched, scene digest_ok=None
+  [PASS] epoch_seen     3 epoch start(s) applied of 3 received
+  [PASS] first_apply    0 frame(s) before the first apply
+  [PASS] applied_ratio  250/250 applied = 100.0% (need >= 90%)
+  [PASS] min_frames     250 vector frame(s), need >= 200
+RESULT: PASS
+json report -> /work/legs/step1_tractor_bw250_moving.json
+00:35:58Z == tractor-log (/tmp/lifetrac_strict/legs/step1_tractor_log_bw250_moving.txt)
+vector_stats lines: 56
+encoder ms_total: p50 241.7 / p95 275.1 / max 349.2
+stage p50 ms: resize=0.5 l0=16.1 l1=93.5 l3=51.5 temporal_pack=73.6
+frame bytes: p50 200 / max 203
+levels seen: {'0': 56}; lines with a pending epoch start: 0
+last: epoch 2 n_live 30 residual 3408.416 detail 80 epochs 3 trigger safety ttl_dropped 0 waiting 3
+counters to the last line (1 run): frames 251; epoch starts 3 = first 1 forced 0 horizon 0 safety 2 relabel 0; repair share 62 frames, 219 re-sends (32 repeat-once); carousel re-sends 187; DEL repeats 986; ttl_dropped 0
+/tmp/lifetrac_strict/legs/step1_tractor_bw250_moving.jsonl: 1 file pulled, 0 skipped. 2.0 MB/s (115908 bytes in 0.055s)
+/tmp/lifetrac_strict/legs/step1_tractor_bw250_moving.json: 1 file pulled, 0 skipped. 0.5 MB/s (2252 bytes in 0.005s)
+/tmp/lifetrac_strict/legs/step1_tractor_bw250_moving.txt: 1 file pulled, 0 skipped. 1.4 MB/s (22358 bytes in 0.015s)
+/tmp/lifetrac_strict/legs/step1_camera_service_bw250_moving.log: 1 file pulled, 0 skipped. 1.6 MB/s (25707 bytes in 0.015s)
+/tmp/lifetrac_strict/legs/step1_tractor_log_bw250_moving.txt: 1 file pulled, 0 skipped. 0.1 MB/s (554 bytes in 0.004s)
+00:35:59Z == pass bw250_moving done (evidence: C:/Users/dorkm/Documents/GitHub/LifeTrac-bench-main/LifeTrac-v25/DESIGN-CONTROLLER/bench-evidence/bench_session_2026-10-14/step1)

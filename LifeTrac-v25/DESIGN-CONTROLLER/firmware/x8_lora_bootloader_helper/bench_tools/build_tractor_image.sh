@@ -161,7 +161,8 @@ SSH_OPTS=(-o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-
 adb_sh() {    # adb_sh <serial> <command line>; returns the remote exit code
     local serial=$1 cmd=$2 line rc=""
     while IFS= read -r line || [ -n "$line" ]; do
-        line=${line%$'\r'}
+        # every trailing CR: adb 37 (platform-tools 2026) ends lines with \r\r\n
+        while [ "${line%$'\r'}" != "$line" ]; do line=${line%$'\r'}; done
         case $line in
             *__LT_RC=*) rc=${line##*__LT_RC=}; line=${line%__LT_RC=*}; [ -z "$line" ] || printf '%s\n' "$line" ;;
             *) printf '%s\n' "$line" ;;

@@ -77,10 +77,14 @@ Does not prove:
   - Record that criterion as "not testable at V0", and walk again when the
     ladder lands.
 - **FHSS command delivery and the FHSS switch leg ("2d on profile 1").** These
-  wait for the RS-12.15 reverse-delivery firmware fix. Base→tractor delivery
+  waited for the RS-12.15 reverse-delivery firmware fix. Base→tractor delivery
   on FHSS was 1/17 and 49/281 in legs H/I, so before the fix these legs would
-  measure that defect, not VECTOR. The FHSS walk is image-only
-  (`-ReactiveFire 0`, no base commands).
+  have measured that defect, not VECTOR. The fix is on both boards since
+  2026-10-18 (`e083ae46`; 22/23, 72/72 and 36/36 commands delivered,
+  [RESULTS](../../../bench-evidence/RS_12_15_reverse_delivery_2026-10-18/RESULTS.md)),
+  so these legs are unblocked; they are not part of this walk and still need
+  their own GO. The FHSS walk is image-only (`-ReactiveFire 0`, no base
+  commands).
 - **A distance.** A conducted path has no fading, multipath, foliage, antenna
   gain or height. The edge found here is a path loss at the bench's power. It
   serves to compare codecs and profiles; it is not a range figure.
@@ -614,14 +618,14 @@ Closing check `C0close`: <…>.
 
 | measure | criterion | result |
 |---|---|---|
-| Base command delivery during VECTOR | not worse than during `mono_g4` | DTS 0 dB: <…>; per step: <…>; FHSS: not measured — waits for the RS-12.15 reverse-delivery fix |
+| Base command delivery during VECTOR | not worse than during `mono_g4` | DTS 0 dB: <…>; per step: <…>; FHSS: not measured (the FHSS walk is image-only; the command-delivery leg is separate, unblocked by RS-12.15 since 2026-10-18) |
 | Fragment loss | not worse than `mono_g4` on the same workload and profile | Round A P3 <…>; per step: <…> |
 | Range-edge leg | at each 3 dB step: VS frames/s, level reached, command delivery, the same for `mono_g4`; VS1 keeps an L0 picture and STATUS where `mono_g4` delivers no complete frame | per-step tables above; level <V0 throughout>; the L0/STATUS clause **not testable at V0** (no ladder built) |
 
 ## What these legs did NOT test
 
 - V1–V3 (the ladder) and with it the §8.6 L0/STATUS clause; self-select (D-VS6b), B4, B5
-- FHSS command delivery and the FHSS switch leg (RS-12.15 reverse-delivery fix first)
+- FHSS command delivery and the FHSS switch leg (separate legs; unblocked by the RS-12.15 reverse-delivery fix, on both boards since 2026-10-18)
 - the mode switch (no 2d leg); web_ui in the loop; the production stack (B1, RS-9.2/9.4, RS-11.7)
 - a distance: conducted path, no fading or antenna effects
 - <anything cut on the day>

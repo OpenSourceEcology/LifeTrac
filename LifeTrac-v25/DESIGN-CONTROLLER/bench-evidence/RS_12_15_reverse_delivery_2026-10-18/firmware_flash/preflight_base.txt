@@ -1,0 +1,11 @@
+image: firmware_bench_diag_e083ae46_13f20aa1.bin  24972 B  md5 e083ae46a64686031b39866eca42e094
+       not a recorded build (see bench-evidence/RS_13_vector_scene_2026-09-26/firmware/README.md)
+settings: /c/Users/dorkm/Documents/GitHub/LifeTrac-bench-main/LifeTrac-v25/DESIGN-CONTROLLER/firmware/x8_lora_bootloader_helper/bench_tools/bench.env (non-empty environment variables win)
+=== base fio@192.168.1.117 (adb serial 2D0A1209DABC240B; the base is flashed over ssh): staging
+kernel: 6.1.24-lmp-standard
+=== base: preflight
+PREFLIGHT-OK image=/tmp/lifetrac_p0c/firmware_bench_diag_e083ae46_13f20aa1.bin size=24972 md5=e083ae46a64686031b39866eca42e094 REVIVE_MODE=reboot FLASH_VERIFY_ONLY=0
+FLASH_PREFLIGHT_ONLY=1: staging checked, stopping before openocd/UART/watchdog.
+
+Staged and preflighted only. To flash (operator GO required):
+  bash bench_tools/flash_l072.sh base C:/Users/dorkm/Documents/LifeTrac-bench-archive/firmware/firmware_bench_diag_e083ae46_13f20aa1.bin --go

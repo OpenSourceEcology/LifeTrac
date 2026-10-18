@@ -1,6 +1,7 @@
 # Bench boards: chips, firmware and board-resident software
 
-State as of **2026-10-10**, plus the boot-unit retirement of **2026-10-12**.
+State as of **2026-10-10**, plus the boot-unit retirement of **2026-10-12**
+and the changes of **2026-10-14 to 2026-10-18** listed below.
 Both boards are measured from read-only captures:
 - base: [`bench-evidence/board_state_2026-10-04/base/`](../../../bench-evidence/board_state_2026-10-04/base/);
 - tractor: [`bench-evidence/board_state_2026-10-10/tractor/`](../../../bench-evidence/board_state_2026-10-10/tractor/).
@@ -10,6 +11,16 @@ removed. That change is recorded in
 [`bench-evidence/board_state_2026-10-12_unit_retirement/`](../../../bench-evidence/board_state_2026-10-12_unit_retirement/README.md)
 and marked "Changed 2026-10-12" in the sections below; see
 [Retired boot units](#retired-boot-units-2026-10-12).
+
+Later changes are marked "Changed 2026-10-14" and "Changed 2026-10-18":
+the base tree and image redeployed with `deploy_base.sh` and a new tractor
+image loaded (2026-10-14/15,
+[`bench-evidence/bench_session_2026-10-14/`](../../../bench-evidence/bench_session_2026-10-14/)),
+then a power cycle of both boards, the first boot after the retirement, and
+both L072s flashed with the bench build `e083ae46` (2026-10-18,
+[`power_cycle_2026-10-18/`](../../../bench-evidence/bench_session_2026-10-14/power_cycle_2026-10-18/)
+and
+[`RS_12_15_reverse_delivery_2026-10-18/`](../../../bench-evidence/RS_12_15_reverse_delivery_2026-10-18/)).
 
 The rest comes from a review of AI NOTES, bench-evidence,
 X8_HEALTH_AND_RECOVERY and git history.
@@ -32,7 +43,7 @@ how far a board is from that state.
 | serial (adb) | `2D0A1209DABC240B` | `2E2C1209DABC240B` |
 | hardware | Portenta X8 on a Portenta Max Carrier | same |
 | OS (LmP) | **4.0.11-934-91**, kernel 6.1.24-lmp-standard (uuu reflash 2026-05-13 and 05-24). The bundle is `https://downloads.arduino.cc/portentax8image/934.tar.gz`; its sha256 list is in [T3a](../../../X8_HEALTH_AND_RECOVERY/recovery/T3a_sdp_uuu_reflash.md). | **4.0.3-674-88**, kernel 5.10.93-lmp-standard (factory, never reflashed). Arduino still hosts the image at `https://downloads.arduino.cc/portentax8image/674.tar.gz` (854,998,055 B). Nobody here has downloaded or byte-verified it, so there is no sha256 on record. Reflashing to 934 would move it to 6.1.24; BENCH_SETUP §3 compares the two. |
-| access | adb; ethernet 192.168.1.117 with eth0 pinned to 100BASE-TX full (marginal cable); ssh key `~/.ssh/lifetrac_base_ed25519`. On 2026-10-10 it did not enumerate on USB after a power cycle, but ssh worked. | adb only (WiFi off by policy) |
+| access | adb; ethernet 192.168.1.117 with eth0 pinned to 100BASE-TX full (marginal cable); ssh key `~/.ssh/lifetrac_base_ed25519`. On 2026-10-10 it did not enumerate on USB after a power cycle, but ssh worked. **Changed 2026-10-18:** it was back on USB/adb after that day's power cycle: the boot check ran over adb ([check](../../../bench-evidence/bench_session_2026-10-14/power_cycle_2026-10-18/02_prov_check_base.txt)), and so did the leg harness. | adb only (WiFi off by policy) |
 | power-down | `systemctl poweroff` did **not** keep it off: it booted again about 4.5 min later (2026-10-04). Remove power to keep it down. | stayed off after `systemctl poweroff` |
 | clock | NTP, but no battery-backed clock: the wall clock is stepped forward early in a boot (239 s at the 10-10 boot, the one boot measured; the size presumably follows how long the board was off), so journal time spans across that step are inflated | no time source; it lags by days to weeks (it read 2026-09-23 on 2026-10-12, 19 days behind) |
 
@@ -45,7 +56,7 @@ goes with which module is not recorded.
 
 | chip | where | runs | LifeTrac-custom? | saved | notes |
 |---|---|---|---|---|---|
-| STM32L072 in the Murata CMWX1ZZABZ (+ SX1276, no firmware) | carrier | `firmware/murata_l072` bench build **`0c1bb0a9`** since 2026-09-15 | **yes** | Source on `main`. Binaries and the full flashed-build inventory in [`RS_13…/firmware/`](../../../bench-evidence/RS_13_vector_scene_2026-09-26/firmware/README.md). `0c1bb0a9` rebuilds byte-identically from `main` with arm-none-eabi-gcc **12.2.1 (Arm GNU Toolchain 12.2.MPACBTI-Rel1)**. | The firmware never writes its own flash or EEPROM. Its option bytes were never recorded. The only proof of what is on the chip is the 09-15 flash logs (base copy now in the capture; `run_flash_bench.sh` deletes them at the next flash). |
+| STM32L072 in the Murata CMWX1ZZABZ (+ SX1276, no firmware) | carrier | `firmware/murata_l072` bench build **`e083ae46`** since 2026-10-18 (RS-12.15 reverse delivery, #152); before that `0c1bb0a9`, 2026-09-15 → 2026-10-18 | **yes** | Source on `main` (`13f20aa1`, merged as `3c8ced60`). `e083ae46` builds byte-identically with arm-none-eabi-gcc **12.2.1 (Arm GNU Toolchain 12.2.MPACBTI-Rel1)**; the copy flashed on 2026-10-18 is in [`RS_12_15…/firmware_flash/`](../../../bench-evidence/RS_12_15_reverse_delivery_2026-10-18/firmware_flash/). Older binaries, the `0c1bb0a9` rollback image among them, and the full flashed-build inventory are in [`RS_13…/firmware/`](../../../bench-evidence/RS_13_vector_scene_2026-09-26/firmware/README.md). | The firmware never writes its own flash or EEPROM. Its option bytes were never recorded. The only proof of what is on the chip is the 2026-10-18 flash logs (Verify OK, `flash_rc=0` on both boards; copies in `RS_12_15…/firmware_flash/`; `run_flash_bench.sh` deletes the board copies at the next flash). |
 | STM32H747 Cortex-M7 (flash bank 1) | X8 module | **stock Arduino x8h7** SPI bridge, programmed at boot by `stm32h7-program.service` from `/usr/arduino/extra/STM32H747AII6_CM7.bin`. The image differs per board: base sha256 `d81eaa81…`, tractor `0b03cd9c…`. | no | Part of each LmP image | **The tractor reflashes it at every boot.** Its `program-h7.sh` cannot read the version (the sysfs read times out), so it reprograms bank 1, `0x08000000`–`0x080709a4`, ending "Programming Finished … Verified OK"; bank 2 is not touched. The base's newer script prints "matches, No Update" after the same failed read, so on the base it is not proof. LifeTrac overwrote this bank with `tractor_h7` on 2026-05-04; it is stock again. |
 | STM32H747 Cortex-M4 (flash bank 2, `0x08100000`) | X8 module | **unknown, probably a May 2026 LifeTrac bench sketch**, started at every boot by x8h7 | probably | Sources only: `firmware/x8_uart_route_probe`, `x8_lora_bootloader_helper`, `portenta_m7_l072_passthrough_ping`, `tractor_h7`. The flashed ELFs were never kept. | Last recorded uploads: x8_uart_route_probe → 2D0A, x8_lora_bootloader_helper → 2E2C (the May notes mix up COM ports, so the per-board mapping is uncertain). No erase is recorded. No visible effect, since both L072s boot normally, but it is undocumented code. Identify it with the openocd dump in *Open items*, then decide whether to blank the slot. |
 | i.MX8M Mini boot chain, kernel, device tree | X8 module | stock LmP (U-Boot arms the 60 s WDOG) | no (two May bootargs/BLS experiments were removed by later reflashes) | 934 bundle on the PC (private archive, sha256) | The i.MX's own Cortex-M4 is unused. |
@@ -94,20 +105,44 @@ Repo L072 binaries that are on no board:
 
   None rebuilds byte-identically: the requirements are floors and the tags are
   mutable. The two LifeTrac images are exported to the private archive.
+  **Changed 2026-10-14:** `deploy_base.sh` at `f6e4b463` built
+  `lifetrac-v25:latest` / `:f6e4b463` `0413f3c4dac3` and kept the old one as
+  `lifetrac-v25:previous` `4623980c2dac`
+  ([log](../../../bench-evidence/bench_session_2026-10-14/boot_deploy_images/12_deploy_base.txt),
+  [after](../../../bench-evidence/bench_session_2026-10-14/boot_deploy_images/13_base_post_deploy.txt));
+  `build_tractor_image.sh` then built `lifetrac-tractor-x8:f6e4b463` /
+  `:latest` `b2a3c8070240` here
+  ([log](../../../bench-evidence/bench_session_2026-10-14/boot_deploy_images/20_build_tractor_image.txt)).
 - **Containers:** `design-controller-mosquitto-1` runs (restart
   unless-stopped). That docker restart policy is what brings it up at boot;
   no systemd unit starts it. Leftovers: `rx_smoke`, `bench_mqtt`, `f11_webui`
   (Exited). **Changed 2026-10-12:** the four `lifetrac-vtest-*` containers
   (Created, never started) and the network `lifetrac-vtest_default` were
-  removed. The `lifetrac-vtest_*` volumes were kept.
+  removed. The `lifetrac-vtest_*` volumes were kept. **Changed 2026-10-14:**
+  the deploy recreated the broker container on `eclipse-mosquitto:2`
+  `0db28dca6f11`; its volume was kept (the `mono_g4` pin below was still
+  retained on 2026-10-18). **Changed
+  2026-10-18:** the broker had been stopped on 2026-10-15 at 00:47:31Z for
+  the RS-13.2 desk check. A `docker stop` holds through a boot, so the
+  2026-10-18 boot left it down, and the desk containers (`restart: "no"`)
+  stayed down too. After the boot the desk stack was removed by project name
+  and the broker started again at 15:37:28Z
+  ([log](../../../bench-evidence/bench_session_2026-10-14/desk_check/logs/step8_teardown_after_reboot.txt)).
+  It runs; no `lifetrac-desk-*` container is left.
 - **Retained topics** on that broker (`retained_topics.txt`) include a
   leftover `control/encode_mode_override {"mode":"mono_g4"}` from leg 2d_r4.
-  The leg prep's `clear_retained.py` clears it.
+  The leg prep's `clear_retained.py` clears it. **Changed 2026-10-18:**
+  cleared before each RS-12.15 leg
+  ([leg V](../../../bench-evidence/RS_12_15_reverse_delivery_2026-10-18/legs/legV_clear_retained.txt)).
 - **`/var/rootdirs/opt/lifetrac/DESIGN-CONTROLLER`** is a git subset of
   `d3751286` plus `DEPLOYED_FROM.txt`, `.env` (keys `LIFETRAC_PIN`,
   `LIFETRAC_LORA_DEVICE`, `LIFETRAC_TRUSTED_PROXIES`) and `secrets/`
   (`lifetrac_pin`, `lifetrac_fleet_key`, a random bench key). The secrets
   stay off git. The tree, minus secrets, is in the private archive.
+  **Changed 2026-10-14:** the tree is now `f6e4b463` (`DEPLOYED_FROM.txt`),
+  with no `deploy/` and no tractor compose files; the old tree is saved on the
+  base as `/home/fio/lifetrac_deploy/prev_tree_deployed_20261014T235548Z.tgz`
+  ([log](../../../bench-evidence/bench_session_2026-10-14/boot_deploy_images/12_deploy_base.txt)).
 - **`/home/fio`.** The unique files are now in the repo capture
   (`files/home_fio/`):
   - `wdog_regs.py`;
@@ -184,7 +219,14 @@ Repo L072 binaries that are on no board:
     `arduino-iot-cloud-provisioning`.
 
   Both LifeTrac images are now in the private archive; `pre-rs13`'s only
-  off-board copy is there.
+  off-board copy is there. **Changed 2026-10-14** (loaded 2026-10-15 UTC):
+  `lifetrac-tractor-x8:latest` / `:f6e4b463` is `b2a3c8070240` (numpy 2.4.6,
+  cv2 5.0.0), built on the base; the old `:latest` is kept as `:previous`
+  `2727dfd36f9f`
+  ([push](../../../bench-evidence/bench_session_2026-10-14/boot_deploy_images/21_push_tractor_image.txt)).
+  At the 2026-10-18 boot `tractor-camera` started from it (through
+  `lifetrac-camera.service`, above) and was stopped
+  ([log](../../../bench-evidence/bench_session_2026-10-14/power_cycle_2026-10-18/01_tractor_camera_stop.txt)).
 - **`/home/fio`.**
   - Unique, now in the repo capture: `wdog_regs.py`,
     `lifetrac_compact_at_probe.sh`, `at_probe.sh`, and the 09-15 flash logs.
@@ -363,8 +405,11 @@ state on a re-provisioned board, in its item "old boot units retired":
    the same on another board pair](#doing-the-same-on-another-board-pair),
    step 2. It never runs `docker compose` on that file. It also leaves the
    tractor's compose files in `firmware/tractor_x8/` out of the tarball
-   (RS-5.20) and removes an old copy of them from the deployed tree. Until
-   that first deploy the file on the base is armed: never bring it up. Its
+   (RS-5.20) and removes an old copy of them from the deployed tree. The
+   first deploy, on 2026-10-14 at `f6e4b463`, renamed the base's copy to
+   `docker-compose.video-test.yml.RETIRED-2026-10-14`
+   ([log](../../../bench-evidence/bench_session_2026-10-14/boot_deploy_images/12_deploy_base.txt));
+   until then it was armed. Never bring it up. Its
    `image_rx` maps `/dev/ttymxc3`, sends a soft RESET_REQ on open that un-parks the
    L072, and has `restart: unless-stopped`, so after one successful `up` it
    comes back at every boot, with no unit involved, until the container is
@@ -549,10 +594,34 @@ are gone, so the rename is now the only barrier. With
 stopping the bench broker (as [RS13_2_DESK_CHECK.md](RS13_2_DESK_CHECK.md)
 Step 3 does) would let it start `image_rx` at the next base boot.
 
-### Not yet observed: the next boot
+<a id="not-yet-observed-the-next-boot"></a>
 
-No board was rebooted on 2026-10-12. At the next power-up of each board, do
-these checks first, before any probe, and record the output:
+### The next boot: observed 2026-10-18
+
+No board was rebooted on 2026-10-12. The first boot of either board after
+the retirement came when the operator power-cycled both on 2026-10-18 at
+about 15:28Z. The checks below were run before any probe, and the retirement
+held on both boards
+([`power_cycle_2026-10-18/`](../../../bench-evidence/bench_session_2026-10-14/power_cycle_2026-10-18/)):
+
+- Check 1: the retire item reads `ok` on both (`02_prov_check_*.txt`).
+- Check 2: no `lifetrac-vtest-*` or `tractor-*-v2` container on either
+  board (`03_nextboot_*.txt`). The base listed **no** running container: the
+  bench broker had been stopped on 2026-10-15 for the RS-13.2 desk check,
+  and the desk containers have `restart: "no"`. On the tractor the three
+  `x8-*` containers ran, and `tractor-camera` / `tractor-mosquitto` had
+  started at boot.
+- Check 3: `tractor-camera` was stopped (`01_tractor_camera_stop.txt`), after
+  which `uart_chk` printed `__UART_CHK_DONE__` alone on both boards.
+- Check 4: `systemctl --failed` listed `psplash-start.service`, and on the
+  tractor also `lifetrac-camera.service`, which failed when its container was
+  stopped.
+- The journal of that boot has no entry for the three retired units on
+  either board.
+- Both L072s booted listening (`0x85` RXCONT) and were parked, `PARK_OK`,
+  `0x80` (`04_power_up_guard.txt`, `05_radio_recheck.txt`).
+
+For a later boot or another board pair, the checks are:
 
 1. `bash provision_bench_board.sh base --ssh --check` and
    `bash provision_bench_board.sh tractor --check`. The item "old boot units
@@ -634,21 +703,24 @@ item below.
 
 - [x] **Tractor capture.** Done 2026-10-10 with images, `pre-rs13`
   included (`board_state_2026-10-10/`).
-- [ ] The base did not enumerate on USB/adb after the 2026-10-10 power cycle
-  (ssh works). Check its USB cable and port.
+- [x] ~~The base did not enumerate on USB/adb after the 2026-10-10 power
+  cycle (ssh works). Check its USB cable and port.~~ Back on USB/adb after
+  the 2026-10-18 power cycle: the boot check and the leg harness reached it
+  over adb ([check](../../../bench-evidence/bench_session_2026-10-14/power_cycle_2026-10-18/02_prov_check_base.txt)).
+  The cause of the 10-10 miss is not known; if it recurs, use ssh.
 - [x] **Decide on the tractor's `lifetrac-tractor-compose.service`.** Done
   2026-10-12: retired, its compose file disarmed and the three old
   `tractor-*-v2` containers removed
   ([record](../../../bench-evidence/board_state_2026-10-12_unit_retirement/README.md)).
-- [ ] **Confirm the retirement at the next boot of each board,** with the
-  four checks under
-  [Not yet observed: the next boot](#not-yet-observed-the-next-boot). No
-  board was rebooted on 2026-10-12.
+- [x] **Confirm the retirement at the next boot of each board.** Done
+  2026-10-18, at the first power cycle since 2026-10-12: all four checks
+  passed on both boards
+  ([The next boot: observed 2026-10-18](#the-next-boot-observed-2026-10-18)).
 - [x] **Decide on the base's `docker-compose.video-test.yml`** (rule 7).
   Decided with the operator's OK and done in the bench kit on 2026-10-14:
   `deploy_base.sh` no longer ships it or `deploy/`, and renames the copy on
-  the base as on the tractor (TODO RS-5.18). Not yet run on the base: the
-  file there stays armed until the next `deploy_base.sh` run.
+  the base as on the tractor (TODO RS-5.18). Run on the base the same day:
+  the file is now `docker-compose.video-test.yml.RETIRED-2026-10-14` (rule 7).
 - [ ] **Decide on the tractor's udev-started `lifetrac-camera.service`.** It
   is a fourth path that maps `/dev/ttymxc3` at boot: it reads "disabled",
   but the udev rule's `SYSTEMD_WANTS` starts it, and it is bound (`BindsTo`)
@@ -687,14 +759,18 @@ item below.
   `timeout.conf` drop-in, and the four never-started `lifetrac-vtest-*`
   containers removed
   ([record](../../../bench-evidence/board_state_2026-10-12_unit_retirement/README.md)).
-- [ ] **Base docker store.** The broker container
-  `design-controller-mosquitto-1` references image `sha256:2a23a3e427e4`,
+- [x] **Base docker store.** The broker container
+  `design-controller-mosquitto-1` referenced image `sha256:2a23a3e427e4`,
   which is no longer in the base's image list (`eclipse-mosquitto:2` is now
-  `0db28dca6f11`), so the layer store is not fully consistent. The first
-  `deploy_base.sh` run is expected to recreate the broker container on the
-  current image; its volume is kept. Before any image purge, make sure the
-  flown image `4623980c2dac` is saved (a `docker save` of it is in the
-  private archive).
+  `0db28dca6f11`), so the layer store was not fully consistent. Done
+  2026-10-14: the first `deploy_base.sh` run recreated the broker container
+  on `0db28dca6f11`
+  ([after](../../../bench-evidence/bench_session_2026-10-14/boot_deploy_images/13_base_post_deploy.txt)),
+  volume kept (its retained topics were still there on 2026-10-18,
+  [log](../../../bench-evidence/bench_session_2026-10-14/desk_check/logs/step8_teardown_after_reboot.txt)).
+  Before any image purge, make sure the flown image `4623980c2dac` (now
+  `lifetrac-v25:previous`) is saved (a `docker save` of it is in the private
+  archive).
 - [ ] Optional, on GO: read back the L072 option bytes; their current values
   are recorded nowhere.
 - [ ] Record the carrier ↔ module pairing, both carriers' DIP switch

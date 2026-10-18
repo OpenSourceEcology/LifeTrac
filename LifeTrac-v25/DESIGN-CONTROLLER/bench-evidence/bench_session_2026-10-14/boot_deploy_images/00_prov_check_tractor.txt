@@ -1,0 +1,49 @@
+== provision_bench_board.sh: tractor on 2E2C1209DABC240B over adb (check)
+  [info]    soc serial 2E2C1209DABC240B, LmP 4.0.3-674-88, kernel 5.10.93-lmp-standard, shell user fio
+  [ok]      sudo without a password (sudoers.d/99-lifetrac-bench-nopasswd)
+  [info]    image 674: compose-apps-early-start.service succeeds here, left as is (--mask-compose to mask anyway)
+  [ok]      units/disable-wifi.service installed in /etc/systemd/system
+  [ok]      disable-wifi.service enabled (rfkill block wifi at every boot)
+  [ok]      wpa_supplicant.service masked
+  [ok]      WiFi soft-blocked now (rfkill)
+  [TODO]    NetworkManager WiFi radio off
+  stored WiFi profiles found: 5star
+  [TODO]    no stored NetworkManager WiFi profiles
+  [TODO]    camera USB provisioning (provision_x8.sh: modprobe, udev, lifetrac-camera.service, fio in video)
+  [ok]      docker running
+  [ok]      probe image hub.foundries.io/arduino/arduino-ootb-python-devel:738bc44
+  [ok]      eclipse-mosquitto:2 (the tractor's local broker; it cannot pull)
+  [ok]      old boot units retired (no unit file systemd can load, not active, no job queued): lifetrac-tractor-compose.service
+  [ok]      radio UART free: lifetrac-camera.service and tractor-camera stopped
+  [info]    probe image id 9a454afe48f7 (foundries_python.tar loads 9a454afe48f7)
+  [info]    eclipse-mosquitto:2 image id 2a23a3e427e4 (a moving tag: note the id in the session evidence)
+  [info]    /dev/ttymxc3 (radio UART) is free
+
+== summary: tractor 2E2C1209DABC240B (check)
+  [info]    soc serial 2E2C1209DABC240B, LmP 4.0.3-674-88, kernel 5.10.93-lmp-standard, shell user fio
+  [ok]      sudo without a password (sudoers.d/99-lifetrac-bench-nopasswd)
+  [info]    image 674: compose-apps-early-start.service succeeds here, left as is (--mask-compose to mask anyway)
+  [ok]      units/disable-wifi.service installed in /etc/systemd/system
+  [ok]      disable-wifi.service enabled (rfkill block wifi at every boot)
+  [ok]      wpa_supplicant.service masked
+  [ok]      WiFi soft-blocked now (rfkill)
+  [TODO]    NetworkManager WiFi radio off
+  [TODO]    no stored NetworkManager WiFi profiles
+  [TODO]    camera USB provisioning (provision_x8.sh: modprobe, udev, lifetrac-camera.service, fio in video)
+  [ok]      docker running
+  [ok]      probe image hub.foundries.io/arduino/arduino-ootb-python-devel:738bc44
+  [ok]      eclipse-mosquitto:2 (the tractor's local broker; it cannot pull)
+  [ok]      old boot units retired (no unit file systemd can load, not active, no job queued): lifetrac-tractor-compose.service
+  [ok]      radio UART free: lifetrac-camera.service and tractor-camera stopped
+  [info]    probe image id 9a454afe48f7 (foundries_python.tar loads 9a454afe48f7)
+  [info]    eclipse-mosquitto:2 image id 2a23a3e427e4 (a moving tag: note the id in the session evidence)
+  [info]    /dev/ttymxc3 (radio UART) is free
+
+Still to do by hand (BENCH_SETUP.md):
+  [ ] verify: HC-01 / HC-02 health checks, then 'provision_bench_board.sh tractor --check' shows no TODO
+  [ ] L072 bench firmware (build md5 0c1bb0a9573f813137f941dfa47177d0): ../FLASH_RUNBOOK.md
+  [ ] tractor image lifetrac-tractor-x8 (built on the base): DEPLOY.md (build_tractor_image.sh)
+  [ ] after every boot: stop lifetrac-camera.service and tractor-camera before any probe;
+      they come back at boot and on camera hotplug and grab /dev/ttymxc3
+  [ ] radios: the LifeTrac L072 firmware boots listening (RXCONT); park it with radio_park.py
+      if the radios must stay off, and confirm later with radio_state.py
