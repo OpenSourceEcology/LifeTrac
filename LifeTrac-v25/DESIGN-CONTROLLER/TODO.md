@@ -1226,7 +1226,7 @@ No-regrets work, correct under every surviving architecture (do first):
   a hardware NRST jumper on the carrier. Largest single bench-fragility item. **Base too (2026-10-18):**
   gpio163 has not reset the base L072 since 2026-08; the fault is between gpio163 and PF4 (openocd on
   PF4 works on both boards). Tractor first-leg misses: candidates (a)–(d) in BENCH_RUNBOOK, "L072 resets
-  at leg start"; do not change the reset launch until a first-leg log has shown which one it is.
+  at leg start"; (c)'s signature was seen 2026-10-19 on A2c2 (not a first leg), so its launch fix need not wait; first-leg misses still need a first-leg log.
 - [ ] **RS-5.3 Dev-loop smoke tier** — `-DurationS 30 -NoArchive` harness mode to cut the
   edit→verdict loop from ~9 min to ~4; keep 120 s+archive for evidence runs. **Verified 2026-07-25 —
   half of this already ships.** `-DurationS` is an existing parameter and **already defaults to 30**
@@ -3393,7 +3393,7 @@ Design: [VECTOR_SCENE.md](VECTOR_SCENE.md). Research and review record: [2026-09
 explicit GO)
 
 - [~] **A16 — loss repair on a saturated stream (first item). Fix merged
-  2026-10-11 (#143; SIL only, not yet on air):**
+  2026-10-11 (#143; SIL only; flown on air 2026-10-19 but not exercised):**
   - **What it does.** Every DEL is repeated once in the next frame. Every
     fourth frame a 25 % repair share goes to re-sends (repeat-pending shapes
     included, oldest statement first). In the store, a DEL naming an absent id
@@ -3414,8 +3414,8 @@ explicit GO)
     `tools/vector_dry_run.py tractor-log` totals them on a `counters` line.
     The payloads are byte-identical with and without them (encoder A/B over
     3,300 photo frames plus 1,280 A16, trigger-sweep and masked frames).
-  - **Still open:** the repair share at V2 (VECTOR_SCENE.md §4.5.4 open item); on-air confirmation
-    in the VECTOR legs A2a, A2a2 of the antenna DTS legs (radio GO; until 2026-10-19 the range-edge 0 dB step), scored by `bench_tools/rs13_digest_trace.py`. Neither
+  - **Still open:** the repair share at V2 (VECTOR_SCENE.md §4.5.4 open item); on-air confirmation. The on-air check flew 2026-10-19
+    in the VECTOR legs A2a, A2a2 ([RESULTS](bench-evidence/RS_13_range_edge_2026-10-19/RESULTS.md)) but did not exercise the fix: `bench_tools/rs13_digest_trace.py` found 0 loss-opened episodes, thin (digest 598 and 568 checked, 0 mismatched; the one loss, A2a2 row 268, opened no mismatch or resync). It still needs a lossy link: a distance test (no attenuation). Neither
     RS-13.1 A16 episode would be scored under the 25-row isolation rule (second loss 13 rows / 7.0 s
     later on 2a_r4, the 7.07 s emitter grid at 2 fps; 11 rows / 6.0 s on 2d_r4); the tool traces both and flags them `!! A16 shape`.
   - The original analysis:
@@ -3475,9 +3475,9 @@ explicit GO)
   - P8 as an absolute bound, p95 ≤ the 350 ms budget (A17);
   - P6's return clause to count the in-flight frame (A18);
   - write the FHSS P6 bound on paper.
-- [~] **Images — both rebuilt and step 0/1 run 2026-10-14/15; the bw500 video
-  pass at 243 B is still open** (no radio; record
-  [`bench_session_2026-10-14/`](bench-evidence/bench_session_2026-10-14/)).
+- [x] **Images — both rebuilt and step 0/1 run 2026-10-14/15; the bw500 video
+  pass at 243 B re-run 2026-10-19, closed** (no radio; record
+  [`bench_session_2026-10-14/`](bench-evidence/bench_session_2026-10-14/); the re-run in [`RS_13_range_edge_2026-10-19/legs/`](bench-evidence/RS_13_range_edge_2026-10-19/legs/)).
   Planned: rebuild both images from a SHA with the A16 fix and the
   `vector_stats` counters (the deployed base `4623980c2dac`, `d3751286`,
   predated all VECTOR web_ui/store code), then run step 0/1 camera-only from
@@ -3509,10 +3509,10 @@ explicit GO)
     fragment) until link_budget arrives (provisional 243 B)"
     ([log](bench-evidence/bench_session_2026-10-14/step1/step1_camera_service_bw500_moving.log));
     frame bytes max 203 on every pass. The bw500 video pass is therefore not
-    yet the P8 reference for bw500 legs.
-  - [ ] **Open:** re-run the bw500 video pass (camera-only) at 243 B. The `step1_pass.sh` fix is in code since
-    2026-10-18 (not yet run on the tractor): its bootcheck must show `byte_budget=243 B` and no `VECTOR budget … until
-    link_budget` line. A clamped pass exits 6 (`INVALID`); only an exit-0 `done` pass, recorded, closes this item.
+    yet the P8 reference for bw500 legs (superseded 2026-10-19: the re-run below is).
+  - [x] **Done 2026-10-19:** the bw500 video pass (camera-only) re-run at 243 B with the fixed `step1_pass.sh` (its first run on the tractor),
+    exit 0 `done` on the console ([RESULTS](bench-evidence/RS_13_range_edge_2026-10-19/RESULTS.md)). Bootcheck `byte_budget=243 B/frame (… phy=image_bw500)`, no `VECTOR budget … until link_budget` line in the camera log;
+    251 VECTOR frames, wire p95 242 B / max 243 B, dry run PASS; encoder p50 / p95 / max 199.7 / 221.8 / 227.7 ms; epoch starts 6 (first 1, safety 1, relabel 4). It is the P8 reference for bw500 legs ([`legs/step1_*bw500_moving*`](bench-evidence/RS_13_range_edge_2026-10-19/legs/)).
 - [ ] **RS-13.2 desk check:** the browser on the production compose (base:
   `mosquitto` + rebuilt `web_ui` only), replaying the round-4 captures. Merged in
   #143:
@@ -3583,11 +3583,11 @@ explicit GO)
     - the status line ("design proposal, not implemented"), DECISIONS.md's
       "None of these decisions is implemented", and §8.6's test table (no
       `test_vector_sync.py`) are out of date.
-- [ ] **Next radio session = the antenna legs** (re-scoped 2026-10-19). Each needs its own explicit GO; none has flown. They are to fly
+- [~] **Next radio session = the antenna legs** (re-scoped 2026-10-19). Each needs its own explicit GO; (1) flew 2026-10-19, (2) and (3) have not. They fly
   on the antennas, as the 2026-10-18 RS-12.15 legs did. Order: (1) here, then (2) and (3), the next two items. Leg lines: `legs/leg_prep.sh <leg name>`.
-  - (1) §8.6 command delivery, VECTOR vs `mono_g4`, and the on-air check of the A16 fix (#143): a receive-only channel spot-check,
-    then the DTS legs A2c, A2a, A2c2, A2a2 interleaved (`-ReactiveFire 1 -ProbeEcho 0 -TxBatch 0 -ForceFrfHz <pick>`), scored with
-    `rs13_probe_score.py` and `rs13_digest_trace.py`. Neither needs attenuation. P8 reference: the bw500 step-1 re-run (no radio, Images item).
+  - [x] (1) **Done 2026-10-19** ([RESULTS](bench-evidence/RS_13_range_edge_2026-10-19/RESULTS.md)): §8.6 command delivery, VECTOR vs `mono_g4`, and the on-air check of the A16 fix (#143). The receive-only spot-check (51 channels, 49 hot) picked 927.5 MHz;
+    the DTS legs A2c, A2a, A2c2, A2a2 flew 300 s each there (`-ReactiveFire 1 -ProbeEcho 0 -TxBatch 0`), FRF readback OK on both boards every leg. Command delivery: VECTOR 433/433 vs `mono_g4` 418/420, Fisher p = 0.242, NOT WORSE. P3 loss: 1/1228 vs 1/1230, p = 1.
+    A16 not exercised: the one VECTOR loss (A2a2 row 268) opened no DIGEST mismatch or resync, 0 loss-opened episodes (thin; A16 item). Max K 1, no gap > 3 s; VECTOR encoder p95 247.2 / 261.3 ms (step-1 reference 221.8 ms, Images item).
   - [-] not planned (no attenuation equipment, operator 2026-10-19): Round A's conducted 0 dB step and leakage check, and the Round B / C 3 dB walks of `bench_tools/RS13_RANGE_EDGE_LEG.md` (#143). The procedure stays for reference. No range data comes from the bench.
   - [x] Scoring helpers (2026-10-18, no radio; 41 SIL tests in `base_station/tests/test_rs13_scoring_sil.py`):
     `bench_tools/rs13_rf_extract.py` (level, R0, leakage, tracking, closing), `rs13_probe_score.py` (§8.6
@@ -3601,17 +3601,17 @@ explicit GO)
 - [ ] A live web_ui leg (UI-driven switch, web_ui as an uplink actor), after the
   base image rebuild (done 2026-10-14, `0413f3c4dac3`).
 - [~] **Bench-kit follow-ups found 2026-10-15 / 10-18** (no radio;
-  the 2026-10-18 fixes are in code, not yet run on a board):
+  the 2026-10-18 fixes are in code; first real-board runs 2026-10-19, [RESULTS](bench-evidence/RS_13_range_edge_2026-10-19/RESULTS.md)):
   - [x] ~~`legs/step1_pass.sh` should pass `LIFETRAC_REG_PROFILE`~~ Fixed 2026-10-18 (1 = bw250, 2 =
     bw500). A pass whose boot log shows the `VECTOR budget` clamp line (the old grep missed it) prints a
-    WARNING, keeps its files, ends `INVALID` and exits 6. Still to do: the bw500 re-run (Images item).
+    WARNING, keeps its files, ends `INVALID` and exits 6. First tractor run 2026-10-19 (bw500): `byte_budget=243 B/frame`, no clamp line, exit 0 `done` (Images item); the exit-6 path did not fire.
   - [x] ~~`legs/scene_check.sh` starts its 10.5 s window before the camera's first frame~~
     ([`preflight_moving`](bench-evidence/bench_session_2026-10-14/step1/preflight_moving_scene.txt)
     reached 7.2 s). Fixed 2026-10-18: the window runs until 10.5 s after the sixth frame
     (the 10 s pair's reference), at most 20 s after the first; no frame within 20 s, or
     fewer than 10, fails with a `NO-FRAMES` reason; the stale `/tmp/scene_check.jpg` is
-    removed first. Confirm on the next camera run (the scene file's new `camera: first
-    frame …` line).
+    removed first. First run 2026-10-19: every scene file has the new line ("camera: first frame 0.5 s after opening /dev/video1",
+    the sixth frame 0.2 s and the last 10.7 s after the first); 10 s change: preflight 57.01 %, legs 11.51 / 17.07 / 9.53 / 18.15 % (min 8 %).
   - [x] ~~The harness has no injector hook~~ (leg W's console-tail trigger fired 2 min 41 s late). Done 2026-10-18,
     not yet flown: `-InjectCmd "<script.py> args" [-InjectOn first_frame|fault:<code>[:<sub>|:final]]`, triggered
     on the base from rx_smoke's own log (`bench_tools/inject_watch.sh`) or by a ~2 s PC poll of tractor FAULT
@@ -3621,17 +3621,17 @@ explicit GO)
     The fault is between gpio163 (x8h7 line 3) and PF4: openocd on PF4 does reset it. The harness prints
     `BASE_L072_RESET unverified` and archives `base_gpio163_output=`; score base brackets post − pre
     ([`deltas.py`](bench-evidence/RS_12_15_reverse_delivery_2026-10-18/scripts/deltas.py)). Next steps:
-    BENCH_RUNBOOK, "L072 resets at leg start".
+    BENCH_RUNBOOK, "L072 resets at leg start". 2026-10-19: `unverified` on all four legs.
   - **Tractor L072 reset: judged at leg end since 2026-10-18** (`TRACTOR_L072_RESET`, `tractor_ocd_reset.log`, a
     per-leg `OCD_LEG=` tag). It missed on the first leg after each flash reboot (V; O, Q, R, S, T, U) and landed on P
-    and Q2 ([ERRATA](bench-evidence/RS_12_15_clock_authority_2026-09-14/ERRATA.md) §1); why is unknown, since that log
-    was never kept. Candidates (a)–(d), none verified, and the next step: BENCH_RUNBOOK, "L072 resets at leg start".
+    and Q2 ([ERRATA](bench-evidence/RS_12_15_clock_authority_2026-09-14/ERRATA.md) §1). First real run 2026-10-19: landed on A2c, A2a, A2a2; on A2c2 it matched candidate (c)'s signature, killed by SIGHUP before openocd started (`OCD_EXIT=129`, no openocd banner, [log](bench-evidence/RS_13_range_edge_2026-10-19/legs/legA2c2_tractor_ocd_reset.log); its counters carried over, `legA2c2_deltas.txt`).
+    A2c2 was not the first leg after a boot, so that miss did not need a fresh boot; whether the first-leg misses are (c) too is unknown. Open: the fix (run the reset from a pushed LF-only script with `trap '' HUP`, or under setsid; BENCH_RUNBOOK, "L072 resets at leg start").
   - Seen again for RS-12.21: the post-leg parks took up to three attempts per board (`PARK_TRANSIENT` / `PARK_FAIL`
     while the scan SM was still walking) before `PARK_OK` (`legs/leg*_park.txt`); the end-of-round check read
-    `0x80` on both ([check](bench-evidence/RS_12_15_reverse_delivery_2026-10-18/legs/session_end_radio_check.txt)).
+    `0x80` on both ([check](bench-evidence/RS_12_15_reverse_delivery_2026-10-18/legs/session_end_radio_check.txt)). 2026-10-19: `PARK_OK` on the first attempt on both boards after every leg (`legs/legA2*_park.txt`).
   - [x] `legs/leg_prep.sh` writes every range-edge leg (profile, codec, probes and length from the tag; `--duration`,
     `--reactive-fire`; capture = leg + 180 s; legs/README.md, "Range-edge legs"), and `legs/stage_boards.sh` stages
-    `channel_survey_sniff.py` (2026-10-18, no board). 2026-10-19: of these tags only A2c, A2a, A2c2, A2a2 are still planned.
+    `channel_survey_sniff.py` (2026-10-18, no board). 2026-10-19: of these tags only A2c, A2a, A2c2, A2a2 were still planned; all four flew from it that day (first real run, `legs/legA2*_prep.txt`).
   - [ ] `legs/leg_replay.py`: TypeError at line 68 (`dr.last_ts` None) after its first line
     on a capture with no VECTOR frame (leg 2c). `legs/leg_post.sh`: copy the archive's
     `inject.log`, `inject_trigger.txt`, `tractor_ocd_reset.log` and run the RS-13 scoring
@@ -3676,7 +3676,7 @@ explicit GO)
 - [x] `web_ui.py`: codec-6 frames to the store, `_tile_stale_worker` gated off in VECTOR, `"vector"` choice with its 60–100 detail dial, `settings.html` (#135). The deployed base image predates it (RS-13.2 item above)
 - [~] **B1** deploy the daemons in the stock compose/systemd config (RS-4.8): not done, every on-air result is from the bench harness. **B6** numpy/OpenCV declared in `firmware/tractor_x8/requirements.txt`; image `2727dfd36f9f` built with them on the base X8 (cv2 5.0)
 - [ ] **B4** D-VS6 encode floor in `AutoRadioPolicy` (lock loss now; loss-driven once the RS-12.20 gap detector lands); D-VS6b tractor self-select; **B5** AE/AWB lock
-- [x] Bench legs `bench-evidence/RS_13_vector_scene_2026-09-26/RESULTS.md` (RS-13.1, #139): camera workload, p2 and p1, 1 fps and 2 fps, frames published, fragment loss and the switch against `mono_g4`; no storm signature on FHSS. **Command delivery was not measured** (no base commands on 2a/2b/2c) — it moves to the antenna DTS legs above (2026-10-19; it was the range-edge session's 0 dB step)
+- [x] Bench legs `bench-evidence/RS_13_vector_scene_2026-09-26/RESULTS.md` (RS-13.1, #139): camera workload, p2 and p1, 1 fps and 2 fps, frames published, fragment loss and the switch against `mono_g4`; no storm signature on FHSS. **Command delivery was not measured** (no base commands on 2a/2b/2c) — it moves to the antenna DTS legs above (2026-10-19; it was the range-edge session's 0 dB step); measured there 2026-10-19 on DTS: VECTOR 433/433 vs `mono_g4` 418/420, Fisher p = 0.242, not worse ([RESULTS](bench-evidence/RS_13_range_edge_2026-10-19/RESULTS.md)); FHSS still to measure
 - [-] Range-edge leg with the RF attenuator (3 dB steps): not planned (no attenuation equipment, operator 2026-10-19). It was to give the level reached, VS frames/s and command delivery per step, against `mono_g4`, and the campaign's first field-range data (`VECTOR_SCENE.md` §8.6). Range data now needs a real distance test with natural path loss.
 
 **Phase 3 — self-model**
