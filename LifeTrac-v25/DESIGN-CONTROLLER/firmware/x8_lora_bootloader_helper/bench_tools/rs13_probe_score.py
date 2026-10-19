@@ -21,7 +21,9 @@ Fails closed. Exit 2 when a log is missing or holds no timestamped daemon
 line (the tractor's is checked on a leg that fired probes; the harness
 writes `docker logs` output, so a gone container or a failed adb call
 leaves an empty or error-only file: that is no log, not a dead reverse
-link), a PROBE line does not parse, the base's tx# or the
+link), the tractor's log shows its image-tx-worker thread crashed, a fatal
+HostLink open, or RXCONT arming disabled (-RxcontArm 0) (it was not
+receiving), a PROBE line does not parse, the base's tx# or the
 tractor's rx# counter skips (lines missing from a log, or a daemon restart
 inside the leg), a base seq repeats, or the tractor logged a seq the base
 never sent (the two logs are not from the same leg). Exit 1 when a leg
@@ -123,6 +125,17 @@ def score_leg(rx_text: str, tx_text: str) -> dict:
             f"({sum(1 for line in tx_text.splitlines() if line.strip())} non-blank lines): "
             f"the tractor log is missing or empty (a failed `docker logs tx_smoke`), not a "
             f"dead reverse link")
+    if base:
+        # The tractor could not receive while its worker was dead or its radio never
+        # opened: probes sent then would count as link loss.
+        for mark, why in (("Exception in thread image-tx-worker", "its image-tx-worker thread "
+                           "crashed"),
+                          ("fatal: cannot open L072 HostLink", "it never opened its L072 HostLink"),
+                          ("RXCONT arming DISABLED", "it ran with -RxcontArm 0, its command "
+                           "downlink deaf by design")):
+            if mark in tx_text:
+                raise ScoreError(f"tx_daemon.log: {why} (`{mark}`): the tractor was not receiving, "
+                                 f"so a low delivery would measure the daemon, not the link")
     trac = _collect(tx_text, _TR_MARK, _TR_RX, "tractor LoRa cmd: PROBE")
     _check_counter([b[3] for b in base], "base PROBE TX tx#")
     _check_counter([t[2] for t in trac], "tractor PROBE rx#")

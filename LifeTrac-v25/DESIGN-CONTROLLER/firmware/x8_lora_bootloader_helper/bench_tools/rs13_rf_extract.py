@@ -39,7 +39,8 @@ window although frames were published, the stats thread or the receive worker
 crashed, or the windows stop before the frames do -- RS-12.17; with --leak, no
 `rx_frames=` line, a crashed stats thread, receive worker or receiver, stats
 lines that stop before the
-log does or cover less than the leg's duration_s, or a DTS leg without the
+log does or cover less than the leg's duration_s (which params.txt must give
+as a positive number), or a DTS leg without the
 FRF read-back at the pick) or, with --leak, when a frame was decoded; 2 on
 missing or garbled input. Only rx_daemon.log (one clock)
 is read for timing.
@@ -47,6 +48,7 @@ is read for timing.
 from __future__ import annotations
 
 import argparse
+import math
 import os
 import re
 import statistics
@@ -162,12 +164,16 @@ def leak_unscorable(log: dict, params: dict | None = None) -> str | None:
         return (f"the last `rx_frames=` stats line is {gap:.0f} s before the log ends "
                 f"(> {TAIL_SLACK_S:.0f} s): the stats thread stopped (RS-12.17)"
                 if gap is not None else "no timestamped `rx_frames=` stats line")
+    raw = (params or {}).get("duration_s")
     try:
-        dur = float((params or {}).get("duration_s") or 0)
-    except ValueError:
-        dur = 0.0
+        dur = float(raw)
+    except (TypeError, ValueError):
+        dur = math.nan
+    if not (math.isfinite(dur) and dur > 0):
+        return (f"params duration_s={raw!r} is not a positive number of seconds: the receiver's "
+                f"coverage of the leg cannot be checked")
     span = log["t_rx_last"] - log["t_first"]
-    if dur and span < dur - TAIL_SLACK_S:
+    if span < dur - TAIL_SLACK_S:
         return (f"the `rx_frames=` stats lines cover {span:.0f} s of a {dur:.0f} s leg: the "
                 f"receiver stopped early")
     return None

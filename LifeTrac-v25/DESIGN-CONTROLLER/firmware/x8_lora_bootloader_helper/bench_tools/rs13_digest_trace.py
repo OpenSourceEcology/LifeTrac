@@ -67,7 +67,8 @@ VECTOR frame, or with --strict when an episode fails, or an episode or a
 DIGEST mismatch run has no loss before it (an A16 shape in a not-scored
 episode is flagged, not scored, so it does not set the exit code); 2 on
 missing or garbled input (any capture line that is not JSON with a ts and
-hex, unknown or conflicting profile, a payload the replay cannot parse, or a
+hex, unknown profile, a meta line that is not the capture's first line (two
+capture sessions appended into one file), a payload the replay cannot parse, or a
 VECTOR body the store rejects), which also withholds the verdict over the
 captures.
 """
@@ -103,7 +104,7 @@ def load_capture(path: str) -> tuple[str | None, list[tuple[float, bytes]]]:
     line must be the meta line or a payload line, or this raises."""
     if not os.path.isfile(path):
         raise TraceError(f"missing {path}")
-    profile, frames = None, []
+    profile, frames, meta_at = None, [], 0
     with open(path, encoding="utf-8") as fh:
         for n, line in enumerate(fh, 1):
             line = line.strip()
@@ -114,7 +115,14 @@ def load_capture(path: str) -> tuple[str | None, list[tuple[float, bytes]]]:
             except ValueError:
                 raise TraceError(f"{path} line {n} is not JSON (truncated or garbled)") from None
             if isinstance(obj, dict) and isinstance(obj.get("meta"), dict):
-                profile = obj["meta"].get("profile", profile)
+                if meta_at or frames:
+                    raise TraceError(
+                        f"{path} line {n}: a meta line after "
+                        + (f"the one at line {meta_at}" if meta_at else "payload lines")
+                        + ": `vector_dry_run.py capture` appends one meta line per session, so "
+                        "this file holds two captures (one capture per file)")
+                meta_at = n
+                profile = obj["meta"].get("profile")
                 continue
             if not isinstance(obj, dict) or "hex" not in obj or "ts" not in obj:
                 raise TraceError(f"{path} line {n} is neither the meta line nor a payload line")

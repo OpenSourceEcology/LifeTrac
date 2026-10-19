@@ -170,6 +170,31 @@ class ProbeScoreTests(unittest.TestCase):
         self.assertIn("pooled VECTOR 9/10 = 90.0 %; pooled mono_g4 8/10 = 80.0 %", out)
         self.assertIn("NOT WORSE (VECTOR >= mono_g4)", out)
 
+    def test_a_tractor_that_was_not_receiving_is_not_scored(self) -> None:
+        vec = {"reg_profile": 2, "reactive_fire": 1, "probe_echo": 0,
+               "cam_extra_env": "-e LIFETRAC_ENCODE_MODE=9"}
+        mono = dict(vec, cam_extra_env="-e LIFETRAC_ENCODE_MODE=6")
+        for bad in ("Exception in thread image-tx-worker:\n",
+                    f"{_ts(1)} ERROR image_tx_daemon: fatal: cannot open L072 HostLink: timeout\n",
+                    f"{_ts(0)} WARNING image_tx_daemon: RS-11.5 diagnostic: RXCONT arming DISABLED "
+                    "— command downlink deaf for this run\n"):
+            with tempfile.TemporaryDirectory() as root:
+                a = _archive(root, "A2a", vec, _base_log(range(1, 11)),
+                             _tractor_log(range(1, 4)) + bad)
+                b = _archive(root, "A2c", mono, _base_log(range(1, 11)), _tractor_log(range(1, 10)))
+                rc, out = _run(ps.main, [a, b])
+            self.assertEqual(rc, 2, out)
+            self.assertIn("A2a: CANNOT SCORE: tx_daemon.log:", out)
+            self.assertIn("pooled verdict withheld", out)
+            self.assertNotIn("NOT WORSE", out)
+        # A leg that fired no probe is not scored on the tractor's log at all.
+        with tempfile.TemporaryDirectory() as root:
+            quiet = _archive(root, "C9v", {"reactive_fire": 0}, f"{_ts(0)} INFO x: started\n",
+                             f"{_ts(1)} ERROR image_tx_daemon: fatal: cannot open L072 HostLink\n")
+            rc, out = _run(ps.main, [quiet])
+        self.assertEqual(rc, 1, out)
+        self.assertIn("fired no probe", out)
+
     def test_pool_only_dts_legs_without_echo(self) -> None:
         vec = {"reg_profile": 2, "reactive_fire": 1, "probe_echo": 0,
                "cam_extra_env": "-e LIFETRAC_ENCODE_MODE=9"}
@@ -401,7 +426,7 @@ class RfExtractTests(unittest.TestCase):
                      + f"{_ts(10)} INFO image_rx_daemon: stats: rx_frames=0 frames_published=0\n"
                      f"{_ts(12)} WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=9 snr=-14.0 "
                      f"rssi=-121 dump=00\n")
-            a = _archive(root, "leak_dts", {"reg_profile": 2}, quiet, frf)
+            a = _archive(root, "leak_dts", {"reg_profile": 2, "duration_s": 20}, quiet, frf)
             rc, out = _run(rf.main, ["--leak", a])
             self.assertEqual(rc, 0, out)
             self.assertIn("leakage check: PASS", out)
@@ -451,6 +476,14 @@ class RfExtractTests(unittest.TestCase):
             self.assertEqual(rc, 1, out)
             self.assertIn("leakage check: NOT SCORED", out)
             self.assertIn("the receive worker crashed", out)
+            # Coverage needs the leg's length: a missing or malformed duration_s is no evidence.
+            for dur in (None, "120s", "nan", "inf", "0", "-120"):
+                params = {"reg_profile": 1} if dur is None else {"reg_profile": 1, "duration_s": dur}
+                rc, out = _run(rf.main, ["--leak", _archive(root, f"dur_{dur}".replace("-", "m"),
+                                                            params, long_quiet, "")])
+                self.assertEqual(rc, 1, (dur, out))
+                self.assertIn("leakage check: NOT SCORED", out)
+                self.assertIn("is not a positive number of seconds", out)
             ok = {"reg_profile": 1, "duration_s": 120}
             rc, out = _run(rf.main, ["--leak", _archive(root, "full_leg", ok, long_quiet, "")])
             self.assertEqual(rc, 0, out)                         # 120 s of stats for a 120 s leg
@@ -543,6 +576,10 @@ class DigestTraceLoadTests(unittest.TestCase):
                 dt.load_capture(self._write([meta, ok, bad]))
         with self.assertRaisesRegex(dt.TraceError, "no payload"):
             dt.load_capture(self._write([meta]))
+        bw250 = json.dumps({"meta": {"profile": "image_bw250"}})
+        for lines in ([meta, ok, bw250, ok], [meta, ok, meta, ok], [ok, meta]):
+            with self.assertRaisesRegex(dt.TraceError, "holds two captures"):
+                dt.load_capture(self._write(lines))
         with self.assertRaisesRegex(dt.TraceError, "missing"):
             dt.load_capture(os.path.join(tempfile.gettempdir(), "no_such_capture.jsonl"))
 
