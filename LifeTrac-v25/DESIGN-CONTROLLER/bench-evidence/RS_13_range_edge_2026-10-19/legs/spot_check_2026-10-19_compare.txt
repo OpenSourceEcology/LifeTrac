@@ -1,0 +1,13 @@
+channels: 51   hot channels: 49
+legal centers (500 kHz BW inside 902-928): 51   of which zero-hot: 2
+
+best candidates:
+    927.5 MHz  hot= 0  max=  -94 dBm  n=473
+    922.5 MHz  hot= 0  max=  -77 dBm  n=474
+
+RECOMMENDED: -ForceFrfHz 927500000   (927.5 MHz, hot=0, max=-94 dBm)
+
+-- change vs survey_base_day3.jsonl (51 shared channels) --
+newly HOT   (2): 914.5(-91->-43), 916.5(-90->-44)
+newly CLEAN (1): 922.5(-46->-77)
+channels that flipped state: 3/51 (6%) — a high number means the emitter moved, and any pinned channel needs re-validation

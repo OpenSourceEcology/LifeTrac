@@ -1,0 +1,12 @@
+train_gap_ms=40  tx_pipeline_depth=2  synth_budget_b=250  force_frf_hz=927500000  git_sha=1d10f57f  
+  (rx rx_frames counter 589 is stale; using 609 fragments from frag_arrival events)
+  !! received 609 > sent 607: the TX and RX logs disagree on the window; loss shown as 0 — check the seq-gap figure
+loss 0/607 = 0.0%   crc_dumps=1  timeouts=0  published=608
+capture seq gaps (legA2a_base.jsonl): lost 0/612 = 0.0%  (received 612, 0 gaps, longest 0; 1 codec run; period 0.50 s)
+radio deltas: {'radio_dio0': 834, 'radio_rx_ok': 613, 'radio_crc_err': 2, 'radio_tx_ok': 217}
+FIRMWARE DROP (drx_ok - host URCs): 613 - 607 = 6
+identity residue: 2
+crc closure: dcrc_err=2 vs crc_dumps=1
+URC-path: rx_urc_lost=0 rx_pretx_drained=0
+RS-12.10: rx_fifo_skip=0 tx_deaf_sum=3375999 us over 217 TX (mean 15.6 ms) tx_deaf_max=25.5 ms tx_done_to_rearm_max=1844 us (max fields: post-bracket values)
+RS-12.15: consider_remote deltas aligned=0 snapped=0 locked_out=0 epoch_drift=0 bad_hop=0 not_init=613 | demotion reset=0 kept=0

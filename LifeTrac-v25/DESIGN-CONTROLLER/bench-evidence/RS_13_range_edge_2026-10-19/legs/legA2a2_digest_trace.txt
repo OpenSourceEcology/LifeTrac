@@ -1,0 +1,13 @@
+== rs13_digest_trace: legA2a2_base.jsonl (leg A2a2, profile image_bw500, 615 rows, 615 vector; horizon 25 rows) ==
+capture seq gaps (legA2a2_base.jsonl): lost 1/616 = 0.2%  (received 615, 1 gap, longest 1; 1 codec run; period 0.50 s)
+seq gaps (row, frames lost): [(268, 1)]
+store: ttl_dropped 0, orphans 0, digest 568 checked / 0 mismatched; final digest_ok True; last DIGEST checked (row, result): (614, 'ok')
+resync: none
+DIGEST mismatch runs: 0 (each starts within the horizon after a seq gap, or at the join)
+
+| leg | loss at row | episode (start-end, frames, s) | ended by | back in step (digest_trace, frames after the loss) | isolated? | pass? |
+|---|---|---|---|---|---|---|
+| A2a2 | - | no resync episode | - | - | - | - |
+
+
+A16 confirmation over 1 capture(s) (A2a2): 0 episode(s); loss-opened 0 -- THIN: fewer than 3; pool the Round B VECTOR legs with seq-gap loss <= 10 %; isolated and scored 0: 0 PASS, 0 FAIL -> NO SCORED EPISODE

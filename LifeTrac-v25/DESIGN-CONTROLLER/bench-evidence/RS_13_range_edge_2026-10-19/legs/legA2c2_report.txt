@@ -1,0 +1,12 @@
+train_gap_ms=40  tx_pipeline_depth=2  synth_budget_b=250  force_frf_hz=927500000  git_sha=1d10f57f  
+  (tx frags_ok counter 608 is stale; using 609 fragments from per-frame TX events)
+  (rx rx_frames counter 608 is stale; using 609 fragments from frag_arrival events)
+loss 0/609 = 0.0%   crc_dumps=2  timeouts=0  published=609
+capture seq gaps (legA2c2_base.jsonl): lost 1/614 = 0.2%  (received 613, 1 gap, longest 1; 1 codec run; period 0.50 s)
+radio deltas: {'radio_dio0': 831, 'radio_rx_ok': 614, 'radio_crc_err': 2, 'radio_tx_ok': 211}
+FIRMWARE DROP (drx_ok - host URCs): 614 - 609 = 5
+identity residue: 4
+crc closure: dcrc_err=2 vs crc_dumps=2
+URC-path: rx_urc_lost=0 rx_pretx_drained=0
+RS-12.10: rx_fifo_skip=0 tx_deaf_sum=3278595 us over 211 TX (mean 15.5 ms) tx_deaf_max=25.5 ms tx_done_to_rearm_max=1844 us (max fields: post-bracket values)
+RS-12.15: consider_remote deltas aligned=0 snapped=0 locked_out=0 epoch_drift=0 bad_hop=0 not_init=614 | demotion reset=0 kept=0 | tx_first_anchor delta=0 (post 0)
