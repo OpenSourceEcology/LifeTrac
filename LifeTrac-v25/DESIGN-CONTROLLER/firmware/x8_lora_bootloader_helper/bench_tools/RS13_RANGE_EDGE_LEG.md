@@ -15,7 +15,7 @@ step attenuator, no conducted shielded path, no 50 Ω terminations.
   ([The 0 dB step](#the-0-db-step)). They measure the §8.6 command-delivery
   row (`rs13_probe_score.py`) and check the A16 fix on air
   (`rs13_digest_trace.py`). These two measurements never needed
-  attenuation. They still need their own radio GO. None has flown.
+  attenuation. They need their own radio GO; they flew on 2026-10-19 ([RESULTS](../../../bench-evidence/RS_13_range_edge_2026-10-19/RESULTS.md); A16 not exercised).
 - **Reading those legs on the antennas.** The RF hardware prerequisite and
   Prep item 3 (the RF path check) do not apply. R0's −65 to −75 dBm window
   belongs to the conducted path. Record the level only, and ignore an

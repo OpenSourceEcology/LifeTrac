@@ -33,7 +33,7 @@ per-session reference and the trap list. The rest of the bench kit:
 | `rs13_probe_score.py <archive> [...]` | PC | base→tractor command delivery (tractor `LoRa cmd: PROBE` seqs that the base sent / base `PROBE TX`). Pools VECTOR against `mono_g4` from params.txt with a two-sided Fisher exact test, only over legs whose params show `reg_profile=2` and `probe_echo=0` and a VECTOR or `mono_g4` codec (`cam_extra_env` `LIFETRAC_ENCODE_MODE=9` / `6`); otherwise the pooled verdict is withheld, exit 1. Exit 2 on an empty or error-only daemon log (a failed `docker logs`), a tractor log showing its `image-tx-worker` crashed, a fatal HostLink open, or RXCONT arming disabled (`-RxcontArm 0`) (it was not receiving), counter skips, or logs from different legs; exit 1 when a leg fired no probe. |
 | `rs13_digest_trace.py <leg>_base.jsonl [...]` | PC | the A16 confirmation table and per-row DIGEST trace (encoder n_live against the base's live count) of a VECTOR capture, replayed through this checkout's store (run it at the base image's SHA); flags `!! A16 shape` in not-scored episodes. A gap of two or more frames is a burst, not scored. The join ends at the first epoch start the store accepts (a key frame, or its repeat-once copy when the key was lost inside the capture), and DIGEST mismatch runs split at epoch switches and starts. Refuses (exit 2) a capture with a second meta line (two capture sessions appended into one file), a payload the replay cannot parse or a VECTOR body the store rejects. |
 | [`RS13_VECTOR_LEG.md`](RS13_VECTOR_LEG.md) + [`RS13_RESULTS_TEMPLATE.md`](RS13_RESULTS_TEMPLATE.md) | PC | RS-13.1 VECTOR (codec 6) legs: image smoke, camera-only dry run, radio legs with pass criteria, and the `RESULTS.md` skeleton. Adds `-CamExtraEnv` to the harness (env for the `camera_svc` container) and archives `camera_service.log`. |
-| [`RS13_RANGE_EDGE_LEG.md`](RS13_RANGE_EDGE_LEG.md) | PC | written 2026-10-10 as the next radio session after RS-13.1 (not flown; radios only on an explicit GO per round): conducted SMA-attenuator path, leakage check, 0 dB step with VECTOR / mono_g4 interleaved and `-ReactiveFire 1 -ProbeEcho 0` (the `VECTOR_SCENE.md` §8.6 command-delivery row, the A16-fix confirmation), then the 3 dB walk-down at both profiles, stop rules and its own RESULTS template. **Not planned since 2026-10-19:** the bench has no attenuator path, so the conducted path, the leakage check and the walks stay as reference only. Its interleaved DTS legs `A2c`, `A2a`, `A2c2`, `A2a2` and their scoring still apply, on the antennas. |
+| [`RS13_RANGE_EDGE_LEG.md`](RS13_RANGE_EDGE_LEG.md) | PC | written 2026-10-10 as the next radio session after RS-13.1 (not flown; radios only on an explicit GO per round): conducted SMA-attenuator path, leakage check, 0 dB step with VECTOR / mono_g4 interleaved and `-ReactiveFire 1 -ProbeEcho 0` (the `VECTOR_SCENE.md` §8.6 command-delivery row, the A16-fix confirmation), then the 3 dB walk-down at both profiles, stop rules and its own RESULTS template. **Not planned since 2026-10-19:** the bench has no attenuator path, so the conducted path, the leakage check and the walks stay as reference only. Its interleaved DTS legs `A2c`, `A2a`, `A2c2`, `A2a2` and their scoring still apply, on the antennas; they flew 2026-10-19 (`bench-evidence/RS_13_range_edge_2026-10-19/RESULTS.md`). |
 | `../../../tools/vector_dry_run.py capture\|replay\|tractor-log` | both boards (daemon container) / PC | captures `cmd/image_frame` (tractor) or `video/tile_delta` (base) payloads to JSONL, replays them through the base station's own parser + `VectorSceneStore`, and prints per-frame size vs the one-fragment limit, store verdict, orphans, DIGEST, arrival timing and PASS/FAIL checks (`--strict` exits 1). `tractor-log` summarises camera_service's `vector_stats` lines (encoder ms per stage) and totals their cumulative counters on a `counters` line: frames, epoch starts per cause, and the A16 repair's share frames, re-sends, carousel re-sends and DEL repeats. |
 | [`RS13_2_DESK_CHECK.md`](RS13_2_DESK_CHECK.md) + [`rs13_2_desk.compose.yml`](rs13_2_desk.compose.yml) | base (compose) + PC browser | RS-13.2 desk check: the rebuilt web_ui on the production compose (mosquitto + web_ui only; the override fences off `lora_bridge` and the bench radio endpoint), the round-4 captures replayed into it, and the §7.5 checklist. No radio. |
 | `../../../tools/vector_replay_publish.py <capture>` | base (in `lifetrac-v25:latest`) / PC | publishes a `vector_dry_run.py` capture to a broker at its recorded timing (`--speed`, `--loop`, row windows, `--drop-rows` / `--drop-every` to inject seq-gap losses, `--log`, `--dry-run`). Never retains. |
@@ -271,22 +271,31 @@ board is reset.
 **Tractor: the SWD reset misses on the first leg after a flash reboot**
 (2026-10-18 leg V; legs O, Q, R, S, T and U of 09-14/15). It landed on
 09-14 legs P and Q2, the two legs there flown without a flash before them.
-The cause is unknown: no leg has kept the openocd log yet (leg V's stayed
-on the tractor's tmpfs and was overwritten; the harness archives it as
-`tractor_ocd_reset.log` from the 2026-10-18 bench-kit change on, not yet
-flown).
-Candidates, none verified:
+Why those first-leg misses happen is still unknown: none of those legs kept
+the openocd log (leg V's stayed on the tractor's tmpfs and was overwritten).
+The harness has archived it as `tractor_ocd_reset.log` since the 2026-10-18
+bench-kit change.
+**2026-10-19, the first archived logs**
+(`bench-evidence/RS_13_range_edge_2026-10-19/legs/leg*_tractor_ocd_reset.log`):
+the reset landed on A2c, A2a and A2a2. On A2c2 it missed with candidate (c)'s signature:
+`OCD_EXIT=129` and no openocd banner. A2c2 was the third leg of the day and
+the tractor had been up since the 2026-10-18 flash, so it did not need a
+fresh boot.
+Candidates; only (c) has been seen in an archived reset log (once, A2c2):
 - (a) A SWD attach failure: the DPIDR / sysfs-mmap race (FLASH_RUNBOOK and
   README_P0C TT-1).
 - (b) An openocd hang (RS-5.2), cleared by the next leg's `pkill -9 openocd`.
-- (c) A SIGHUP race on a cold page cache. The adb/sudo session hangup
+- (c) A SIGHUP race (first proposed as a cold-page-cache effect; A2c2 hit it
+  with openocd run minutes earlier). The adb/sudo session hangup
   reaches the forked `nohup` before it ignores HUP: the subshell's `trap :`
-  is reset in its children, and the new wrapper (bench kit 2026-10-18, not
-  yet flown) starts nohup one fork later than the code that flew legs O–X. It shows as `OCD_EXIT=129` with no openocd banner
-  (verdict `killed by SIGHUP ... openocd never started`). If confirmed, run
-  the reset from a pushed LF-only script with `trap '' HUP` (an ignored
-  disposition survives exec) or under setsid. `trap '' HUP` cannot be
-  written inside the harness's single-quoted `sh -c`.
+  is reset in its children, and the new wrapper (bench kit 2026-10-18, flown
+  since 2026-10-19) starts nohup one fork later than the code that flew legs
+  O–X. It shows as `OCD_EXIT=129` with no openocd banner (verdict `killed by
+  SIGHUP ... openocd never started`). Seen on 2026-10-19 A2c2, on a board up
+  since the day before, so it does not need a fresh boot. The fix, still
+  open: run the reset from a pushed LF-only script with `trap '' HUP` (an
+  ignored disposition survives exec) or under setsid. `trap '' HUP` cannot
+  be written inside the harness's single-quoted `sh -c`.
 - (d) `08_boot_user_app.cfg` does `init; halt` and never resumes the H7 (it
   ends with `shutdown`). Only the first leg after a boot halts an H7 that is
   serving a live x8h7 bridge; later legs attach to an H7 the previous leg
@@ -295,8 +304,8 @@ Candidates, none verified:
   shows as an attach or halt error, or a hang, in that leg's log.
 
 `tractor_ocd_reset.log` from the first leg after the next flash reboot tells
-(a) to (d) apart. Do not change the reset launch (`trap :` → `trap ''` or
-setsid) until such a log has shown which one it is.
+whether those misses are (c) too, or (a), (b) or (d). A log has now shown
+(c), so its fix need not wait for that leg.
 
 ## Bench web UI on the base (optional)
 
