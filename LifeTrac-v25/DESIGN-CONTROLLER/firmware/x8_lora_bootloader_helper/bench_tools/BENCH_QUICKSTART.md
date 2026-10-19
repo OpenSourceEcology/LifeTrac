@@ -331,10 +331,12 @@ The other RS-13 legs (legs/README.md, "The four RS-13 legs"):
   (`-CamExtraEnv "-e LIFETRAC_ENCODE_MODE=6"`).
 - 2d is the over-the-air switch: `leg_prep.sh 2d image_bw500`, then
   `leg2d_switch.sh 2d` right after the harness launch.
-- The range-edge session ([RS13_RANGE_EDGE_LEG.md](RS13_RANGE_EDGE_LEG.md))
-  uses its own leg names: `leg_prep.sh A2c`, `leg_prep.sh B12v --duration 120`
-  and so on (legs/README.md, "Range-edge legs"). The tag sets the profile,
-  codec, probes and length.
+- The range-edge procedure ([RS13_RANGE_EDGE_LEG.md](RS13_RANGE_EDGE_LEG.md))
+  uses its own leg names (legs/README.md, "Range-edge legs"). The tag sets
+  the profile, codec, probes and length. Since 2026-10-19 only `A2c`, `A2a`,
+  `A2c2` and `A2a2` are planned, to fly on the antennas (`leg_prep.sh A2c`).
+  The attenuator legs (`leak_*`, `B*`, `C*`, `*close`) are not planned: the
+  bench has no attenuator path.
 - A command-plane leg adds `-InjectCmd "<injector> <args>"` to the harness
   line; the harness starts the injector on the base at the first published
   frame (BENCH_RUNBOOK, "A leg").

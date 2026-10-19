@@ -51,8 +51,10 @@ Does not check:
 - **the radio, the encoder or the A16 fix.** The captures are fixed bytes from
   the round-4 encoder (`4ab58b8d`). An encoder-side A16 fix does not change
   them, so A16 still shows in these replays; that is expected. The fix is
-  verified by `scripts/a16_sil.py` and the range-edge session's 0 dB step. If
-  the merged fix also changed the **store**, the replays will differ from the
+  verified by `scripts/a16_sil.py`. Its on-air confirmation is the `A2a` /
+  `A2a2` legs of [RS13_RANGE_EDGE_LEG.md](RS13_RANGE_EDGE_LEG.md), to fly on
+  the antennas (2026-10-19: the attenuator walk is not planned). If the
+  merged fix also changed the **store**, the replays will differ from the
   RESULTS episode lists: record the difference (see Step 5).
 - live timing. The replay reproduces the base's capture timing (on-air jitter
   included); web_ui stamps arrival with its own clock and an airtime of 0, as it

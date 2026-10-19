@@ -3415,7 +3415,7 @@ explicit GO)
     The payloads are byte-identical with and without them (encoder A/B over
     3,300 photo frames plus 1,280 A16, trigger-sweep and masked frames).
   - **Still open:** the repair share at V2 (VECTOR_SCENE.md §4.5.4 open item); on-air confirmation
-    at the range-edge 0 dB step (radio GO), scored by `bench_tools/rs13_digest_trace.py`. Neither
+    in the VECTOR legs A2a, A2a2 of the antenna DTS legs (radio GO; until 2026-10-19 the range-edge 0 dB step), scored by `bench_tools/rs13_digest_trace.py`. Neither
     RS-13.1 A16 episode would be scored under the 25-row isolation rule (second loss 13 rows / 7.0 s
     later on 2a_r4, the 7.07 s emitter grid at 2 fps; 11 rows / 6.0 s on 2d_r4); the tool traces both and flags them `!! A16 shape`.
   - The original analysis:
@@ -3583,12 +3583,12 @@ explicit GO)
     - the status line ("design proposal, not implemented"), DECISIONS.md's
       "None of these decisions is implemented", and §8.6's test table (no
       `test_vector_sync.py`) are out of date.
-- [ ] **Next radio session = the range-edge session** (on GO, after the items above). The procedure
-  merged in #143: `bench_tools/RS13_RANGE_EDGE_LEG.md` (legs: `legs/leg_prep.sh <leg name>`).
-  - a receive-only channel spot-check, then `-ForceFrfHz <pick>` on every DTS leg;
-  - a 0 dB step with VECTOR and mono_g4 interleaved (2c, 2a, 2c′, 2a′) and `-ReactiveFire 1 -ProbeEcho 0`,
-    which gives the §8.6 command-delivery row (never measured in RS-13.1) and the A16-fix confirmation;
-  - the 3 dB attenuator steps at V0 over a conducted, shielded path; `-TxBatch 0` throughout.
+- [ ] **Next radio session = the antenna legs** (re-scoped 2026-10-19). Each needs its own explicit GO; none has flown. They are to fly
+  on the antennas, as the 2026-10-18 RS-12.15 legs did. Order: (1) here, then (2) and (3), the next two items. Leg lines: `legs/leg_prep.sh <leg name>`.
+  - (1) §8.6 command delivery, VECTOR vs `mono_g4`, and the on-air check of the A16 fix (#143): a receive-only channel spot-check,
+    then the DTS legs A2c, A2a, A2c2, A2a2 interleaved (`-ReactiveFire 1 -ProbeEcho 0 -TxBatch 0 -ForceFrfHz <pick>`), scored with
+    `rs13_probe_score.py` and `rs13_digest_trace.py`. Neither needs attenuation. P8 reference: the bw500 step-1 re-run (no radio, Images item).
+  - [-] not planned (no attenuation equipment, operator 2026-10-19): Round A's conducted 0 dB step and leakage check, and the Round B / C 3 dB walks of `bench_tools/RS13_RANGE_EDGE_LEG.md` (#143). The procedure stays for reference. No range data comes from the bench.
   - [x] Scoring helpers (2026-10-18, no radio; 41 SIL tests in `base_station/tests/test_rs13_scoring_sil.py`):
     `bench_tools/rs13_rf_extract.py` (level, R0, leakage, tracking, closing), `rs13_probe_score.py` (§8.6
     command delivery) and `rs13_digest_trace.py` (A16; replaces RS-13.1's `scripts/digest_trace.py`). They
@@ -3629,9 +3629,9 @@ explicit GO)
   - Seen again for RS-12.21: the post-leg parks took up to three attempts per board (`PARK_TRANSIENT` / `PARK_FAIL`
     while the scan SM was still walking) before `PARK_OK` (`legs/leg*_park.txt`); the end-of-round check read
     `0x80` on both ([check](bench-evidence/RS_12_15_reverse_delivery_2026-10-18/legs/session_end_radio_check.txt)).
-  - [x] `legs/leg_prep.sh` writes every range-edge leg (profile, codec, probes and length from
-    the tag; `--duration`, `--reactive-fire`; capture = leg + 180 s; legs/README.md, "Range-edge
-    legs"), and `legs/stage_boards.sh` stages `channel_survey_sniff.py` (2026-10-18, no board).
+  - [x] `legs/leg_prep.sh` writes every range-edge leg (profile, codec, probes and length from the tag; `--duration`,
+    `--reactive-fire`; capture = leg + 180 s; legs/README.md, "Range-edge legs"), and `legs/stage_boards.sh` stages
+    `channel_survey_sniff.py` (2026-10-18, no board). 2026-10-19: of these tags only A2c, A2a, A2c2, A2a2 are still planned.
   - [ ] `legs/leg_replay.py`: TypeError at line 68 (`dr.last_ts` None) after its first line
     on a capture with no VECTOR frame (leg 2c). `legs/leg_post.sh`: copy the archive's
     `inject.log`, `inject_trigger.txt`, `tractor_ocd_reset.log` and run the RS-13 scoring
@@ -3676,8 +3676,8 @@ explicit GO)
 - [x] `web_ui.py`: codec-6 frames to the store, `_tile_stale_worker` gated off in VECTOR, `"vector"` choice with its 60–100 detail dial, `settings.html` (#135). The deployed base image predates it (RS-13.2 item above)
 - [~] **B1** deploy the daemons in the stock compose/systemd config (RS-4.8): not done, every on-air result is from the bench harness. **B6** numpy/OpenCV declared in `firmware/tractor_x8/requirements.txt`; image `2727dfd36f9f` built with them on the base X8 (cv2 5.0)
 - [ ] **B4** D-VS6 encode floor in `AutoRadioPolicy` (lock loss now; loss-driven once the RS-12.20 gap detector lands); D-VS6b tractor self-select; **B5** AE/AWB lock
-- [x] Bench legs `bench-evidence/RS_13_vector_scene_2026-09-26/RESULTS.md` (RS-13.1, #139): camera workload, p2 and p1, 1 fps and 2 fps, frames published, fragment loss and the switch against `mono_g4`; no storm signature on FHSS. **Command delivery was not measured** (no base commands on 2a/2b/2c) — it moves to the range-edge session's 0 dB step above
-- [ ] Range-edge leg with the RF attenuator (3 dB steps): level reached, VS frames/s and command delivery per step, against `mono_g4`; first field-range data for the campaign (`VECTOR_SCENE.md` §8.6)
+- [x] Bench legs `bench-evidence/RS_13_vector_scene_2026-09-26/RESULTS.md` (RS-13.1, #139): camera workload, p2 and p1, 1 fps and 2 fps, frames published, fragment loss and the switch against `mono_g4`; no storm signature on FHSS. **Command delivery was not measured** (no base commands on 2a/2b/2c) — it moves to the antenna DTS legs above (2026-10-19; it was the range-edge session's 0 dB step)
+- [-] Range-edge leg with the RF attenuator (3 dB steps): not planned (no attenuation equipment, operator 2026-10-19). It was to give the level reached, VS frames/s and command delivery per step, against `mono_g4`, and the campaign's first field-range data (`VECTOR_SCENE.md` §8.6). Range data now needs a real distance test with natural path loss.
 
 **Phase 3 — self-model**
 
@@ -3699,7 +3699,7 @@ explicit GO)
 - [ ] **Base (`lora_proto.py`, `image_rx_daemon.py`, `web_ui.py`):** opcodes `0x6D RUNG_REQ`, `0x6E RUNG_ACK` (with `status`), `0x6F RUNG_CONF`, `0x70 RUNG_HELLO` (alternating slots), `0x71 LINK_HB`; every base copy 1.0 s apart through the shared command gate; the flow (apply instant carried in `RUNG_CONF`, per-copy DTS delay, lease on the new rung), `T_conf` 10 s / `T_revert` 5 s (600 ms once the drive plane is on air) / `T_lease` 15 s / `T_cool` 60 s / `T_hb` 5 s / `T_deaf` 10 s; parked rendezvous listening when deaf; rung ladder in `AutoRadioPolicy` (down at < 3 dB margin for 2 windows with the vector ladder at V2 and the tractor stopped; up after 6 windows; profile switch resets the rung); "rung" chip beside the profile selector; audit events
 - [ ] **Tractor (`image_tx_daemon.py`, `camera_service.py`):** ACK/HELLO handling (own slots, lease), scheduled apply, `tractor/link_budget` republished per rung, retained `tractor/link_rx` status (last command heard, SNR, rung, queue depth) for `camera_service`, the beacon sweep when deaf, `T_deaf` 60 s rendezvous fallback (12 missed heartbeats; bench-only until D-VS9)
 - [ ] **SIL:** `test_rung_switch_sil.py` modelled on `test_link_tune_sil.py`: every failure row of §4.6.8 including the lost-reply sequence (converges within `T_revert` + `T_lease`), timers counted from the apply instant and the 1.0 s gate, hysteresis, no request while moving, budget update after a switch, schema-2 header field round trip
-- [ ] **Bench legs:** (1) switch leg at each rung pair, scored on proven-switch time and frames lost during the switch; (2) rendezvous leg (park one board mid-session; re-found within `T_deaf` + 10.5 s); (3) the range-edge attenuator walk-down with rung changes allowed
+- [ ] **Bench legs:** (1) switch leg at each rung pair, scored on proven-switch time and frames lost during the switch; (2) rendezvous leg (park one board mid-session; re-found within `T_deaf` + 10.5 s); (3) ~~the range-edge attenuator walk-down with rung changes allowed~~ not planned (no attenuation equipment, operator 2026-10-19); a distance test with rung changes allowed would replace it
 
 **Control plane (D-VS9):** revive firmware Batch 2 (reserved control slot, mute gate, skip/ditto) sized per rung, and fix the FHSS reverse direction (reserved reverse slot or base clock authority) before the drive plane ships; see `VECTOR_SCENE.md` §7.4.
 
@@ -4211,7 +4211,7 @@ Major implementation-plan-level tasks not already enumerated in Phases 2–5 abo
 - [ ] **L-V4.** TAKE CONTROL preemption — within next M7 tick (≤ 20 ms).
 - [ ] **L-V5.** Replay rejection — captured-frame retransmit rejected + logged.
 - [ ] **L-V6.** Tamper rejection — bit-flipped frame rejected via GCM tag + logged.
-- [ ] **L-V7.** Adaptive SF ladder — step-attenuator sweep, no hunting, 30 s clean before step-up.
+- [ ] **L-V7.** Adaptive SF ladder — step-attenuator sweep, no hunting, 30 s clean before step-up. (2026-10-19: no attenuation equipment, operator; the sweep is not planned. A range walk with natural path loss is the alternative.)
 - [ ] **L-V8.** R-6 telemetry fragmentation round-trip — 120 B payload survives bit-identical via fragment+reassemble.
 - [ ] **L-V9.** R-7 retune cost recorded; burst-batching code path validated under image load if > 5 ms.
 - [ ] **L-V10.** L5 FHSS spectrum-analyser compliance — 8 channels, ≤ 12.5 % dwell, no OOB, EIRP ≤ +36 dBm.

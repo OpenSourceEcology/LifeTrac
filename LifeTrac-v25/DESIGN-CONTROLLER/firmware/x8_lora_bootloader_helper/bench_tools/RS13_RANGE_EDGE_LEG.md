@@ -1,7 +1,42 @@
 # RS-13 range edge — VECTOR and mono_g4 over a conducted attenuator walk-down
 
-*Procedure, 2026-10-10. Not flown. This is the next radio session after
-RS-13.1, as the RS-13.1 review set it out
+**Status, 2026-10-19: not planned.** The operator decided on 2026-10-19: "We
+are not going to perform any attenuation tests because we do not have the
+proper equipment." The bench has no attenuator path: no fixed SMA pads or
+step attenuator, no conducted shielded path, no 50 Ω terminations.
+
+- **Will not fly:** anything that needs the conducted path. That is the
+  leakage check (`leak_dts`, `leak_fhss`), Round A's conducted 0 dB step,
+  the Round B and Round C 3 dB walks, and their closing checks (`B0close`,
+  `C0close`).
+- **Still planned, on the antennas** (as the 2026-10-18 RS-12.15 legs flew):
+  the receive-only channel spot-check (Prep, item 4), then the interleaved
+  DTS legs `A2c`, `A2a`, `A2c2`, `A2a2` with their scoring
+  ([The 0 dB step](#the-0-db-step)). They measure the §8.6 command-delivery
+  row (`rs13_probe_score.py`) and check the A16 fix on air
+  (`rs13_digest_trace.py`). These two measurements never needed
+  attenuation. They still need their own radio GO. None has flown.
+- **Reading those legs on the antennas.** The RF hardware prerequisite and
+  Prep item 3 (the RF path check) do not apply. R0's −65 to −75 dBm window
+  belongs to the conducted path. Record the level only, and ignore an
+  `OUT OF RANGE` line from `rs13_rf_extract.py` and its pad advice. With no
+  Round B to pool from, a thin A16 confirmation stays thin: say so.
+  Prep item 4's spot-check runs on the antennas, not on a conducted path.
+  `leg_prep.sh` still labels these tags "Round A, 0 dB step" and prints a
+  NOTE unless `EVIDENCE_DIR` is under `bench-evidence/RS_13_range_edge_<date>/`:
+  keep that folder (Prep item 6). In the [template](#results-template), fill
+  in Software, Firmware, the spot-check, Round A and the §8.6 rows, and mark
+  RF setup, the leakage check, Rounds B and C and The edge "not flown: no
+  attenuation equipment (2026-10-19)".
+- **Lost:** the range data (where SF7 / VECTOR runs out, VS frames/s per
+  step). It needs a real distance test instead: a range walk with natural
+  path loss ([TODO.md](../../../../TODO.md), S-HW.2).
+
+The rest of this file stays as reference. It would apply if the equipment is
+ever obtained.
+
+*Procedure, 2026-10-10. Not flown. It was planned as the next radio session
+after RS-13.1, as the RS-13.1 review set it out
 ([RESULTS, "Remaining radio tests"](../../../bench-evidence/RS_13_vector_scene_2026-09-26/RESULTS.md#remaining-radio-tests-review-2026-10-04-after-the-round)).
 It measures two rows of `VECTOR_SCENE.md` §8.6: the range-edge leg ("at each
 3 dB step: VS frames received per second, level reached, command delivery,
