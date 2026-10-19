@@ -26,7 +26,10 @@ tractor's rx# counter skips (lines missing from a log, or a daemon restart
 inside the leg), a base seq repeats, or the tractor logged a seq the base
 never sent (the two logs are not from the same leg). Exit 1 when a leg
 fired no probe (nothing to score; FHSS walk legs are image-only). Any failed
-leg withholds the pooled verdict. A real tractor log with no PROBE line
+leg withholds the pooled verdict; so does (exit 1) a leg whose params.txt does
+not show reg_profile=2 and probe_echo=0, or whose codec is neither VECTOR nor
+mono_g4, since the 8.6 comparison pools VECTOR and mono_g4 DTS legs flown with
+-ProbeEcho 0 only (its per-leg figures still print). A real tractor log with no PROBE line
 scores 0 delivered: that is a real result on a dead reverse link (RS-0.12
 B1, 0/86), and the block says so loudly. Timestamps are not used to score:
 the base and tractor clocks are not comparable.
@@ -225,6 +228,8 @@ def main(argv: list[str] | None = None) -> int:
     a = ap.parse_args(argv)
     rc = 0
     pools: dict[str, list[int]] = {}
+    unlike: list[str] = []                   # legs not shown to be DTS with -ProbeEcho 0
+    other: list[str] = []                    # legs that are neither VECTOR nor mono_g4
     for arch in a.archive:
         name = os.path.basename(os.path.normpath(arch))
         try:
@@ -243,12 +248,28 @@ def main(argv: list[str] | None = None) -> int:
             continue
         for line in format_leg(name, params, res):
             print(line)
-        pool = pools.setdefault(leg_codec(params), [0, 0])
+        codec = leg_codec(params)
+        pool = pools.setdefault(codec, [0, 0])
+        if codec not in ("vector", "mono_g4"):
+            other.append(f"{name} ({codec})")
         pool[0] += res["delivered"]
         pool[1] += res["sent"]
+        if params.get("reg_profile") != "2" or params.get("probe_echo") != "0":
+            unlike.append(f"{name} (reg_profile={params.get('reg_profile', '?')}, "
+                          f"probe_echo={params.get('probe_echo', '?')})")
     if len(a.archive) > 1:
         if rc:
             print("pooled verdict withheld: a leg above could not be scored")
+        elif other and "vector" in pools and "mono_g4" in pools:
+            print("pooled verdict withheld: the 8.6 comparison pools VECTOR and mono_g4 legs "
+                  "only (params cam_extra_env LIFETRAC_ENCODE_MODE=9 / 6), and these legs are "
+                  "neither: " + "; ".join(other) + ". The per-leg figures above stand")
+            rc = 1
+        elif unlike and "vector" in pools and "mono_g4" in pools:
+            print("pooled verdict withheld: the 8.6 comparison pools DTS legs flown with "
+                  "-ProbeEcho 0 only (params reg_profile=2, probe_echo=0), and these legs are "
+                  "not shown to be: " + "; ".join(unlike) + ". The per-leg figures above stand")
+            rc = 1
         elif "vector" in pools and "mono_g4" in pools:
             for line in pooled_verdict(tuple(pools["vector"]), tuple(pools["mono_g4"])):
                 print(line)

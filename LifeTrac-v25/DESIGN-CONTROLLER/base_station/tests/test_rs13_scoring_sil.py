@@ -170,6 +170,37 @@ class ProbeScoreTests(unittest.TestCase):
         self.assertIn("pooled VECTOR 9/10 = 90.0 %; pooled mono_g4 8/10 = 80.0 %", out)
         self.assertIn("NOT WORSE (VECTOR >= mono_g4)", out)
 
+    def test_pool_only_dts_legs_without_echo(self) -> None:
+        vec = {"reg_profile": 2, "reactive_fire": 1, "probe_echo": 0,
+               "cam_extra_env": "-e LIFETRAC_ENCODE_MODE=9"}
+        for name, mono, why in (
+                ("echo", dict(vec, probe_echo=1), "A2c (reg_profile=2, probe_echo=1)"),
+                ("fhss", dict(vec, reg_profile=1), "A2c (reg_profile=1, probe_echo=0)"),
+                ("unset", {"reactive_fire": 1, "cam_extra_env": "-e LIFETRAC_ENCODE_MODE=6"},
+                 "A2c (reg_profile=?, probe_echo=?)")):
+            mono = dict(mono, cam_extra_env="-e LIFETRAC_ENCODE_MODE=6")
+            with tempfile.TemporaryDirectory() as root:
+                a = _archive(root, "A2a", vec, _base_log(range(1, 11)), _tractor_log(range(1, 10)))
+                b = _archive(root, "A2c", mono, _base_log(range(1, 11)), _tractor_log(range(1, 3)))
+                rc, out = _run(ps.main, [a, b])
+            self.assertEqual(rc, 1, (name, out))
+            self.assertIn("pooled verdict withheld", out)
+            self.assertIn(why, out)
+            self.assertNotIn("NOT WORSE", out)
+            self.assertIn("delivered 2/10 = 20.0 %", out)       # the per-leg figures still print
+        # A leg that is neither VECTOR nor mono_g4 does not slip out of the pool unseen.
+        mono = dict(vec, cam_extra_env="-e LIFETRAC_ENCODE_MODE=6")
+        for extra in ("", "-e LIFETRAC_ENCODE_MODE=7"):
+            with tempfile.TemporaryDirectory() as root:
+                legs = [_archive(root, "A2a", vec, _base_log(range(1, 11)), _tractor_log(range(1, 10))),
+                        _archive(root, "A2c", mono, _base_log(range(1, 11)), _tractor_log(range(1, 10))),
+                        _archive(root, "C", dict(vec, cam_extra_env=extra), _base_log(range(1, 11)),
+                                 _tractor_log([1]))]
+                rc, out = _run(ps.main, legs)
+            self.assertEqual(rc, 1, out)
+            self.assertIn("these legs are neither: C (", out)
+            self.assertNotIn("NOT WORSE", out)
+
     def test_main_exit_codes(self) -> None:
         with tempfile.TemporaryDirectory() as root:
             noprobe = _archive(root, "B9v", {"reactive_fire": 0}, f"{_ts(0)} INFO x: started\n")
@@ -412,6 +443,14 @@ class RfExtractTests(unittest.TestCase):
                 self.assertIn("leakage check: NOT SCORED", out)
                 self.assertIn(why, out)
                 self.assertNotIn("leakage check: PASS", out)
+            # The receive worker died; the stats thread printed zeros to the end.
+            rc, out = _run(rf.main, ["--leak", _archive(
+                root, "worker", {"reg_profile": 1, "duration_s": 120},
+                long_quiet.replace(f"{_ts(20)} INFO", "Exception in thread image-rx-worker:\n"
+                                   f"{_ts(20)} INFO", 1), "")])
+            self.assertEqual(rc, 1, out)
+            self.assertIn("leakage check: NOT SCORED", out)
+            self.assertIn("the receive worker crashed", out)
             ok = {"reg_profile": 1, "duration_s": 120}
             rc, out = _run(rf.main, ["--leak", _archive(root, "full_leg", ok, long_quiet, "")])
             self.assertEqual(rc, 0, out)                         # 120 s of stats for a 120 s leg
@@ -656,8 +695,44 @@ class A16RuleTests(unittest.TestCase):
             rows[i]["digest"] = "BAD"
         rows[14]["digest"] = "-"                            # no DIGEST: does not break the run
         rows[15]["digest"] = "BAD"
-        runs = dt.mismatch_runs(rows, [(11, 1)], first_key=3)
+        runs = dt.mismatch_runs(rows, [(11, 1)], join=3)
         self.assertEqual(runs, [(1, 2, True), (12, 15, True), (40, 41, False)])
+
+    def test_runs_split_at_a_digest_free_epoch_start(self) -> None:
+        # The base joined mid-epoch (rows 0-9, BAD DIGESTs); the key frame at
+        # row 10 carries no DIGEST and starts the epoch; a loss at row
+        # 12 opens new mismatches on 13-16. The join's run must not swallow them.
+        rows = _rows(60, key_rows=(10,))
+        for r in rows:
+            r["epoch_start"] = r["boundary"] = r["idx"] == 10
+        for i in range(0, 10):
+            rows[i]["digest"], rows[i]["checks"] = "BAD", [(20, 19)]
+        for i in (10, 11, 12):
+            rows[i]["digest"], rows[i]["checks"] = "-", []
+        for i in range(13, 17):
+            rows[i]["digest"], rows[i]["checks"] = "BAD", [(20, 19)]
+        self.assertEqual(dt.join_row(rows), 10)
+        self.assertEqual(dt.mismatch_runs(rows, [(12, 1)], dt.join_row(rows)),
+                         [(0, 9, True), (13, 16, True)])
+        res = dt.score_episodes(rows, [_ep(15, 20)], [(12, 1)])[0]
+        self.assertEqual((res["anchor"], res["loss_row"], res["status"]), (13, 12, "PASS"))
+        for r in rows:                                       # the old rule: one run from row 0
+            r["boundary"] = False
+        self.assertEqual(dt.score_episodes(rows, [_ep(15, 20)], [(12, 1)])[0]["status"], "join")
+
+    def test_join_ends_at_the_repeat_once_anchor(self) -> None:
+        # The key frame was lost: the epoch start the store accepts is its
+        # repeat-once copy (row 3, a delta frame carrying the anchor and
+        # LAYER_CLEAR); the next key frame is row 50.
+        rows = _rows(80, key_rows=(50,))
+        for r in rows:
+            r["epoch_start"] = r["boundary"] = r["idx"] in (3, 50)
+        self.assertEqual(dt.join_row(rows), 3)
+        res = dt.score_episodes(rows, [_ep(22, 30)], [(20, 1)])[0]
+        self.assertEqual((res["status"], res["loss_row"]), ("PASS", 20))
+        for r in rows:                                       # the old first-key rule
+            del r["epoch_start"]
+        self.assertEqual(dt.score_episodes(rows, [_ep(22, 30)], [(20, 1)])[0]["status"], "join")
 
     def test_episode_and_its_mismatch_run_share_the_p1_anchor(self) -> None:
         # Loss at row 10, a DIGEST-quiet stretch (rows 10-33), BAD DIGESTs on
@@ -669,7 +744,7 @@ class A16RuleTests(unittest.TestCase):
             rows[i]["digest"], rows[i]["checks"] = "-", []
         for i in range(34, 38):
             rows[i]["digest"], rows[i]["checks"] = "BAD", [(21, 20)]
-        runs = dt.mismatch_runs(rows, [(10, 1)], first_key=0)
+        runs = dt.mismatch_runs(rows, [(10, 1)], join=0)
         self.assertEqual(runs, [(34, 37, True)])
         res = dt.score_episodes(rows, [_ep(36, 60)], [(10, 1)])[0]
         self.assertEqual((res["anchor"], res["loss_row"]), (34, 10))
@@ -679,7 +754,7 @@ class A16RuleTests(unittest.TestCase):
         res = dt.score_episodes(rows, [_ep(36, 60)], [])[0]
         self.assertEqual(res["status"], "no loss")
         self.assertIn("before row 34, where its DIGEST mismatch run starts", res["reasons"][0])
-        self.assertEqual(dt.mismatch_runs(rows, [], first_key=0), [(34, 37, False)])
+        self.assertEqual(dt.mismatch_runs(rows, [], join=0), [(34, 37, False)])
         # A second loss between the run's start and the resync entry is not
         # what opened it: the episode keeps the loss before the run.
         res = dt.score_episodes(rows, [_ep(36, 60)], [(10, 1), (35, 1)])[0]
@@ -788,6 +863,14 @@ class DigestTraceEndToEndTests(unittest.TestCase):
         rc, out = _run(dt.main, [path, "--horizon", "20", "--strict"])
         self.assertEqual(rc, 1)
         self.assertIn("FAIL (re-opens A16)", out)
+
+    def test_epoch_starts_from_the_replay(self) -> None:
+        # The epoch-start key (frame 44) lost: its repeat-once copy starts the epoch.
+        _dr, rows = dt.replay(dt.load_capture(self._capture(drops={44}))[1], "image_bw500")
+        self.assertEqual([r["idx"] for r in rows if r["epoch_start"]], [0, 44])
+        # The capture opens on a repeat copy (frame 0 lost): still the join.
+        _dr, rows = dt.replay(dt.load_capture(self._capture(drops={0}))[1], "image_bw500")
+        self.assertEqual(dt.join_row(rows), 43)
 
     def test_a_body_the_store_rejects_withholds_the_trace(self) -> None:
         # Frame 5 with a bad version bit (the store tests' trick): a real store rejection.

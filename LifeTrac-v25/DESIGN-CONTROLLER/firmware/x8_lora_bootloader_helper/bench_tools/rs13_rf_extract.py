@@ -35,9 +35,10 @@ level.
 
 Exit 0 when every archive gave its figures (a tracking or R0-range miss is a
 result, printed, not an error); 1 when an archive cannot give them (no rx_rf
-window although frames were published, the stats thread crashed, or the
-windows stop before the frames do -- RS-12.17; with --leak, no `rx_frames=`
-line, a crashed stats thread or receiver, stats lines that stop before the
+window although frames were published, the stats thread or the receive worker
+crashed, or the windows stop before the frames do -- RS-12.17; with --leak, no
+`rx_frames=` line, a crashed stats thread, receive worker or receiver, stats
+lines that stop before the
 log does or cover less than the leg's duration_s, or a DTS leg without the
 FRF read-back at the pick) or, with --leak, when a frame was decoded; 2 on
 missing or garbled input. Only rx_daemon.log (one clock)
@@ -136,6 +137,9 @@ def parse_rx_log(text: str) -> dict:
             "rx_frames_max": max(rx_frames) if rx_frames else None, "t_first": t_first,
             "t_last": t_last, "t_rx_last": t_rx_last,
             "stats_crashed": "Exception in thread image-rx-stats" in text,
+            # Reception runs in its own thread (image_rx_daemon: image-rx-worker); the
+            # stats thread keeps printing zero counters after it dies.
+            "worker_crashed": "Exception in thread image-rx-worker" in text,
             "rx_fatal": "fatal: cannot open L072 HostLink" in text}
 
 
@@ -146,6 +150,9 @@ def leak_unscorable(log: dict, params: dict | None = None) -> str | None:
     thread reported rx_frames to the end of the log and across the leg."""
     if log["stats_crashed"]:
         return "the stats thread crashed (`Exception in thread image-rx-stats`)"
+    if log["worker_crashed"]:
+        return ("the receive worker crashed (`Exception in thread image-rx-worker`): reception "
+                "stopped while the stats kept printing")
     if log["rx_fatal"]:
         return "the receiver never opened its L072 HostLink (`fatal: cannot open L072 HostLink`)"
     if log["rx_frames_max"] is None:
@@ -193,6 +200,9 @@ def unusable(log: dict) -> str | None:
     if log["stats_crashed"]:
         return ("the stats thread crashed (`Exception in thread image-rx-stats`): its rx_rf "
                 "windows stop there and describe only the start of the leg (RS-12.17)")
+    if log["worker_crashed"]:
+        return ("the receive worker crashed (`Exception in thread image-rx-worker`): reception "
+                "stopped there, so the windows describe only the start of the leg")
     pub = log["published"]
     if pub and not log["windows"]:
         return (f"{len(pub)} frames published but no rx_rf window: the base daemon predates "

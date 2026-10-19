@@ -15,7 +15,13 @@ count at the check (RS13_RANGE_EDGE_LEG.md, Round A "A16 confirmation"):
   or on its first row when no run holds it; it is opened by the last loss at
   or before that anchor, within --horizon rows -- the same measure as the
   mismatch runs' P1 check below. An episode anchored before the first epoch
-  start in the capture is the base's join;
+  start the store accepts (a key frame, or the repeat-once copy of its anchor
+  + LAYER_CLEAR when the key was lost inside the capture, i.e. the copy
+  switched the store out of an epoch it already held; a mid-epoch anchor, or
+  a copy that opens the capture, is not one: the base still lacks the shapes
+  defined before it joined) is the base's join.
+  A mismatch run ends at an OK DIGEST and at an epoch switch or epoch start,
+  so a join's mismatches never run into a later loss's;
 * the loss is isolated when it is one lost frame (a seq gap of one) and no
   other loss falls within --horizon rows after it; a gap of two or more
   frames is a burst, which the rule's single-loss recovery bound does not
@@ -126,8 +132,11 @@ def replay(frames: list, profile: str) -> tuple[object, list[dict]]:
 
     Per row: idx, t (s from the first row), codec, kind, seq, vector, wire,
     records, digest ("ok" / "BAD" / "-"), checks [(encoder n_live, base live
-    count at the check)], orph_add, ttl, resync, and the live ids the frame
-    added / removed."""
+    count at the check)], orph_add, ttl, resync, the live ids the frame
+    added / removed, epoch_start (an applied key frame, or the key's
+    repeat-once copy -- anchor + LAYER_CLEAR -- when the key was lost inside
+    the capture: it switched the store out of an epoch it already held) and
+    boundary (epoch_start, or the frame switched the store's epoch)."""
     dr = vdr.DryRun(profile)
     store = dr.store
     cur: list = []
@@ -141,7 +150,16 @@ def replay(frames: list, profile: str) -> tuple[object, list[dict]]:
     rows, prev_ids, po = [], set(), 0
     for ts, payload in frames:
         cur.clear()
+        held = store._epoch                       # None until the store applied a VECTOR frame
         r = dr.feed(payload, ts)
+        switched = bool(getattr(r, "epoch_switched", False))
+        # A lost key's repeat-once copy is an epoch start only when it switched the
+        # store out of an epoch it already held (the key's loss is then a seq gap);
+        # a copy that opens the store's first epoch (the capture, or the VECTOR run
+        # after a codec switch, begins on it) is still the join.
+        start = bool(r.vector and getattr(r, "applied", False)
+                     and (r.frame_kind == FRAME_KIND_KEY
+                          or (switched and held is not None and store._epoch_clear is not None)))
         st = store.stats
         ids = {sh.id for sh in store._live()}
         rows.append({"idx": r.idx, "t": r.t_rel, "parsed": r.parsed, "codec": r.codec,
@@ -149,7 +167,8 @@ def replay(frames: list, profile: str) -> tuple[object, list[dict]]:
                      "records": r.records, "digest": r.digest, "checks": list(cur),
                      "orph_add": st["orphans"] - po, "ttl": st["ttl_dropped"],
                      "resync": bool(st["resync"]), "added": sorted(ids - prev_ids),
-                     "removed": sorted(prev_ids - ids)})
+                     "removed": sorted(prev_ids - ids), "epoch_start": start,
+                     "boundary": start or switched})
         po, prev_ids = st["orphans"], ids
     return dr, rows
 
@@ -195,15 +214,30 @@ def _check(row: dict):
     return row["checks"][-1] if row["checks"] else None
 
 
-def mismatch_runs(rows: list[dict], gaps: list, first_key: int | None,
+def join_row(rows: list[dict]) -> int | None:
+    """The first epoch start the store accepted: the base's join ends there
+    (a key frame, or its repeat-once copy when the key was lost). Hand-built
+    rows without the replay's ``epoch_start`` field fall back to the first
+    key frame."""
+    if rows and "epoch_start" in rows[0]:
+        return next((r["idx"] for r in rows if r["epoch_start"]), None)
+    return next((r["idx"] for r in rows if r["vector"] and r["kind"] == FRAME_KIND_KEY), None)
+
+
+def mismatch_runs(rows: list[dict], gaps: list, join: int | None,
                   horizon: int = HORIZON) -> list[tuple[int, int, bool]]:
-    """Runs of BAD DIGESTs (rows with no DIGEST do not break a run):
-    ``(first row, last row, explained)``; explained = the run starts within
-    ``horizon`` rows after a seq gap, or before the first epoch start (the
-    join)."""
+    """Runs of BAD DIGESTs: ``(first row, last row, explained)``. A run ends
+    at an OK DIGEST and before a ``boundary`` row (an epoch switch or epoch
+    start: its check follows the reset); rows
+    with no DIGEST do not break it. explained = the run starts within
+    ``horizon`` rows after a seq gap, or before ``join`` (join_row: the
+    base's join)."""
     loss = [g[0] for g in gaps]
     runs, cur = [], None
     for r in rows:
+        if r.get("boundary") and cur is not None:
+            runs.append(cur)
+            cur = None
         if r["digest"] == "BAD":
             cur = [r["idx"], r["idx"]] if cur is None else [cur[0], r["idx"]]
         elif r["digest"] == "ok" and cur is not None:
@@ -213,7 +247,7 @@ def mismatch_runs(rows: list[dict], gaps: list, first_key: int | None,
         runs.append(cur)
     out = []
     for a, b in runs:
-        joined = first_key is None or a < first_key
+        joined = join is None or a < join
         out.append((a, b, joined or any(0 <= a - L <= horizon for L in loss)))
     return out
 
@@ -258,9 +292,9 @@ def score_episodes(rows: list[dict], episodes: list[dict], gaps: list, *,
     loss = [g[0] for g in gaps]
     lost = dict(gaps)                                 # row -> frames lost in its gap
     last_row = rows[-1]["idx"]
-    first_key = next((r["idx"] for r in rows if r["vector"] and r["kind"] == FRAME_KIND_KEY), None)
+    join = join_row(rows)
     if runs is None:
-        runs = mismatch_runs(rows, gaps, first_key, horizon)
+        runs = mismatch_runs(rows, gaps, join, horizon)
     by_idx = {r["idx"]: r for r in rows}
     out, prev_loss = [], None
     for e in episodes:
@@ -270,12 +304,13 @@ def score_episodes(rows: list[dict], episodes: list[dict], gaps: list, *,
         out.append(res)
         anchor = next((a for a, b, _ in runs if a <= e["start"] <= b), e["start"])
         res["anchor"] = anchor
-        if first_key is None or anchor < first_key:
+        if join is None or anchor < join:
             res["status"] = "join"
             res["reasons"].append(
                 ("starts" if anchor == e["start"] else f"its DIGEST mismatch run starts (row "
-                 f"{anchor})") + " before the first epoch start in the capture (the base "
-                "joining mid-epoch)")
+                 f"{anchor})") + " before the first epoch start in the capture ("
+                + (f"row {join}" if join is not None else "none") + ": the base joining "
+                "mid-epoch)")
             continue
         prior = [L for L in loss if L <= anchor]
         if not prior or anchor - prior[-1] > horizon:
@@ -388,7 +423,13 @@ def _marks(rows, gaps, episodes) -> dict:
         if e["end"] is not None:
             marks.setdefault(e["end"], []).append(f"resync out ({e['ended_by']})")
     for r in rows:
-        if r["vector"] and r["kind"] == FRAME_KIND_KEY:
+        if r.get("epoch_start"):
+            marks.setdefault(r["idx"], []).append(
+                "epoch start" if r["kind"] == FRAME_KIND_KEY
+                else "epoch start (repeat-once copy of a lost key)")
+        elif r.get("boundary"):
+            marks.setdefault(r["idx"], []).append("epoch switch")
+        elif "epoch_start" not in r and r["vector"] and r["kind"] == FRAME_KIND_KEY:
             marks.setdefault(r["idx"], []).append("epoch start")
     return marks
 
@@ -437,8 +478,7 @@ def analyse(path: str, profile_arg: str | None, horizon: int, tail: int,
         raise TraceError(f"internal: seq-gap rows sum to {sum(n for _, n in gaps)} but "
                          f"rs12_leg_report counts {seq['lost']}")
     loss_pct = 100.0 * seq["lost"] / seq["expected"] if seq["expected"] else 0.0
-    first_key = next((r["idx"] for r in rows if r["vector"] and r["kind"] == FRAME_KIND_KEY), None)
-    runs = mismatch_runs(rows, gaps, first_key, horizon)
+    runs = mismatch_runs(rows, gaps, join_row(rows), horizon)
     eps = score_episodes(rows, dr.resync_episodes(), gaps, horizon=horizon, tail=tail,
                          loss_pct=loss_pct, max_loss_pct=max_loss, runs=runs)
     return {"path": path, "leg": leg_name(path), "profile": profile, "dr": dr, "rows": rows,
