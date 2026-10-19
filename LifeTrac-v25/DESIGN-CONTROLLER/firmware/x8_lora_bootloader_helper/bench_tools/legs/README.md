@@ -215,7 +215,11 @@ How to fly and read them:
 
 `leg_prep.sh` knows the leg names of
 [RS13_RANGE_EDGE_LEG.md](../RS13_RANGE_EDGE_LEG.md), each optionally
-followed by a `_suffix` (`A2a_r2`):
+followed by a `_suffix` (`A2a_r2`). Since 2026-10-19 only the `A2*` tags are
+planned: they are to fly on the antennas (the §8.6 command-delivery row and
+the A16 confirmation), on the operator's explicit GO for the round (RS13_RANGE_EDGE_LEG.md, "Safety and GO rules"). The `leak_*`, `B*`, `C*` and
+`*close` tags need the conducted attenuator path, which the bench does not
+have, so they are not planned. `leg_prep.sh` still accepts them.
 
 | tag | prep | harness | base capture |
 |---|---|---|---|

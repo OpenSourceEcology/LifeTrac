@@ -316,7 +316,7 @@ None of these decisions is implemented. Each one lists its options and a **RECOM
 - **Rendezvous:** a deaf base parks on the rendezvous channel; a deaf tractor sweeps `RUNG_HELLO` across the hop set (one channel per slot; every 2 s on DTS); a healthy tractor beacons once per 10 s on the rendezvous channel (12 B on air, 0.7 % of airtime at F2), naming its working rung so a parked base retunes to it directly; the cold-start scan parks there first.
 - **Policy:** down one rung when the SNR margin is below 3 dB for 2 windows and the vector ladder is already at V2 and the tractor is stopped; up one rung after 6 healthy windows; a profile switch resets the rung to the profile's fastest.
 
-**RECOMMENDATION: B, after the range-edge leg of `VECTOR_SCENE.md` §8.6 shows where SF7 runs out.** Ship the L072 key, the schema-2 header field and the beacon first (they are useful for diagnosis alone), then the handshake, then the policy.
+**RECOMMENDATION: B, after field range data from a distance test shows where SF7 runs out.** Ship the L072 key, the schema-2 header field and the beacon first (they are useful for diagnosis alone), then the handshake, then the policy. *Gate changed 2026-10-19:* there will be no attenuation tests, because the bench has no attenuators, so the range-edge leg of `VECTOR_SCENE.md` §8.6 will not run. The decision is unchanged; only its gate moved. The gate was "after the range-edge leg of `VECTOR_SCENE.md` §8.6 shows where SF7 runs out".
 
 ### D-VS9 — Control-plane resilience before the drive plane ships
 

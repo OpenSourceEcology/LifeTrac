@@ -590,8 +590,11 @@ wrapper you run in PowerShell; prefer it to typing the lines below.
   legs flown with `-ReactiveFire 1 -ProbeEcho 0`, scored as tractor
   `LoRa cmd: PROBE … (rx#N)` lines over base `PROBE TX … (tx#N)` lines, and kept
   out of the image-loss record. RS-13.1 left that row unmeasured (RESULTS,
-  "Remaining radio tests"); the range-edge session measures it at its 0 dB
-  step ([RS13_RANGE_EDGE_LEG.md](RS13_RANGE_EDGE_LEG.md), Round A).
+  "Remaining radio tests"). The legs planned to measure it are the
+  interleaved DTS legs `A2c`, `A2a`, `A2c2`, `A2a2` of
+  [RS13_RANGE_EDGE_LEG.md](RS13_RANGE_EDGE_LEG.md), to fly on the antennas
+  (2026-10-19: the attenuator session is not planned; see that file's
+  status).
 - **2d — switch leg, DTS, boots `mono_g4`** (same command as 2c). At T+60 s
   and T+180 s, on the base board, publish the operator override the way
   `web_ui` does (`rx_smoke` relays it as a 0x63 command and republishes the
@@ -649,6 +652,10 @@ GO for RS-13.2 (browser desk check on the production compose, then the
 attenuator range-edge leg, [RS13_RANGE_EDGE_LEG.md](RS13_RANGE_EDGE_LEG.md))
 when 2a, 2b and 2d pass and 2c's baseline is on record. NO-GO otherwise, with
 the failing row named in the RESULTS verdict.
+
+*2026-10-19: the attenuator range-edge leg is not planned (the bench has no
+attenuator path). Only its `A2c`, `A2a`, `A2c2`, `A2a2` legs remain, to fly on
+the antennas ([RS13_RANGE_EDGE_LEG.md](RS13_RANGE_EDGE_LEG.md), status).*
 
 ## Evidence layout
 
