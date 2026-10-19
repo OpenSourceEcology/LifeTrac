@@ -28,7 +28,7 @@ def leg(arch):
         if m and int(m.group(2)) > -60 and float(m.group(1)) < -5: hot.append(t)
     lost = []
     for (t0, s0), (t1, s1) in zip(arr, arr[1:]):
-        d = (s1 - s0) % 65536
+        d = (s1 - s0) % 256        # the logged fragment seq is 8-bit (image_tx_daemon.py: `& 0xFF`)
         if 1 < d < 50:
             for k in range(1, d):
                 lost.append(t0 + (t1-t0)*k/d)
