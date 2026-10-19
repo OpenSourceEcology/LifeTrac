@@ -8,11 +8,13 @@
 #
 # Usage:   bash stage_boards.sh [--probes-only] [base|tractor ...]     (default: both)
 #   --probes-only   only the radio probe tools + paho (what power_up_guard.sh
-#                   stages); no code tree, no injectors
+#                   stages) and, on the tractor, 08_boot_user_app.cfg; no code
+#                   tree, no injectors, no channel survey
 # Inputs:  lib/bench_env.sh settings (serials, BASE_TRANSPORT, ...); the files of
 #          THIS checkout (repo-root _paho_pull/paho, the helper probes, bench_tools,
 #          base_station, tools/, firmware/tractor_x8).
-# Writes:  board: /tmp/lifetrac_strict/{probes,bench tools,paho,code tree,legs/},
+# Writes:  board: /tmp/lifetrac_strict/{probes,bench tools,channel_survey_sniff.py,paho,
+#          code tree,legs/},
 #          /tmp/lifetrac_p0c/08_boot_user_app.cfg (tractor; LF-clean);
 #          PC: md5 record appended to $EVIDENCE_DIR/staging_<role>.txt.
 # Boards:  copies files and creates the two staging folders (mode 0777); runs an
@@ -21,7 +23,8 @@
 # Origin:  bench-evidence/RS_13_vector_scene_2026-09-26/scripts/stage_boards.sh
 #          (historical copy, unchanged). New here: env-driven paths/serials, the
 #          LF-clean 08_boot_user_app.cfg, md5 verification of every pushed file,
-#          ssh support for the base.
+#          ssh support for the base, channel_survey_sniff.py for the range edge's
+#          spot-check.
 set -u
 . "$(dirname "${BASH_SOURCE[0]}")/../lib/bench_env.sh" || exit 1
 
@@ -39,9 +42,12 @@ done
 H="$HELPER_DIR"
 PROBES=("$H/method_g_stage1_probe.py" "$H/method_h_stage2_tx_probe_v2.py" "$H/rs115_stats_probe.py"
         "$H/rs116_health_probe.py" "$BT_DIR/radio_park.py" "$BT_DIR/radio_state.py")
+# channel_survey_sniff.py: the receive-only channel spot-check, run on the base before
+# the first DTS leg of the day (RS13_RANGE_EDGE_LEG.md Prep 4; it imports
+# method_h_stage2_tx_probe_v2 from the probes above)
 TOOLS=("$BT_DIR/clear_retained.py" "$BT_DIR/clear_retained_host.py" "$BT_DIR/frag_gap_report.py"
        "$BT_DIR/kf_inject.py" "$BT_DIR/dual_inject.py" "$DC/base_station/image_rx_daemon.py"
-       "$DC/base_station/cmd_timing.py")
+       "$DC/base_station/cmd_timing.py" "$H/channel_survey_sniff.py")
 PAHO="$REPO_ROOT/_paho_pull/paho"
 [ -d "$PAHO" ] || die "missing $PAHO (repo-root _paho_pull/paho, tracked in git)"
 

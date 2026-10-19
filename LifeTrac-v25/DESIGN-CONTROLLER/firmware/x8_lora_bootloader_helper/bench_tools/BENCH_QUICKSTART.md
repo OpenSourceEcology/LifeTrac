@@ -219,7 +219,8 @@ Wheel versions are pinned in the `requirements.lock.txt` files next to each
    This re-pushes `/tmp/lifetrac_strict` on both boards. Run it after any
    reboot (and every flash reboots) or when the last push is 5 days old,
    because `systemd-tmpfiles` ages `/tmp`. Afterwards,
-   `ls /tmp/lifetrac_strict | wc -l` must be at least 19. The flash staging
+   `ls /tmp/lifetrac_strict | wc -l` must be at least 19 (23 on a fresh full
+   staging, `channel_survey_sniff.py` included). The flash staging
    in `/tmp/lifetrac_p0c` is separate: `flash_l072.sh <board> <bin>` without
    `--go` re-stages it and runs the wrapper's preflight, and `PREFLIGHT-OK`
    means it is complete.
@@ -243,7 +244,8 @@ Wheel versions are pinned in the `requirements.lock.txt` files next to each
 
    ```bash
    CAND=<candidate carrier in Hz>
-   scp -i "$BASE_SSH_KEY" $DC/firmware/x8_lora_bootloader_helper/channel_survey_sniff.py "$BASE_SSH_USER@$BASE_HOST:/tmp/lifetrac_strict/"
+   # channel_survey_sniff.py is staged by legs/stage_boards.sh (step 2); after a
+   # --probes-only or power_up_guard.sh staging run: bash "$BT/legs/stage_boards.sh" base
    $BASE "sudo docker rm -f rx_smoke 2>/dev/null; sudo $R -e LIFETRAC_REG_PROFILE=2 $BI -u /work/channel_survey_sniff.py --start-hz $CAND --stop-hz $CAND --step-hz 500000 --dwell-s 45 --interval-s 0.05" | tee spot_$(date +%F).txt
    py -3 $DC/tools/survey_compare.py spot_$(date +%F).txt
    ```
@@ -302,6 +304,12 @@ helper directory with the serials, `-HostIp` and `-ForceFrfHz` from
 `leg_post.sh`. If PowerShell says that running scripts is disabled, see
 [PC_SETUP.md](PC_SETUP.md#powershell-execution-policy).
 
+The harness output ends with `=== LEG CHECKS ===`, just above the
+`[EVIDENCE]` line. `TRACTOR_L072_RESET landed` is the normal line; `failed`
+or `unknown` means score the tractor brackets with `deltas.py` (reset-aware;
+BENCH_RUNBOOK, "A leg"). `BASE_L072_RESET unverified` prints on every leg
+until the RS-5.2 base follow-up is done.
+
 If you must type the harness command yourself, it is the line below, with
 every `<...>` replaced by your `bench.env` values. Typed by hand, it skips
 `leg_prep.sh`'s carrier gate and the archive record, so pass the archive to
@@ -311,7 +319,7 @@ every `<...>` replaced by your `bench.env` values. Typed by hand, it skips
 cd LifeTrac-v25\DESIGN-CONTROLLER\firmware\x8_lora_bootloader_helper
 .\run_live_radio_monitor.ps1 -TxAdbSerial <TRACTOR_SERIAL> -RxAdbSerial <BASE_SERIAL> -HostIp <PC_HOST> `
    -TxFeed camera -RegProfile 2 -ForceFrfHz <DTS_CARRIER_HZ from today's spot-check> -DurationS 300 -SynthFps 2 `
-   -KfRequestDisable 1 -ProbeEcho 0 -LogFragArrivals 1 -TxBatch 0 `
+   -KfRequestDisable 1 -ReactiveFire 0 -ProbeEcho 0 -LogFragArrivals 1 -TxBatch 0 `
    -CamExtraEnv "-e LIFETRAC_ENCODE_MODE=9 -e LIFETRAC_VECTOR_DETAIL=80" -Archive
 ```
 
@@ -323,6 +331,13 @@ The other RS-13 legs (legs/README.md, "The four RS-13 legs"):
   (`-CamExtraEnv "-e LIFETRAC_ENCODE_MODE=6"`).
 - 2d is the over-the-air switch: `leg_prep.sh 2d image_bw500`, then
   `leg2d_switch.sh 2d` right after the harness launch.
+- The range-edge session ([RS13_RANGE_EDGE_LEG.md](RS13_RANGE_EDGE_LEG.md))
+  uses its own leg names: `leg_prep.sh A2c`, `leg_prep.sh B12v --duration 120`
+  and so on (legs/README.md, "Range-edge legs"). The tag sets the profile,
+  codec, probes and length.
+- A command-plane leg adds `-InjectCmd "<injector> <args>"` to the harness
+  line; the harness starts the injector on the base at the first published
+  frame (BENCH_RUNBOOK, "A leg").
 
 **Not flying after the prep after all** (no GO, the harness refused, the
 round was aborted)? `leg_prep.sh` has woken both receivers and left the base
@@ -361,6 +376,13 @@ gives the post-lock sequence gaps and the P1 resync episodes; it reads
 The loss of record is the report's `capture seq gaps` line. The counter
 `loss` line can be stale (RS13_VECTOR_LEG A14) or frozen by a dead stats
 thread (RS-12.17).
+
+The range-edge session adds three scoring helpers in `bench_tools/`, run by
+hand (`leg_post.sh` does not run them): `rs13_rf_extract.py` (received level,
+R0, leakage, tracking and closing checks), `rs13_probe_score.py` (command
+delivery) and `rs13_digest_trace.py` (A16 confirmation). They take paths, so
+they need no copy; each exits non-zero on missing or garbled input.
+RS13_RANGE_EDGE_LEG.md says which to run per leg.
 
 ## 8. Park and power down
 

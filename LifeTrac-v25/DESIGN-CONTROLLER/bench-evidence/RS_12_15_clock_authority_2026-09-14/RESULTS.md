@@ -19,6 +19,11 @@ state: both L072s run v2 (`5a160e4a`), parked.**
 
 Both radios parked (0x80).
 
+**Errata (2026-10-18):** see [ERRATA.md](ERRATA.md). It covers the tractor
+L072 restarts at the start of legs Q2 and P, the cause of leg R's negative
+loss line, and the counting method behind the 09-14 loss figures. No
+conclusion in this file changes.
+
 ## The fix
 
 Root cause (from RS-12.12/14): every profile-1 follower lock loss began
@@ -71,6 +76,14 @@ firmware, so leg L vs O/P is a clean firmware A/B.
 | L (old) | RS-12.10 `e8ad8424` | 7.8 % | 49 | 0 | 0.8 s |
 | O (new) | RS-12.15 `2ee69f9c` | 0.3 % | 28 | 0 | 0.6 s |
 | P (new) | RS-12.15 `2ee69f9c` | 4.9 % | 20 | 0 | 0.6 s |
+
+*Note (2026-10-18): the loss column comes from each daemon's last periodic
+stats line, and the figures depend on the counting method. Event-based
+re-derivations give L 6.8–7.8 %, O 2.2 % and P 2.8–5.7 %
+([ERRATA.md](ERRATA.md) §3). Reading 3's conclusion is unchanged: the
+difference is still not distinguishable at this n. But leg O's 0.3 % was
+mostly a counting artifact (2.2 % over the shared window), not only a
+low-interference window.*
 
 ## Honest reading
 
@@ -233,6 +246,19 @@ All flashes Verify OK / flash_rc=0. Radios parked 0x80 both after leg R.
 | Q  | e8ad8424 | 1.5 fps / 400 B | kf 15x20 | 0.6 % | 0 | 0 |
 | Q2 | e8ad8424 | 2 fps / 400 B   | kf 15x20 | 6.5 % | 3 | 0 |
 
+**Note (2026-10-18):** the tractor L072 restarted at the start of leg Q2.
+That was after the pre bracket and before any leg traffic: its FAULT-URC
+uptimes put the boot 3.4 s before the TX daemon opened. Q2 tractor deltas are
+therefore the post values, so `radio_tx_ok` is 1136, not 886→1136 = 250. The
+one tractor figure quoted here, 3 commands received, is the same either way
+(pre 0) and matches the tractor log. Leg P's tractor L072 restarted the same
+way. P was the other leg flown without a flash before it, and its FAULT-URC
+uptimes put the boot 3.6 s before its TX daemon opened. P has no tractor post
+bracket, so no figure depends on it. No other leg's L072 restarted. The loss
+column has the same stats-line caveat as the L/O/P table above: Q reads
+0.9–2.5 % and Q2 5.4–7.4 % by the event-based methods. See
+[ERRATA.md](ERRATA.md) §1–§3.
+
 Neither reproduced the lock loss. The mechanism needs the tractor BOTH to
 receive commands AND to pause its own TX for > 2 s so the LOCK_LOSS timer
 fires and demotes it. The steady synth publisher delivers neither: the
@@ -271,6 +297,17 @@ The follower held (frag gaps: max 0.6 s, none > 3 s); no regression.
 The base-bracket loss line read negative (a bracket artifact: the base
 follower scan-reset once mid-leg, perturbing its radio_rx_ok pre/post
 delta), so follower health here is the frag-gap metric, not that number.
+
+**Correction (2026-10-18):** the negative line was not a reset of any kind.
+- The base brackets show no L072 restart.
+- The base's one `clk_demotion_reset` is the demotion at the end of the leg.
+  No fragment gap exceeds 0.6 s, so no 2 s lock loss happened mid-leg.
+- The loss line never read `radio_rx_ok`.
+
+The cause is that the logs cover different windows. The TX log ends mid-train
+(seq 49, idx 11), and the base decodes 28 more fragments after that. Over the
+window both logs cover, 1212 fragments were sent and 1207 decoded (0.4 %).
+The frag-gap conclusion above stands. See [ERRATA.md](ERRATA.md) §2.
 
 ### What remains
 

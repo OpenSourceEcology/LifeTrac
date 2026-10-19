@@ -3,24 +3,50 @@
 # RS13_VECTOR_LEG.md step 2: no radio-UART holders, scene check, health probes on
 # both boards, clear_retained on the base broker, pre-brackets on both boards,
 # then the base-side vector_dry_run capture started DETACHED on the base (it
-# outlives this script and covers the harness's 300 s leg with --duration 480).
-# Ends by printing (and saving) the harness command for this leg.
+# outlives this script and runs for the leg's length plus 180 s: --duration 480
+# for a 300 s leg). Ends by printing (and saving) the harness command for this leg.
 #
-# Usage:   bash leg_prep.sh <leg> <image_bw500|image_bw250> [options]
+# Usage:   bash leg_prep.sh <leg> [image_bw500|image_bw250] [options]
 #   <leg>          tag used in every file name, e.g. 2a, 2b_yt, 2c_r5 (letters,
 #                  digits, '_', '.', '-' only)
 #   image_bw500    DTS profile 2 (refused unless DTS_CARRIER_HZ is set, see below)
-#   image_bw250    FHSS profile 1
+#   image_bw250    FHSS profile 1 (may be left out for a range-edge tag)
+# Range-edge tags (RS13_RANGE_EDGE_LEG.md "Leg names"; a _suffix such as _r2 may
+# follow): the tag sets the profile, the codec at boot, the probes and, where the
+# procedure fixes it, the length. Every line has -TxBatch 0 -ProbeEcho 0, and every
+# DTS line -ForceFrfHz (the DTS gate below).
+#   leak_dts | leak_fhss  leakage check: VECTOR, 120 s, -ReactiveFire 0, capture
+#                         without --strict (it must stay empty)
+#   A2c A2c2 | A2a A2a2   Round A, the 0 dB step (DTS): mono_g4 | VECTOR, 300 s,
+#                         -ReactiveFire 1
+#   B<step>m | B<step>v   Round B, the DTS walk: mono_g4 | VECTOR, -ReactiveFire 1
+#   C<step>m | C<step>v   Round C, the FHSS walk: mono_g4 | VECTOR, -ReactiveFire 0
+#                         A walk leg needs --duration 120 (coarse) or 180 (fine), the
+#                         step plan's choice; C0m / C0v (FHSS's 0 dB pair) are 180 s.
+#   B0close | C0close     closing check: VECTOR, 120 s, DTS with probes | FHSS without
+#   <step> is the step chain in dB: 0 to 66 in 3 dB steps. A tag that starts like one
+#   of these (leak, A2, B or C and a digit, in any letter case) but is none of them
+#   is refused, and so is a profile or --boot-mode that contradicts the tag. Other
+#   tags keep the RS-13.1 defaults below.
 # Options:
-#   --boot-mode vector|mono_g4   camera mode at boot (default: mono_g4 for legs
-#                  named 2c* / 2d*, vector otherwise)
+#   --boot-mode vector|mono_g4   camera mode at boot (default: from a range-edge tag;
+#                  else mono_g4 for legs named 2c* / 2d*, vector otherwise)
+#   --duration S   leg length, the harness -DurationS (default: from a range-edge tag,
+#                  else 300)
+#   --reactive-fire 0|1   the harness -ReactiveFire: 1 = the base fires a no-op PROBE
+#                  per received frame, scored tractor-side (default: from a
+#                  range-edge tag, else 0, the harness default)
 #   --fps N        camera rate for the harness -SynthFps (default 2)
-#   --strict | --no-strict   base capture --strict (default: strict, except 2c*/2d*)
-#   --min-frames N base capture --min-frames (default 500 at 2 fps; 250 at 1 fps,
-#                  200 for an FHSS leg at 1 fps -- RS13_VECTOR_LEG.md 2b)
+#   --strict | --no-strict   base capture --strict (default: strict on a VECTOR leg;
+#                  not on 2c*/2d*, a mono_g4 range-edge leg or the leakage check)
+#   --min-frames N base capture --min-frames (default 500 / 300 / 200 for a 300 / 180 /
+#                  120 s leg at 2 fps; for a 300 s leg at 1 fps 250, or 200 on FHSS --
+#                  RS13_VECTOR_LEG.md 2b)
 #   --no-scene-check   skip the scene check (only for a leg without the camera)
 #   --print-harness    only write and print the harness command (after the DTS
 #                  gate); touches no board, starts no capture -- a preview
+#   On a range-edge tag, --duration, --reactive-fire, --fps and --strict/--no-strict
+#   override the procedure's value; the prep then prints a NOTE naming each one.
 # Inputs:  lib/bench_env.sh settings; DTS_CARRIER_HZ / DTS_CARRIER_DATE for profile 2;
 #          PC_HOST (the harness -HostIp; when empty, this PC's only IPv4 address on
 #          BASE_HOST's /24, or its only IPv4 address at all, is used and printed --
@@ -35,15 +61,18 @@
 #          launch next does. Run it only on the operator's explicit GO for this leg.
 # Origin:  bench-evidence/RS_13_vector_scene_2026-09-26/scripts/leg_prep.sh
 #          (historical copy, unchanged). New here: DTS carrier gate, UART-holder
-#          abort, defaults by leg name, the printed harness command.
+#          abort, defaults by leg name, the printed harness command, the range-edge
+#          tags, --duration and --reactive-fire.
 set -u
 . "$(dirname "${BASH_SOURCE[0]}")/../lib/bench_env.sh" || exit 1
 
-LEG=""; PROFILE=""; MODE=""; FPS=2; STRICT=""; MINF=""; SCENE=1; PRINT_ONLY=0
+LEG=""; PROFILE=""; MODE=""; FPS=""; STRICT=""; MINF=""; SCENE=1; PRINT_ONLY=0; DUR=""; FIRE=""
 while [ $# -gt 0 ]; do
   case $1 in
     --print-harness) PRINT_ONLY=1 ;;
     --boot-mode) MODE=${2:?--boot-mode vector|mono_g4}; shift ;;
+    --duration) DUR=${2:?--duration S}; shift ;;
+    --reactive-fire) FIRE=${2:?--reactive-fire 0|1}; shift ;;
     --fps) FPS=${2:?--fps N}; shift ;;
     --strict) STRICT="--strict" ;;
     --no-strict) STRICT="none" ;;
@@ -55,24 +84,87 @@ while [ $# -gt 0 ]; do
   esac
   shift
 done
-[ -n "$LEG" ] && [ -n "$PROFILE" ] || { bench_usage; exit 2; }
+[ -n "$LEG" ] || { bench_usage; exit 2; }
 bench_check_name "leg tag" "$LEG"
 case $PROFILE in
-  image_bw500) REGP=2 ;;
-  image_bw250) REGP=1 ;;
+  ''|image_bw500|image_bw250) ;;
   *) die "profile must be image_bw500 (DTS, profile 2) or image_bw250 (FHSS, profile 1), not '$PROFILE'" ;;
 esac
-case $LEG in 2c*|2d*) def_mode=mono_g4; def_strict=none ;; *) def_mode=vector; def_strict=--strict ;; esac
-MODE=${MODE:-$def_mode}; STRICT=${STRICT:-$def_strict}; [ "$STRICT" = none ] && STRICT=""
+
+# --- range-edge legs (RS13_RANGE_EDGE_LEG.md "Leg names" and "Leg lines") --------------
+# The tag fixes the profile, the codec at boot and the probes; the length too, except
+# on a walk step (coarse 120 s or fine 180 s is the step plan's call).
+RE=""; RE_NOTE=""
+if [[ $LEG =~ ^(leak_dts|leak_fhss|A2[ac]2?|[BC]0close|[BC](0|[1-9][0-9]?)[vm])(_[A-Za-z0-9_.-]+)?$ ]]; then
+  RE=${BASH_REMATCH[1]}
+elif [[ ${LEG,,} =~ ^(leak|a2|[bc][0-9]) ]]; then
+  die "leg tag '$LEG' looks like a range-edge leg but is none of RS13_RANGE_EDGE_LEG.md's names: leak_dts, leak_fhss, A2c, A2a, A2c2, A2a2, B<step>v|m, C<step>v|m, B0close, C0close (step 0..66 dB in 3 dB steps, no leading zero), each optionally with a _suffix"
+fi
+if [ -n "$RE" ]; then
+  re_dur=""; re_strict=""
+  case $RE in
+    leak_dts|leak_fhss)
+      [ $RE = leak_dts ] && re_prof=image_bw500 || re_prof=image_bw250
+      re_mode=vector; re_fire=0; re_dur=120; re_strict=none
+      re_what="leakage check (${RE#leak_}): jack pads terminated, the base must decode NO frame (the capture stays empty; its min_frames fails by design)" ;;
+    A2c|A2c2) re_prof=image_bw500; re_mode=mono_g4; re_fire=1; re_dur=300; re_what="Round A, 0 dB step, mono_g4 (fly 2c, 2a, 2c', 2a' in that order)" ;;
+    A2a|A2a2) re_prof=image_bw500; re_mode=vector; re_fire=1; re_dur=300; re_what="Round A, 0 dB step, VECTOR (fly 2c, 2a, 2c', 2a' in that order)" ;;
+    B0close) re_prof=image_bw500; re_mode=vector; re_fire=1; re_dur=120; re_what="Round B closing check: step chain back at 0 dB, VECTOR" ;;
+    C0close) re_prof=image_bw250; re_mode=vector; re_fire=0; re_dur=120; re_what="Round C closing check: step chain back at 0 dB, VECTOR" ;;
+    *) step=${RE:1:${#RE}-2}
+       { [ $((step % 3)) = 0 ] && [ "$step" -le 66 ]; } || die "leg $LEG: $step dB is not a step of the step set (0 to 66 dB in 3 dB steps)"
+       case $RE in *v) re_mode=vector ;; *m) re_mode=mono_g4 ;; esac
+       case $RE in
+         B*) re_prof=image_bw500; re_fire=1; re_what="Round B, DTS walk, step $step dB, $re_mode" ;;
+         C*) re_prof=image_bw250; re_fire=0; re_what="Round C, FHSS walk, step $step dB, $re_mode"
+             [ "$step" = 0 ] && re_dur=180 ;;
+       esac ;;
+  esac
+  if [ -z "$re_strict" ]; then [ $re_mode = vector ] && re_strict=--strict || re_strict=none; fi
+  PROFILE=${PROFILE:-$re_prof}
+  [ "$PROFILE" = "$re_prof" ] || die "leg $LEG flies $re_prof ($([ $re_prof = image_bw500 ] && echo DTS, profile 2 || echo FHSS, profile 1); RS13_RANGE_EDGE_LEG.md 'Leg names'), not $PROFILE"
+  [ -z "$MODE" ] || [ "$MODE" = "$re_mode" ] || die "leg $LEG boots $re_mode (its tag names the codec); --boot-mode $MODE contradicts it -- use the tag that names $MODE"
+  # an explicit option that differs from the procedure is kept, and named in a NOTE
+  if [ -n "$DUR" ] && [ -n "$re_dur" ] && [ "$DUR" != "$re_dur" ]; then RE_NOTE="$RE_NOTE --duration $DUR (procedure: $re_dur);"; fi
+  if [ -n "$FIRE" ] && [ "$FIRE" != "$re_fire" ]; then RE_NOTE="$RE_NOTE --reactive-fire $FIRE (procedure: $re_fire);"; fi
+  if [ -n "$FPS" ] && [ "$FPS" != 2 ]; then RE_NOTE="$RE_NOTE --fps $FPS (procedure: 2);"; fi
+  if [ -n "$STRICT" ] && [ "$STRICT" != "$re_strict" ]; then RE_NOTE="$RE_NOTE capture ${STRICT/none/--no-strict} (procedure: ${re_strict/none/--no-strict});"; fi
+  MODE=$re_mode; DUR=${DUR:-$re_dur}; FIRE=${FIRE:-$re_fire}; def_strict=$re_strict
+  [ -n "$DUR" ] || die "leg $LEG: a walk leg's length comes from the step plan (RS13_RANGE_EDGE_LEG.md 'Step plan': coarse steps 120 s, fine steps 180 s) -- pass --duration 120 or --duration 180"
+else
+  [ -n "$PROFILE" ] || { bench_usage; exit 2; }
+  case $LEG in 2c*|2d*) def_mode=mono_g4; def_strict=none ;; *) def_mode=vector; def_strict=--strict ;; esac
+  MODE=${MODE:-$def_mode}; DUR=${DUR:-300}; FIRE=${FIRE:-0}
+fi
+case $PROFILE in image_bw500) REGP=2 ;; image_bw250) REGP=1 ;; esac
+FPS=${FPS:-2}; STRICT=${STRICT:-$def_strict}; [ "$STRICT" = none ] && STRICT=""
 case $MODE in
   vector) CAM_ENV="-e LIFETRAC_ENCODE_MODE=9 -e LIFETRAC_VECTOR_DETAIL=80" ;;
   mono_g4) CAM_ENV="-e LIFETRAC_ENCODE_MODE=6" ;;
   *) die "--boot-mode must be vector or mono_g4" ;;
 esac
 case $FPS in ''|*[!0-9.]*) die "--fps must be a number" ;; esac
+case $DUR in ''|*[!0-9]*|0*) die "--duration must be a whole number of seconds, not '$DUR'" ;; esac
+case $FIRE in 0|1) ;; *) die "--reactive-fire must be 0 or 1, not '$FIRE'" ;; esac
 if [ -z "$MINF" ]; then
-  if [ "$FPS" = 1 ]; then [ $REGP = 1 ] && MINF=200 || MINF=250; else MINF=500; fi
+  case $DUR:$FPS in
+    300:1) [ $REGP = 1 ] && MINF=200 || MINF=250 ;;
+    300:*) MINF=500 ;;
+    *) MINF=$(awk -v d="$DUR" -v f="$FPS" 'BEGIN { printf "%d", d * f * 5 / 6 }') ;;   # 300 / 200 for 180 / 120 s at 2 fps
+  esac
 fi
+CAPDUR=$((DUR + 180))                     # the base capture outlives the leg by 180 s
+PLAN="profile $PROFILE = harness -RegProfile $REGP, boot $MODE, $FPS fps, $DUR s, -ReactiveFire $FIRE, capture $CAPDUR s min-frames $MINF ${STRICT:-no-strict}"
+plan_notes() {
+  [ -z "$RE" ] || echo "range edge: $re_what"
+  [ -z "$RE_NOTE" ] || echo "NOTE: overrides RS13_RANGE_EDGE_LEG.md for $RE:${RE_NOTE%;}"
+  if [ -n "$RE" ]; then
+    case $EVIDENCE_DIR in
+      */RS_13_range_edge_*) ;;
+      *) echo "NOTE: EVIDENCE_DIR is $EVIDENCE_DIR; the range edge's evidence goes to bench-evidence/RS_13_range_edge_<date>/legs (set EVIDENCE_DIR in bench.env)" ;;
+    esac
+  fi
+}
 
 # DTS gate: never fly profile 2 on an unchecked carrier (RS-13.1 A19)
 if [ $REGP = 2 ]; then bench_require_dts_carrier || exit 5; fi
@@ -120,7 +212,7 @@ HIP=" -HostIp $PC_HOST"
 LOGW=$(win_path "$BENCH_SCRATCH/leg${LEG}_harness.txt")
 ARCW=$(win_path "$BENCH_SCRATCH/leg${LEG}_archive.txt")
 PS1="$BENCH_SCRATCH/leg${LEG}_harness.ps1"
-HARNESS=".\\run_live_radio_monitor.ps1 -TxAdbSerial $TRACTOR_SERIAL -RxAdbSerial $BASE_SERIAL$HIP -TxFeed camera -RegProfile $REGP$FRF -DurationS 300 -SynthFps $FPS -KfRequestDisable 1 -ProbeEcho 0 -LogFragArrivals 1 -TxBatch 0 -CamExtraEnv \"$CAM_ENV\" -Archive"
+HARNESS=".\\run_live_radio_monitor.ps1 -TxAdbSerial $TRACTOR_SERIAL -RxAdbSerial $BASE_SERIAL$HIP -TxFeed camera -RegProfile $REGP$FRF -DurationS $DUR -SynthFps $FPS -KfRequestDisable 1 -ReactiveFire $FIRE -ProbeEcho 0 -LogFragArrivals 1 -TxBatch 0 -CamExtraEnv \"$CAM_ENV\" -Archive"
 write_harness() {
   # Tee-Object (Windows PowerShell 5.1) writes UTF-16; leg_post.sh converts the
   # transcript. The archive the harness creates is written to leg<leg>_archive.txt,
@@ -151,6 +243,8 @@ print_next() {
 }
 if [ $PRINT_ONLY = 1 ]; then
   write_harness
+  echo "leg $LEG: $PLAN"
+  plan_notes
   echo "harness wrapper for leg $LEG written (preview only; no board was touched, no capture is running):"
   print_next
   exit 0
@@ -160,7 +254,8 @@ E=$(bench_evidence_dir) || die "cannot create $EVIDENCE_DIR"
 exec > >(tee -a "$E/leg${LEG}_prep.txt") 2>&1
 hdr() { echo "# leg $LEG $1, $(date -u +%Y-%m-%dT%H:%M:%SZ) PC clock"; }
 
-stamp "== leg $LEG prep (profile $PROFILE = harness -RegProfile $REGP, boot $MODE, $FPS fps, capture min-frames $MINF ${STRICT:-no-strict}) from $(bench_git_desc)"
+stamp "== leg $LEG prep ($PLAN) from $(bench_git_desc)"
+plan_notes
 for who in tractor base; do board_present "$who" || { stamp "ABORT: $who ($(board_serial $who)) not reachable via $(board_via $who)"; exit 3; }; done
 
 stamp "-- production camera unit / radio-UART holders"
@@ -196,12 +291,12 @@ stamp "-- pre-brackets (rs115) both boards"
 grep -h -E "^radio_(rx_ok|tx_ok|crc_err)=" "$E/leg${LEG}_pre_base.txt" | tr '\n' ' '; echo " (base)"
 grep -h -E "^radio_(rx_ok|tx_ok|crc_err)=" "$E/leg${LEG}_pre_tractor.txt" | tr '\n' ' '; echo " (tractor)"
 
-stamp "-- base-side capture, detached (docker rs13_cap_base): profile $PROFILE, 480 s, min-frames $MINF ${STRICT:-no-strict}"
+stamp "-- base-side capture, detached (docker rs13_cap_base): profile $PROFILE, $CAPDUR s, min-frames $MINF ${STRICT:-no-strict}"
 board_sh base "$SUDO rm -f $BOARD_STAGE/legs/leg${LEG}_base.jsonl $BOARD_STAGE/legs/leg${LEG}_base.json; \
   $SUDO docker run -d --name rs13_cap_base --network=host -v $BOARD_STAGE:/work -w /work \
   -e PYTHONPATH=/work:/work/paho -e PYTHONUNBUFFERED=1 --entrypoint python3 $BASE_IMAGE \
   /work/vector_dry_run.py capture --topic lifetrac/v25/video/tile_delta --profile $PROFILE \
-  --duration 480 --min-frames $MINF --out /work/legs/leg${LEG}_base.jsonl --json /work/legs/leg${LEG}_base.json $STRICT" \
+  --duration $CAPDUR --min-frames $MINF --out /work/legs/leg${LEG}_base.jsonl --json /work/legs/leg${LEG}_base.json $STRICT" \
   | cut -c1-12 | sed 's/^/rs13_cap_base id /'
 sleep 3
 board_sh base "$SUDO docker logs rs13_cap_base 2>&1 | head -3"
