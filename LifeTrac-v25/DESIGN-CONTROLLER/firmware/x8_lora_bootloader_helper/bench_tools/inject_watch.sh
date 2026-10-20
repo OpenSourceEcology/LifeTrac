@@ -108,6 +108,12 @@ case $cmd in
     mkdir -p "$DIR" || exit 1
     stop_all 0                           # an earlier leg's watcher must not fire into this one
     : > "$LOG"
+    # 2026-10-19: ignore HUP HERE, before the fork. The adb/sudo session hangup
+    # arrives as this script returns; the child would otherwise start with the
+    # default HUP action, and a hangup landing before nohup ignores HUP kills
+    # the watcher (the `run` branch's own trap comes too late). An ignored
+    # disposition is inherited through fork and exec (ocd_reset.sh, leg A2c2).
+    trap '' HUP
     nohup sh "$0" run "$@" >> "$LOG" 2>&1 < /dev/null &
     echo $! > "$PIDF"
     echo "INJECT_WATCH_SPAWNED pid=$!"
@@ -119,7 +125,7 @@ case $cmd in
     echo "INJECT_RESET_DONE"
     ;;
   run)                                   # internal: the detached watcher started by "start"
-    trap '' HUP
+    trap '' HUP                          # already ignored when "start" forked it; harmless again
     trap own_pidf_rm EXIT
     mode=$1; deadline_s=$2; shift 2
     script=$1; shift
