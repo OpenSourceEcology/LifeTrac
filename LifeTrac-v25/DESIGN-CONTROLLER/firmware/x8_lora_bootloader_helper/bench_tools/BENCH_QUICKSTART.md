@@ -398,7 +398,10 @@ compares every TX-log fragment with every RX-log fragment. That old line keeps
 its old figure (it now ends `[whole logs]`), so old reports compare directly. `shared-window loss …`
 matches the `txdone_arrival` trains to the `frag_arrival` trains over the
 window both logs cover (RS_12_15_clock_authority_2026-09-14/ERRATA.md §3).
-Read that one when the whole-log line says received > sent. (With
+Read that one when the whole-log line says received > sent. It prints
+`shared-window loss: n/a, withheld (<reason>)` instead of a figure when the
+two logs cannot be lined up: an outage of about one u8 seq wrap, or a train
+with key-frame copies or parity. (With
 `--capture`, the warning points at the capture seq-gap line, which is the
 loss of record on an RS-13 leg.) `FIRMWARE DROP` subtracts the base's own
 fragment count. When params.txt has no `log_window=after_stop`, a note says

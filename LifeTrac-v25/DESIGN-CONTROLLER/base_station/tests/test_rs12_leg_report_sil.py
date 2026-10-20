@@ -24,6 +24,7 @@ import sys
 import tempfile
 import unittest
 from contextlib import redirect_stdout
+from datetime import datetime, timedelta
 from pathlib import Path
 
 _BS = Path(__file__).resolve().parents[1]
@@ -240,7 +241,8 @@ class StaleRxCounter(unittest.TestCase):
         self.assertIn("loss 0/10 = 0.0%", out)
         self.assertNotIn("loss -", out)
         # no per-fragment events: the old hint, unchanged
-        self.assertIn("whole-log loss shown as 0 — check the seq-gap figure", out)
+        self.assertIn("whole-log loss shown as 0 — re-run with --capture "
+                      "<leg>_base.jsonl for the seq-gap figure", out)
 
     def test_received_above_sent_with_capture_names_the_capture_line(self) -> None:
         # no per-fragment events (no shared window), but a capture: the
@@ -422,6 +424,154 @@ class SharedWindowLoss(unittest.TestCase):
         self.assertIn("3 decoded in a matched train", lines[1])
         res.update(late=0, extra=0)
         self.assertEqual(len(rep.format_shared_loss(res)), 1)
+
+
+def _timed_log(daemon: str, event: str, trains, total: int | None = None,
+               period: float = 0.5) -> str:
+    """One line per fragment, train n at n * period s: ``trains`` holds
+    ``(n, [idx, ...])``; the logged seq is n mod 256 (the u8 wire seq)."""
+    t0 = datetime(2026, 10, 19, 19, 0, 0)
+    out = []
+    for n, idxs in trains:
+        ts = (t0 + timedelta(seconds=n * period)).strftime("%Y-%m-%d %H:%M:%S,%f")[:-3]
+        for i in idxs:
+            tail = (" status=0 toa_us=98624" if event == "txdone_arrival"
+                    else f" total={total if total is not None else 1} fw_us=1 len=244")
+            out.append(f"{ts} INFO {daemon}: {event}: seq={n % 256} idx={i}{tail}")
+    return "\n".join(out) + "\n"
+
+
+def _tx_t(trains) -> str:
+    return _timed_log("image_tx_daemon", "txdone_arrival", trains)
+
+
+def _rx_t(trains, total: int | None = None) -> str:
+    return _timed_log("image_rx_daemon", "frag_arrival", trains, total)
+
+
+class SharedWindowGuards(unittest.TestCase):
+    """PR #161 review: fail closed where the two logs cannot be aligned."""
+
+    def test_an_outage_across_a_full_wrap_is_withheld(self) -> None:
+        # 258 one-fragment trains; the base hears only trains 1, 257 and 258,
+        # whose wire seqs read 1, 1, 2. Grouping by seq alone merged the first
+        # two and reported 256/258 lost (true: 255/258).
+        tx = _tx_t([(n, [0]) for n in range(1, 259)])
+        rx = _rx_t([(1, [0]), (257, [0]), (258, [0])])
+        res = rep.shared_window_loss(tx, rx)
+        self.assertIn("wrap off", res["withheld"])
+        line = rep.format_shared_loss(res)
+        self.assertEqual(len(line), 1)
+        self.assertTrue(line[0].startswith("shared-window loss: n/a, withheld ("))
+        # the same on a longer leg: the base hears trains 1-5 and 261-265, so
+        # wire seq 5 comes round again 128 s after the first seq 5
+        tx = _tx_t([(n, [0]) for n in range(1, 266)])
+        rx = _rx_t([(n, [0]) for n in list(range(1, 6)) + list(range(261, 266))])
+        res = rep.shared_window_loss(tx, rx)
+        self.assertIn("wrap off", res["withheld"])
+
+    def test_a_long_outage_inside_one_wrap_is_still_scored(self) -> None:
+        # 129 trains (64.5 s) unheard between seq 10 and seq 140, inside one
+        # wrap: every match has the same log offset, so every miss is counted.
+        tx = _tx_t([(n, [0]) for n in range(1, 151)])
+        rx = _rx_t([(n, [0]) for n in list(range(1, 11)) + list(range(140, 151))])
+        res = rep.shared_window_loss(tx, rx)
+        self.assertIsNone(res["withheld"])
+        self.assertEqual((res["sent"], res["lost"], res["unheard"]), (150, 129, 129))
+
+    def test_two_copies_received_are_withheld_not_half_lost(self) -> None:
+        # a one-fragment key frame sent with copies=2: the TX log numbers the
+        # transmissions 0 and 1, the base logs the header's idx 0 twice. The
+        # idx overlap read 1/2 lost on a lossless link.
+        tx = _tx_t([(1, [0]), (2, [0, 1]), (3, [0])])
+        rx = _rx_t([(1, [0]), (2, [0, 0]), (3, [0])], total=1)
+        res = rep.shared_window_loss(tx, rx)
+        self.assertIn("key-frame copies", res["withheld"])
+        self.assertIn("n/a, withheld", rep.format_shared_loss(res)[0])
+
+    def test_a_parity_fragment_is_withheld(self) -> None:
+        # two data fragments plus an XOR parity frame (0xFC, not logged by the
+        # base): TX idx 2 is past the header's 2 fragments
+        tx = _tx_t([(1, [0, 1, 2]), (2, [0, 1, 2])])
+        rx = _rx_t([(1, [0, 1]), (2, [0, 1])], total=2)
+        res = rep.shared_window_loss(tx, rx)
+        self.assertIn("TX idx [2] at or past the header's 2 fragment(s)", res["withheld"])
+
+    def test_a_plain_lossless_leg_is_not_withheld(self) -> None:
+        tx = _tx_t([(n, [0]) for n in range(1, 400)])
+        rx = _rx_t([(n, [0]) for n in range(1, 400)])
+        res = rep.shared_window_loss(tx, rx)
+        self.assertIsNone(res["withheld"])
+        self.assertEqual((res["sent"], res["lost"]), (399, 0))
+
+
+def _two_clock_logs(trains, heard, frags: int = 1,
+                    rx_t0: datetime | None = None) -> tuple[str, str]:
+    """TX and RX logs on two board clocks days apart (as on the bench):
+    ``trains`` holds ``(u, t)`` (u = the TX seq before the u8 wrap, t = s
+    from the start), ``heard(n)`` says whether the base decoded train n."""
+    t0 = datetime(2026, 10, 19, 19, 0, 0)
+    rx_t0 = rx_t0 or t0 + timedelta(days=13, hours=8)
+
+    def f(base, t):
+        return (base + timedelta(seconds=t)).strftime("%Y-%m-%d %H:%M:%S,%f")[:-3]
+    tx, rx = [], []
+    for n, (u, t) in enumerate(trains):
+        for i in range(frags):
+            tx.append(f"{f(t0, t + 0.21 * i)} INFO image_tx_daemon: txdone_arrival: "
+                      f"seq={u % 256} idx={i} status=0 toa_us=1")
+            if heard(n):
+                rx.append(f"{f(rx_t0, t + 0.21 * i + 0.25)} INFO image_rx_daemon: "
+                          f"frag_arrival: seq={u % 256} idx={i} total={frags} "
+                          f"fw_us=1 len=1")
+    return "\n".join(tx) + "\n", "\n".join(rx) + "\n"
+
+
+class SharedWindowAlignment(unittest.TestCase):
+    """The wrap guard checks the matches the scorer made: the boards' clocks
+    differ by days but tick together, so every correct match has the same
+    RX-minus-TX log time; a match one u8 wrap off does not."""
+
+    def test_the_seq_running_ahead_of_the_trains(self) -> None:
+        # 15-fragment trains: once the queue saturates the seq moves 8 per
+        # train (frames dropped or batched), so 32 unheard trains are a whole
+        # wrap; the RX log runs 10 trains past the TX log (truth 480/1500)
+        trains, u, t = [], 1, 0.0
+        for n in range(110):
+            trains.append((u, t))
+            u += 1 if n < 12 else 8
+            t += 3.6
+        tx, _ = _two_clock_logs(trains[:100], lambda n: True, 15)
+        _, rx = _two_clock_logs(trains, lambda n: not 40 <= n < 72, 15)
+        res = rep.shared_window_loss(tx, rx)
+        self.assertIn("wrap off", res["withheld"])
+
+    def test_an_outage_just_short_of_a_wrap(self) -> None:
+        # one seq per train, 254 trains unheard: no wrap inside the RX gap,
+        # yet the lookahead finds the seq after it (truth 254/600)
+        trains = [(n + 1, n * 0.5) for n in range(600)]
+        tx, rx = _two_clock_logs(trains, lambda n: not 121 <= n < 375)
+        res = rep.shared_window_loss(tx, rx)
+        self.assertIn("wrap off", res["withheld"])
+
+    def test_an_idle_feed_is_not_an_outage(self) -> None:
+        # the feed stops for 100 s (TX idle, the seq does not move)
+        trains = ([(n + 1, n * 0.5) for n in range(200)]
+                  + [(201 + n, 200 + n * 0.5) for n in range(200)])
+        tx, rx = _two_clock_logs(trains, lambda n: n % 37 != 5)
+        res = rep.shared_window_loss(tx, rx)
+        self.assertIsNone(res["withheld"])
+        self.assertEqual((res["lost"], res["sent"]), (11, 400))
+
+    def test_board_times_are_not_read_as_local_time(self) -> None:
+        # the base clock crosses 2026-11-01 02:00 (a US DST change if read as
+        # the PC's local time): no 3600 s jump, no split train
+        trains = [(n + 1, n * 0.5) for n in range(400)]
+        tx, rx = _two_clock_logs(trains, lambda n: True, 2,
+                                 rx_t0=datetime(2026, 11, 1, 1, 58, 0))
+        res = rep.shared_window_loss(tx, rx)
+        self.assertIsNone(res["withheld"])
+        self.assertEqual(res["lost"], 0)
 
 
 class SharedWindowReport(unittest.TestCase):

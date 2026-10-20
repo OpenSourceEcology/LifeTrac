@@ -45,6 +45,8 @@ the harness (`run_live_radio_monitor.ps1`) live one directory up. Leg reports:
 `tools/rs12_leg_report.py <archive> --pre <bracket> --post <bracket>`.
 Its `shared-window loss` line (2026-10-19) is the fragment loss without the
 log-window artefact. The `loss … [whole logs]` line is the old figure.
+It reads `n/a, withheld (…)` when the logs cannot be aligned (an outage of
+about one u8 seq wrap, key-frame copies or parity).
 
 ## Board facts
 

@@ -24,6 +24,7 @@ import pathlib
 import re
 import statistics
 import sys
+from datetime import datetime, timezone
 
 # TileDeltaFrame header byte 1 (LORA_PROTOCOL.md § TileDeltaFrame) is a u8.
 # The fragment seq both daemons log (txdone_arrival / frag_arrival) wraps at
@@ -34,9 +35,23 @@ SEQ_MOD = 256
 # daemon logs one txdone_arrival per TX_DONE URC (status 0 = on air), the RX
 # daemon one frag_arrival per fragment the base decoded.
 TXDONE_RE = re.compile(r"txdone_arrival: seq=(\d+) idx=(\d+) status=(\d+)")
-FRAG_RE = re.compile(r"frag_arrival: seq=(\d+) idx=(\d+)")
+# total = the header's fragment count (image_rx_daemon: raw[3] + 1). Parity
+# frames (magic 0xFC) are not logged; a copies=2 key frame logs each copy
+# with the same idx.
+FRAG_RE = re.compile(r"frag_arrival: seq=(\d+) idx=(\d+)(?: total=(\d+))?")
+LOG_TS_RE = re.compile(r"^\ufeff?(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d),(\d{3}) ")
 # How many RX trains ahead a TX train may find its match (ERRATA §3 step 2).
 SHARED_LOOKAHEAD = 4
+# A train never spans this long, so two runs of one seq further apart than
+# this are separate trains (the u8 seq came round again).
+TRAIN_SPLIT_S = 10.0
+# How far apart the matched trains' RX-minus-TX log times may spread before
+# one of them is taken to be matched a u8 seq wrap off. The boards' clocks
+# differ by days (the tractor has no time sync) but tick together: over the
+# 55 committed archives with per-fragment events the spread is at most
+# 2.1 s (a 15-fragment train whose first fragments the base lost), and one
+# wrap is 256 frames, 25.6 s even at 10 frames/s.
+ALIGN_TOL_S = 10.0
 
 
 def parse_stats(path: pathlib.Path) -> dict[str, int]:
@@ -52,17 +67,105 @@ def _last_int(pattern: str, text: str, default: int = 0) -> int:
     return int(found[-1]) if found else default
 
 
-def fragment_trains(pairs) -> list[tuple[int, set]]:
-    """``(seq, {idx, ...})`` per train: consecutive ``(seq, idx)`` events
-    with the same seq (mod 256), in log order."""
-    trains: list[tuple[int, set]] = []
-    for seq, idx in pairs:
-        seq %= SEQ_MOD
-        if trains and trains[-1][0] == seq:
-            trains[-1][1].add(idx)
-        else:
-            trains.append((seq, {idx}))
+def _log_time(line: str) -> float | None:
+    """Seconds (epoch, board clock) of a daemon log line, or None."""
+    m = LOG_TS_RE.match(line)
+    if not m:
+        return None
+    return (datetime.strptime(m.group(1), "%Y-%m-%d %H:%M:%S")
+            .replace(tzinfo=timezone.utc).timestamp()
+            + int(m.group(2)) / 1000.0)
+
+
+def fragment_events(text: str, rx: bool) -> list[tuple]:
+    """``(t, seq mod 256, idx, total)`` per per-fragment event, in log order:
+    ``frag_arrival`` lines when ``rx``, else ``txdone_arrival ... status=0``
+    lines (on air). ``t`` is None on a line without a timestamp, ``total``
+    None on the TX side and on old RX lines without it."""
+    out = []
+    for line in text.splitlines():
+        m = (FRAG_RE if rx else TXDONE_RE).search(line)
+        if not m:
+            continue
+        if not rx and int(m.group(3)) != 0:
+            continue
+        total = int(m.group(3)) if rx and m.group(3) else None
+        out.append((_log_time(line), int(m.group(1)) % SEQ_MOD,
+                    int(m.group(2)), total))
+    return out
+
+
+def fragment_trains(events) -> list[dict]:
+    """Trains: consecutive events with the same seq (mod 256), in log order,
+    split where two of them are more than TRAIN_SPLIT_S apart (the seq came
+    round again). Each train: ``seq``, ``idxs`` (set), ``idx_list`` (as
+    logged, duplicates kept), ``totals`` (set), ``t`` (first event's time)."""
+    trains: list[dict] = []
+    last_t = None
+    for t, seq, idx, total in events:
+        same = (trains and trains[-1]["seq"] == seq
+                and not (t is not None and last_t is not None
+                         and t - last_t > TRAIN_SPLIT_S))
+        if not same:
+            trains.append({"seq": seq, "idxs": set(), "idx_list": [],
+                           "totals": set(), "t": t})
+        tr = trains[-1]
+        tr["idxs"].add(idx)
+        tr["idx_list"].append(idx)
+        if total is not None:
+            tr["totals"].add(total)
+        if t is not None:
+            last_t = t
     return trains
+
+
+def _misaligned(pairs, tx_trains) -> str | None:
+    """Why the matched trains are not one alignment, or None. The boards'
+    clocks differ by days but tick together, so every correct match has
+    the same RX-minus-TX log time to within a train's span; a train
+    matched one u8 seq wrap off (after an outage of about 256 frames, or
+    of a little less with the lookahead) is a wrap's time off the rest."""
+    offs = [(rx["t"] - tx["t"], rx["seq"]) for tx, rx in pairs
+            if tx["t"] is not None and rx["t"] is not None]
+    if len(offs) < len(pairs):
+        span = sum((b["seq"] - a["seq"]) % SEQ_MOD
+                   for a, b in zip(tx_trains, tx_trains[1:]))
+        if span >= SEQ_MOD // 2:
+            return (f"matched trains without log timestamps over {span} "
+                    f"seqs: the alignment cannot be checked")
+        return None
+    if not offs:
+        return None
+    lo, hi = min(offs), max(offs)
+    if hi[0] - lo[0] > ALIGN_TOL_S:
+        return (f"the matched trains' RX-minus-TX log times spread "
+                f"{hi[0] - lo[0]:.0f} s (seq {lo[1]} vs seq {hi[1]}): a train "
+                f"was matched a u8 seq wrap off after an outage, so the "
+                f"trains cannot be aligned")
+    return None
+
+
+def _redundant(tx_train: dict, rx_train: dict) -> str | None:
+    """Why a matched train cannot be scored idx by idx, or None. The TX
+    daemon logs each transmission's place in its list; the RX daemon logs
+    the header's fragment index. With key-frame copies (one idx received
+    twice) or parity (a TX idx at or past the header's fragment count, the
+    parity frame itself not logged) the two do not name the same thing."""
+    rx_list = rx_train["idx_list"]
+    if len(rx_list) != len(set(rx_list)):
+        return (f"seq {rx_train['seq']}: the base logged idx "
+                f"{sorted(rx_list)} (a fragment twice: key-frame copies, or a "
+                f"fragment re-sent after a TX_DONE timeout)")
+    if len(rx_train["totals"]) > 1:
+        return (f"seq {rx_train['seq']}: fragment counts "
+                f"{sorted(rx_train['totals'])} in one train")
+    if rx_train["totals"]:
+        total = next(iter(rx_train["totals"]))
+        over = sorted(i for i in tx_train["idxs"] if i >= total)
+        if over:
+            return (f"seq {rx_train['seq']}: TX idx {over} at or past the "
+                    f"header's {total} fragment(s) (copies or parity)")
+    return None
 
 
 def shared_window_loss(tx: str, rx: str,
@@ -86,29 +189,37 @@ def shared_window_loss(tx: str, rx: str,
     3. count the overlap of the two trains' idx sets as decoded;
     4. leave out the RX trains after the last matched one (outside the
        window).
+
+    Fails closed: ``withheld`` carries the reason, and the report gives no
+    figure, when a train was matched a u8 seq wrap off (its RX-minus-TX log
+    time differs from the other matches' by more than ALIGN_TOL_S: an
+    outage of about 256 frames) or when a matched train carries key-frame
+    copies or parity (the two logs number its fragments differently).
     """
-    tx_trains = fragment_trains((int(s), int(i))
-                                for s, i, st in TXDONE_RE.findall(tx)
-                                if int(st) == 0)
-    rx_trains = fragment_trains((int(s), int(i))
-                                for s, i in FRAG_RE.findall(rx))
+    tx_trains = fragment_trains(fragment_events(tx, rx=False))
+    rx_trains = fragment_trains(fragment_events(rx, rx=True))
     if not tx_trains or not rx_trains:
         return None
     nxt, last, decoded, unheard, extra = 0, -1, 0, 0, 0
-    for seq, idxs in tx_trains:
+    withheld = None
+    pairs = []
+    for tr in tx_trains:
         for k in range(nxt, min(nxt + lookahead, len(rx_trains))):
-            if rx_trains[k][0] == seq:
-                decoded += len(idxs & rx_trains[k][1])
-                extra += len(rx_trains[k][1] - idxs)
+            if rx_trains[k]["seq"] == tr["seq"]:
+                withheld = withheld or _redundant(tr, rx_trains[k])
+                decoded += len(tr["idxs"] & rx_trains[k]["idxs"])
+                extra += len(rx_trains[k]["idxs"] - tr["idxs"])
+                pairs.append((tr, rx_trains[k]))
                 last, nxt = k, k + 1
                 break
         else:
             unheard += 1
-    sent = sum(len(idxs) for _, idxs in tx_trains)
+    withheld = _misaligned(pairs, tx_trains) or withheld
+    sent = sum(len(tr["idxs"]) for tr in tx_trains)
     return {"sent": sent, "decoded": decoded, "lost": sent - decoded,
             "trains": len(tx_trains), "unheard": unheard,
-            "late": sum(len(idxs) for _, idxs in rx_trains[last + 1:]),
-            "extra": extra}
+            "late": sum(len(tr["idxs"]) for tr in rx_trains[last + 1:]),
+            "extra": extra, "withheld": withheld}
 
 
 def format_shared_loss(res: dict | None) -> list[str]:
@@ -117,6 +228,8 @@ def format_shared_loss(res: dict | None) -> list[str]:
         return ["shared-window loss: n/a (needs txdone_arrival lines in "
                 "tx_daemon.log and frag_arrival lines in rx_daemon.log: "
                 "harness -LogFragArrivals 1)"]
+    if res.get("withheld"):
+        return [f"shared-window loss: n/a, withheld ({res['withheld']})"]
     sent, lost = res["sent"], res["lost"]
     out = [f"shared-window loss {lost}/{sent} = {100 * lost / sent:.1f}%   "
            f"[txdone_arrival vs frag_arrival, train by train over the window "
@@ -370,6 +483,7 @@ def main(argv: list[str] | None = None) -> int:
     # instead of 617 - 612 = 5). Keep the base's count for that line.
     rcvd_host = rcvd
     shared = shared_window_loss(tx, rx)
+    shared_ok = shared is not None and not shared.get("withheld")
     if rcvd > sent:
         # More received than sent: the logs or counters disagree (the RX log
         # runs on past the TX log's last line, a restarted daemon). Never
@@ -377,10 +491,11 @@ def main(argv: list[str] | None = None) -> int:
         # seq-gap line is the loss of record (RS-13), so point there first.
         if args.capture:
             hint = ("check the capture seq-gap line (the loss of record)"
-                    + (" and the shared-window line" if shared else ""))
+                    + (" and the shared-window line" if shared_ok else ""))
         else:
-            hint = ("read the shared-window line" if shared else
-                    "check the seq-gap figure")
+            hint = ("read the shared-window line" if shared_ok else
+                    "re-run with --capture <leg>_base.jsonl for the seq-gap "
+                    "figure (no shared-window figure here)")
         print(f"  !! received {rcvd} > sent {sent}: the TX and RX logs disagree "
               f"on the window; whole-log loss shown as 0 — {hint}")
         rcvd = sent
