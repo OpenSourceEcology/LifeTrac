@@ -3,7 +3,8 @@
 # capture, collect its files, post-brackets on both boards, the leg reports
 # (rs12_leg_report.py WITH the base capture -- its "capture seq gaps" line is the
 # loss of record, RS-13.1 A14 -- and frag_gap_report.py), the P2/P4 greps, the
-# tractor-log, then PARK both radios last (PARK_TRANSIENT -> wait 60 s, park again).
+# tractor-log, the archive's per-leg files, the RS-13 scorers, then PARK both
+# radios last (PARK_TRANSIENT -> wait 60 s, park again).
 #
 # Usage:   bash leg_post.sh <leg> [<harness archive dir>] [--no-park]
 #   <leg>           the tag given to leg_prep.sh
@@ -14,7 +15,21 @@
 #   --no-park       skip the park (another leg follows at once; park after the last)
 # Inputs:  lib/bench_env.sh settings; the harness archive; the running rs13_cap_base.
 # Writes:  $EVIDENCE_DIR/leg<leg>_{base.txt,base.jsonl,base.json,post_base,post_tractor,
-#          report,gaps,p2p4,tractor_log,params,harness,park,post_transcript}.txt
+#          report,gaps,replay,p2p4,tractor_log,params,harness,park,post_transcript}.txt;
+#          each report is written whole to its file first, then its head is shown.
+#          Copied from the archive when it holds them: leg<leg>_tractor_ocd_reset.log,
+#          leg<leg>_inject.log, leg<leg>_inject_trigger.txt.
+#          The RS-13 scorers (bench_tools/, PC only), each to its own file:
+#            leg<leg>_probe_score.txt   rs13_probe_score.py <archive>, when the base's
+#                                       rx_daemon.log has PROBE TX lines (or the leg
+#                                       flew -ReactiveFire 1)
+#            leg<leg>_rf.txt            rs13_rf_extract.py <archive> --lines, every leg
+#            leg<leg>_leak.txt          rs13_rf_extract.py --leak <archive>, leak_* legs
+#            leg<leg>_digest_trace.txt  rs13_digest_trace.py leg<leg>_base.jsonl, when the
+#                                       capture holds VECTOR frames (or its summary is missing)
+#            leg<leg>_deltas.txt        bracket_deltas.py <legs> <leg>, when the kit has it
+#          A scorer's failure is reported with its exit code ("scorer exit codes:" line)
+#          and never stops the post step or the park.
 # Boards:  waits for and removes rs13_cap_base (a re-run finds it gone and keeps the
 #          files the first run wrote); then refuses the brackets and the park while a
 #          leg daemon (tx_smoke / rx_smoke / synth_pub / camera_svc) still runs or
@@ -31,7 +46,9 @@
 # Origin:  bench-evidence/RS_13_vector_scene_2026-09-26/scripts/leg_post.sh
 #          (historical copy, unchanged). New here: --capture on the leg report,
 #          the archive read from the transcript, the DTS-carrier check on
-#          params.txt, the park retry.
+#          params.txt, the park retry; 2026-10-19: whole report files (the old
+#          `tee | head -8` cut leg W, X and A2* reports at 1024 B), the archive's
+#          per-leg files and the RS-13 scorers.
 set -u
 . "$(dirname "${BASH_SOURCE[0]}")/../lib/bench_env.sh" || exit 1
 
@@ -66,9 +83,39 @@ ARCH=$(win_path "$ARCH")
 [ -f "$ARCH/params.txt" ] || die "not a harness archive (no params.txt): $ARCH"
 
 E=$(bench_evidence_dir) || die "cannot create $EVIDENCE_DIR"
-exec > >(tee -a "$E/leg${LEG}_post_transcript.txt") 2>&1
+# tee ignores Ctrl+C: the EXIT trap's cleanup lines still reach the transcript, and
+# the shell never writes into a pipe whose reader the signal killed.
+exec > >(trap '' INT TERM; exec tee -a "$E/leg${LEG}_post_transcript.txt") 2>&1
 hdr() { echo "# leg $LEG $1, $(date -u +%Y-%m-%dT%H:%M:%SZ) PC clock"; }
 param() { tr -d '\r' < "$ARCH/params.txt" | sed 's/^\xEF\xBB\xBF//' | sed -n "s/^$1=//p" | head -1; }
+
+# save_run FILE N CMD...: CMD's whole output (stdout + stderr) goes to FILE first, then
+# its first N lines (all with N = all) are shown; returns CMD's exit code. Never
+# `CMD | tee FILE | head -N`: head's exit killed tee, and the file stopped at 1024 B.
+RCS=""                                   # "name=rc" of every report and scorer, for the summary line
+save_run() {
+  local f=$1 n=$2 rc
+  shift 2
+  PYTHONIOENCODING=utf-8 "$@" > "$f" 2>&1
+  rc=$?
+  if [ "$n" = all ]; then cat "$f"; else head -n "$n" "$f"; fi
+  return $rc
+}
+note_rc() {    # note_rc NAME RC FILE: record RC; say so when it is not 0
+  RCS="$RCS $1=$2"
+  [ "$2" = 0 ] || echo "  !! $1 exit $2 (whole output: $(basename "$3"))"
+}
+# score NAME FILE KEYS CMD...: one RS-13 scorer, whole output to FILE; shows the lines
+# matching the ERE KEYS (or, when none does, the last 4 lines) and the exit code.
+score() {
+  local name=$1 f=$2 keys=$3 rc
+  shift 3
+  PYTHONIOENCODING=utf-8 "$@" > "$f" 2>&1
+  rc=$?
+  if grep -qE "$keys" "$f"; then grep -E "$keys" "$f" | head -n 12; else tail -n 4 "$f"; fi
+  echo "  ($name: exit $rc -> $(basename "$f"))"
+  RCS="$RCS $name=$rc"
+}
 
 # UART probes run in containers named lt_post_<board>; on an abort (error, Ctrl+C)
 # the EXIT trap removes the ones this run started, so none is left holding the UART.
@@ -94,7 +141,9 @@ stamp "== leg $LEG post (archive $ARCH)"
 REGP=$(param reg_profile); FRF=$(param force_frf_hz)
 [ "$REGP" = 1 ] && PROF=image_bw250 || PROF=image_bw500
 
-stamp "-- waiting for the base capture (rs13_cap_base) to finish its 480 s"
+DURS=$(param duration_s)                 # leg_prep.sh starts the capture for the leg + 180 s
+case $DURS in ''|*[!0-9]*) CAPS="the leg + 180 s" ;; *) CAPS="$((DURS + 180)) s" ;; esac
+stamp "-- waiting for the base capture (rs13_cap_base) to finish its $CAPS"
 # Only when the container still exists: a re-run must not overwrite the first run's
 # capture log with "No such container".
 board_sh base "if $SUDO docker inspect rs13_cap_base >/dev/null 2>&1; then $SUDO docker wait rs13_cap_base >/dev/null 2>&1; $SUDO docker logs rs13_cap_base > $BOARD_STAGE/legs/leg${LEG}_base.txt 2>&1; $SUDO docker rm -f rs13_cap_base >/dev/null 2>&1; else echo '(rs13_cap_base is gone: using the capture files already on the board)'; fi; sed -n '/== vector dry run summary ==/,\$p' $BOARD_STAGE/legs/leg${LEG}_base.txt"
@@ -126,11 +175,22 @@ grep -h -E "^radio_(rx_ok|tx_ok|crc_err)=" "$E/leg${LEG}_post_tractor.txt" | tr 
 
 stamp "-- rs12_leg_report (--capture) + frag_gap_report"
 CAP=(); [ -f "$E/leg${LEG}_base.jsonl" ] && CAP=(--capture "$E/leg${LEG}_base.jsonl")
-PYTHONIOENCODING=utf-8 bench_py "$DC/tools/rs12_leg_report.py" "$ARCH" --pre "$E/leg${LEG}_pre_base.txt" \
-  --post "$E/leg${LEG}_post_base.txt" ${CAP[@]+"${CAP[@]}"} 2>&1 | tee "$E/leg${LEG}_report.txt" | head -8
-PYTHONIOENCODING=utf-8 bench_py "$BT_DIR/frag_gap_report.py" "$ARCH" 2>&1 | tee "$E/leg${LEG}_gaps.txt" | head -8
+save_run "$E/leg${LEG}_report.txt" 8 bench_py "$DC/tools/rs12_leg_report.py" "$ARCH" --pre "$E/leg${LEG}_pre_base.txt" \
+  --post "$E/leg${LEG}_post_base.txt" ${CAP[@]+"${CAP[@]}"}
+note_rc rs12_leg_report $? "$E/leg${LEG}_report.txt"
+save_run "$E/leg${LEG}_gaps.txt" 8 bench_py "$BT_DIR/frag_gap_report.py" "$ARCH"
+note_rc frag_gap_report $? "$E/leg${LEG}_gaps.txt"
 
 stamp "-- P2 / P4 from the archive"
+# leg_replay.py runs first, to its own file: its first line is the P2/P4 seq-gap row,
+# and its exit code is not lost in a pipe (2026-10-19: a TypeError after that first
+# line on every mono_g4 capture went unseen behind `| head -1`).
+RRC=""
+if [ -f "$E/leg${LEG}_base.jsonl" ]; then
+  PYTHONIOENCODING=utf-8 bench_py "$LEGS_DIR/leg_replay.py" "$LEG" "$PROF" --evidence-dir "$E" > "$E/leg${LEG}_replay.txt" 2>&1
+  RRC=$?
+  RCS="$RCS leg_replay=$RRC"
+fi
 { echo "# leg $LEG P2/P4 greps on $ARCH"
   echo "harness: reg_profile=$REGP force_frf_hz=$FRF tx_batch=$(param tx_batch) synth_fps=$(param synth_fps) cam_extra_env=$(param cam_extra_env)"
   if [ "$REGP" = 2 ] && { [ "${FRF:-0}" = 0 ] || [ "$FRF" = 915000000 ]; }; then
@@ -146,15 +206,20 @@ stamp "-- P2 / P4 from the archive"
   echo "tx drops before air (last tx stats line): $(grep -oE 'drop_(full|stale)=[0-9]+' "$ARCH/tx_daemon.log" | tail -2 | tr '\n' ' ')"
   echo "tractor FHSS authority (post bracket): $(grep -hoE '(tx_stream_streak_max|tx_first_anchor)=[0-9]+' "$E/leg${LEG}_post_tractor.txt" | tr '\n' ' ')"
   echo -n "seq-gap loss (per codec run): "
-  if [ -f "$E/leg${LEG}_base.jsonl" ]; then
-    PYTHONIOENCODING=utf-8 bench_py "$LEGS_DIR/leg_replay.py" "$LEG" "$PROF" --evidence-dir "$E" 2>&1 | head -1
+  if [ -n "$RRC" ]; then
+    # its own first line starts "leg <leg>:"; a capture warning on stderr may come first
+    grep -m1 "^leg " "$E/leg${LEG}_replay.txt" || head -1 "$E/leg${LEG}_replay.txt" | grep . || echo "(leg_replay.py printed nothing)"
+    [ "$RRC" = 0 ] || echo "  !! leg_replay.py exit $RRC (whole output: leg${LEG}_replay.txt)"
   else
     echo "no base capture"
   fi
 } | tee "$E/leg${LEG}_p2p4.txt"
 if [ -f "$ARCH/camera_service.log" ]; then
-  PYTHONIOENCODING=utf-8 bench_py "$DC/tools/vector_dry_run.py" tractor-log "$ARCH/camera_service.log" 2>&1 | tee "$E/leg${LEG}_tractor_log.txt"
+  save_run "$E/leg${LEG}_tractor_log.txt" all bench_py "$DC/tools/vector_dry_run.py" tractor-log "$ARCH/camera_service.log"
+  note_rc tractor_log $? "$E/leg${LEG}_tractor_log.txt"
 fi
+
+stamp "-- archive files into legs/"
 cp "$ARCH/params.txt" "$E/leg${LEG}_params.txt" 2>/dev/null
 if [ -f "$HT" ]; then
   if head -c 2 "$HT" | od -An -tx1 | grep -q 'ff fe'; then
@@ -163,6 +228,48 @@ if [ -f "$HT" ]; then
     tr -d '\r' < "$HT" > "$E/leg${LEG}_harness.txt"
   fi
 fi
+# the harness's per-leg extras: the tractor's leg-start SWD reset log, and the
+# -InjectCmd injector's log and PC-side trigger timeline (BENCH_RUNBOOK, "A leg")
+got=""; absent=""
+for f in tractor_ocd_reset.log inject.log inject_trigger.txt; do
+  if [ ! -f "$ARCH/$f" ]; then absent="$absent $f"
+  elif cp "$ARCH/$f" "$E/leg${LEG}_$f"; then got="$got leg${LEG}_$f"
+  else echo "COPY FAILED $f"
+  fi
+done
+echo "copied:${got:- none}; not in this archive:${absent:- none}"
+
+stamp "-- RS-13 scorers (PC only; a failure is reported, it never stops the post step or the park)"
+if grep -q "PROBE TX" "$ARCH/rx_daemon.log" 2>/dev/null || [ "$(param reactive_fire)" = 1 ]; then
+  score rs13_probe_score "$E/leg${LEG}_probe_score.txt" '.' bench_py "$BT_DIR/rs13_probe_score.py" "$ARCH"
+else
+  echo "  (rs13_probe_score: skipped -- no PROBE TX line in rx_daemon.log, reactive_fire=$(param reactive_fire): no probe fired)"
+fi
+RFPATH=(); case $LEG in A2*) RFPATH=(--path antenna) ;; esac   # the A2* legs fly on the antennas since 2026-10-19
+score rs13_rf_extract "$E/leg${LEG}_rf.txt" '^ {0,3}[^ ]' bench_py "$BT_DIR/rs13_rf_extract.py" "$ARCH" --lines ${RFPATH[@]+"${RFPATH[@]}"}
+case $LEG in
+  leak_dts|leak_dts_*|leak_fhss|leak_fhss_*)
+    score rs13_rf_extract_leak "$E/leg${LEG}_leak.txt" '.' bench_py "$BT_DIR/rs13_rf_extract.py" --leak "$ARCH" ;;
+esac
+# VECTOR frames in the capture, from its summary's "frames: N total, V vector" line;
+# empty when the summary is missing: the scorer then decides (exit 1 on no VECTOR frame).
+NVEC=""
+[ -f "$E/leg${LEG}_base.txt" ] && NVEC=$(tr -d '\r' < "$E/leg${LEG}_base.txt" | sed -n 's/^frames: [0-9]* total, \([0-9]*\) vector.*/\1/p' | tail -1)
+if [ ! -f "$E/leg${LEG}_base.jsonl" ]; then
+  echo "  (rs13_digest_trace: skipped -- no base capture)"
+elif [ "$NVEC" = 0 ]; then
+  echo "  (rs13_digest_trace: skipped -- the capture holds no VECTOR frame)"
+else
+  score rs13_digest_trace "$E/leg${LEG}_digest_trace.txt" '^(== |capture seq gaps|store:|resync:|A16 confirmation|!! )|CANNOT TRACE|no VECTOR frame' \
+    bench_py "$BT_DIR/rs13_digest_trace.py" "$E/leg${LEG}_base.jsonl"
+fi
+if [ -f "$BT_DIR/bracket_deltas.py" ]; then
+  score bracket_deltas "$E/leg${LEG}_deltas.txt" '^leg [^:]*: reg_profile|: L072 counters|^cross-check|\[(FAIL|UNVERIFIED|N/A)\]|^STOP RULE' \
+    bench_py "$BT_DIR/bracket_deltas.py" "$E" "$LEG"
+else
+  echo "  (bracket_deltas: skipped -- no bench_tools/bracket_deltas.py in this checkout)"
+fi
+stamp "scorer exit codes (0 = ran clean; the files hold the reasons):${RCS:- none}"
 
 if [ $PARK = 1 ]; then
   stamp "-- park both radios (last)"

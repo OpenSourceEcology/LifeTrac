@@ -14,11 +14,13 @@
 # Range-edge tags (RS13_RANGE_EDGE_LEG.md "Leg names"; a _suffix such as _r2 may
 # follow): the tag sets the profile, the codec at boot, the probes and, where the
 # procedure fixes it, the length. Every line has -TxBatch 0 -ProbeEcho 0, and every
-# DTS line -ForceFrfHz (the DTS gate below).
+# DTS line -ForceFrfHz (the DTS gate below). Since 2026-10-19 the bench has no
+# attenuators: only the A2* legs are planned, on the antennas; the others need the
+# conducted path and get a NOTE saying so.
 #   leak_dts | leak_fhss  leakage check: VECTOR, 120 s, -ReactiveFire 0, capture
 #                         without --strict (it must stay empty)
-#   A2c A2c2 | A2a A2a2   Round A, the 0 dB step (DTS): mono_g4 | VECTOR, 300 s,
-#                         -ReactiveFire 1
+#   A2c A2c2 | A2a A2a2   Round A on the antennas (DTS): mono_g4 | VECTOR, 300 s,
+#                         -ReactiveFire 1 (the conducted 0 dB step until 2026-10-19)
 #   B<step>m | B<step>v   Round B, the DTS walk: mono_g4 | VECTOR, -ReactiveFire 1
 #   C<step>m | C<step>v   Round C, the FHSS walk: mono_g4 | VECTOR, -ReactiveFire 0
 #                         A walk leg needs --duration 120 (coarse) or 180 (fine), the
@@ -47,6 +49,8 @@
 #                  gate); touches no board, starts no capture -- a preview
 #   On a range-edge tag, --duration, --reactive-fire, --fps and --strict/--no-strict
 #   override the procedure's value; the prep then prints a NOTE naming each one.
+#   A range-edge tag expects EVIDENCE_DIR under bench-evidence/RS_13_range_edge_<date>/
+#   (an A2* tag also under RS_13_antenna_<date>/); elsewhere the prep prints a NOTE.
 # Inputs:  lib/bench_env.sh settings; DTS_CARRIER_HZ / DTS_CARRIER_DATE for profile 2;
 #          PC_HOST (the harness -HostIp; when empty, this PC's only IPv4 address on
 #          BASE_HOST's /24, or its only IPv4 address at all, is used and printed --
@@ -107,8 +111,8 @@ if [ -n "$RE" ]; then
       [ $RE = leak_dts ] && re_prof=image_bw500 || re_prof=image_bw250
       re_mode=vector; re_fire=0; re_dur=120; re_strict=none
       re_what="leakage check (${RE#leak_}): jack pads terminated, the base must decode NO frame (the capture stays empty; its min_frames fails by design)" ;;
-    A2c|A2c2) re_prof=image_bw500; re_mode=mono_g4; re_fire=1; re_dur=300; re_what="Round A, 0 dB step, mono_g4 (fly 2c, 2a, 2c', 2a' in that order)" ;;
-    A2a|A2a2) re_prof=image_bw500; re_mode=vector; re_fire=1; re_dur=300; re_what="Round A, 0 dB step, VECTOR (fly 2c, 2a, 2c', 2a' in that order)" ;;
+    A2c|A2c2) re_prof=image_bw500; re_mode=mono_g4; re_fire=1; re_dur=300; re_what="Round A on the antennas (no attenuators since 2026-10-19), mono_g4 (fly A2c, A2a, A2c2, A2a2 in that order)" ;;
+    A2a|A2a2) re_prof=image_bw500; re_mode=vector; re_fire=1; re_dur=300; re_what="Round A on the antennas (no attenuators since 2026-10-19), VECTOR (fly A2c, A2a, A2c2, A2a2 in that order)" ;;
     B0close) re_prof=image_bw500; re_mode=vector; re_fire=1; re_dur=120; re_what="Round B closing check: step chain back at 0 dB, VECTOR" ;;
     C0close) re_prof=image_bw250; re_mode=vector; re_fire=0; re_dur=120; re_what="Round C closing check: step chain back at 0 dB, VECTOR" ;;
     *) step=${RE:1:${#RE}-2}
@@ -156,12 +160,19 @@ fi
 CAPDUR=$((DUR + 180))                     # the base capture outlives the leg by 180 s
 PLAN="profile $PROFILE = harness -RegProfile $REGP, boot $MODE, $FPS fps, $DUR s, -ReactiveFire $FIRE, capture $CAPDUR s min-frames $MINF ${STRICT:-no-strict}"
 plan_notes() {
+  local want
   [ -z "$RE" ] || echo "range edge: $re_what"
   [ -z "$RE_NOTE" ] || echo "NOTE: overrides RS13_RANGE_EDGE_LEG.md for $RE:${RE_NOTE%;}"
+  case $RE in
+    A2*|'') ;;
+    *) echo "NOTE: $RE needs the conducted attenuator path, which the bench does not have since 2026-10-19 (RS13_RANGE_EDGE_LEG.md, Status): only the A2* legs are planned, on the antennas" ;;
+  esac
   if [ -n "$RE" ]; then
+    case $RE in A2*) want="RS_13_antenna_<date>/legs or RS_13_range_edge_<date>/legs" ;; *) want="RS_13_range_edge_<date>/legs" ;; esac
     case $EVIDENCE_DIR in
       */RS_13_range_edge_*) ;;
-      *) echo "NOTE: EVIDENCE_DIR is $EVIDENCE_DIR; the range edge's evidence goes to bench-evidence/RS_13_range_edge_<date>/legs (set EVIDENCE_DIR in bench.env)" ;;
+      */RS_13_antenna_*) case $RE in A2*) ;; *) echo "NOTE: EVIDENCE_DIR is $EVIDENCE_DIR; a conducted-path leg's evidence goes to bench-evidence/$want (set EVIDENCE_DIR in bench.env)" ;; esac ;;
+      *) echo "NOTE: EVIDENCE_DIR is $EVIDENCE_DIR; this leg's evidence goes to bench-evidence/$want (set EVIDENCE_DIR in bench.env)" ;;
     esac
   fi
 }
