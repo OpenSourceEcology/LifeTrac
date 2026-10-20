@@ -278,7 +278,9 @@ arguments. They are parameterised copies of RS-13's `leg_prep.sh` and
 
 - **prep:** scene check, health probes, `clear_retained.py`, pre-brackets,
   base-side capture. It ends by writing the harness command for this leg;
-- **post:** post-brackets, reports, park.
+- **post:** post-brackets, reports (each written whole to `legs/`), the
+  archive's reset and injector logs, the RS-13 scorers and
+  `bracket_deltas.py`, park.
 
 RS-13 leg 2a, VECTOR at boot on DTS, goes like this:
 
@@ -306,9 +308,23 @@ helper directory with the serials, `-HostIp` and `-ForceFrfHz` from
 
 The harness output ends with `=== LEG CHECKS ===`, just above the
 `[EVIDENCE]` line. `TRACTOR_L072_RESET landed` is the normal line; `failed`
-or `unknown` means score the tractor brackets with `deltas.py` (reset-aware;
-BENCH_RUNBOOK, "A leg"). `BASE_L072_RESET unverified` prints on every leg
-until the RS-5.2 base follow-up is done.
+or `unknown` means score the tractor brackets with
+`bench_tools/bracket_deltas.py` (reset-aware; `leg_post.sh` writes
+`leg<X>_deltas.txt`; BENCH_RUNBOOK, "A leg"). `BASE_L072_RESET unverified`
+prints on every leg until the RS-5.2 base follow-up is done.
+
+Since the bench kit of 2026-10-19 (not yet flown) the harness ends a leg by
+stopping the frame source, the injector, then tx_smoke (after `-StopDrainS`,
+default 2 s; pass e.g. 4 on a saturated multi-fragment FHSS leg) and
+rx_smoke, and only then reads the daemon logs (`log_window=after_stop` in
+`params.txt`). LEG CHECKS adds `CLOCKS board minus PC: ...` (read only; the
+offsets are in `params.txt`) and `LOG_WINDOW after_stop (...)`. Every adb
+push is checked and md5-compared with the PC copy (`deploy_md5.txt` in the
+archive). A leg that stops at `[DEPLOY]` with `adb push FAILED` or
+`md5 MISMATCH` and `No daemon was started.` transmitted nothing: look for a
+root-owned file or folder in `/tmp/lifetrac_strict` or `/tmp/lifetrac_p0c`
+on that board, remove it with sudo and re-run the leg. Details: BENCH_RUNBOOK,
+"A leg".
 
 If you must type the harness command yourself, it is the line below, with
 every `<...>` replaced by your `bench.env` values. Typed by hand, it skips
@@ -369,22 +385,44 @@ py -3 firmware/x8_lora_bootloader_helper/bench_tools/frag_gap_report.py <archive
 py -3 tools/vector_dry_run.py replay <legs>/leg<X>_base.jsonl --profile image_bw500
 py -3 tools/vector_dry_run.py tractor-log <archive>/camera_service.log
 py -3 firmware/x8_lora_bootloader_helper/bench_tools/legs/leg_replay.py <X> image_bw500 --evidence-dir <legs>
+py -3 firmware/x8_lora_bootloader_helper/bench_tools/bracket_deltas.py <legs> <X>
 ```
 
 `leg_replay.py <leg> <image_bw500|image_bw250> [--evidence-dir DIR | --capture FILE]`
 gives the post-lock sequence gaps and the P1 resync episodes; it reads
-`<DIR>/leg<leg>_base.jsonl`.
+`<DIR>/leg<leg>_base.jsonl`. On a capture with no VECTOR frame (`mono_g4`)
+it prints `digest_ok n/a (no VECTOR frame)`.
+
+`rs12_leg_report.py` prints two fragment-loss lines. `loss … [whole logs]`
+compares every TX-log fragment with every RX-log fragment. That old line keeps
+its old figure (it now ends `[whole logs]`), so old reports compare directly. `shared-window loss …`
+matches the `txdone_arrival` trains to the `frag_arrival` trains over the
+window both logs cover (RS_12_15_clock_authority_2026-09-14/ERRATA.md §3).
+Read that one when the whole-log line says received > sent. (With
+`--capture`, the warning points at the capture seq-gap line, which is the
+loss of record on an RS-13 leg.) `FIRMWARE DROP` subtracts the base's own
+fragment count. When params.txt has no `log_window=after_stop`, a note says
+the logs were read before the daemons stopped. Every
+10-18/10-19 leg shows 4-5 there: `rx_urc_lost` (0-2 on those legs, on the
+URC-path line) is the part the L072 really lost, and the rest is expected to be
+that window (first leg with `log_window=after_stop` to confirm).
 
 The loss of record is the report's `capture seq gaps` line. The counter
 `loss` line can be stale (RS13_VECTOR_LEG A14) or frozen by a dead stats
 thread (RS-12.17).
 
-The range-edge session adds three scoring helpers in `bench_tools/`, run by
-hand (`leg_post.sh` does not run them): `rs13_rf_extract.py` (received level,
-R0, leakage, tracking and closing checks), `rs13_probe_score.py` (command
-delivery) and `rs13_digest_trace.py` (A16 confirmation). They take paths, so
-they need no copy; each exits non-zero on missing or garbled input.
-RS13_RANGE_EDGE_LEG.md says which to run per leg.
+`bracket_deltas.py <legs> <leg>` scores the L072 counter brackets (reset-aware,
+cross-checked against `leg<X>_gaps.txt`; the RS-12.15 criteria on FHSS legs
+only; BENCH_RUNBOOK, "A leg").
+
+The range-edge session adds three scoring helpers in `bench_tools/`, run per
+leg by `leg_post.sh` (files `leg<X>_{probe_score,rf,digest_trace}.txt`); the
+pooled runs are by hand: `rs13_rf_extract.py` (received level, R0, leakage,
+tracking and closing checks; `--path antenna` for legs on the antennas gives
+the level only), `rs13_probe_score.py` (command delivery, pooled per profile
+and codec, with a `tail:` line per leg) and `rs13_digest_trace.py` (A16
+confirmation). They take paths, so they need no copy; each exits non-zero on
+missing or garbled input. RS13_RANGE_EDGE_LEG.md says which to run per leg.
 
 ## 8. Park and power down
 
@@ -446,4 +484,5 @@ list. These are the common symptoms:
 | docker images vanish on the base | `compose-apps-early-start-recovery.service` is unmasked: it runs `rm -rf /var/lib/docker` every 60 s | mask it ([BENCH_SETUP.md](BENCH_SETUP.md)) |
 | board resets about 60 s into a long operation | the U-Boot-armed X8 watchdog | FLASH_RUNBOOK §3; close `/dev/watchdog0` with `V` |
 | a harness parameter seems ignored | misspelled name | the harness now rejects unknown names; read the archive's `params.txt` |
+| harness stops at `[DEPLOY] adb push FAILED ...` or `[DEPLOY] md5 MISMATCH ...`, `No daemon was started.` | since the 2026-10-19 bench kit every push is checked; usually a root-owned file or folder in `/tmp/lifetrac_strict` or `/tmp/lifetrac_p0c` on that board | remove it with sudo on that board and re-run the leg; nothing was transmitted |
 | adb lost the board after `adb kill-server` | the board's adbd hung | run `adb -s <serial> wait-for-device` once; if that fails, replug USB-C or press RESET. Avoid `kill-server` while the boards are enumerating ([ADB_TIPS_AND_TRICKS.md](../../../X8_HEALTH_AND_RECOVERY/recovery/ADB_TIPS_AND_TRICKS.md)) |

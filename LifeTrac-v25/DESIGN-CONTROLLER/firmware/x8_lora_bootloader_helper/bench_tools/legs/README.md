@@ -24,8 +24,8 @@ Before you start, read:
   - `leg2d_switch.sh` makes the base transmit commands.
   - Run them only inside a GO'd leg.
   - The other scripts never transmit.
-- **Park last.** `leg_post.sh` parks both radios after the reports. Before you
-  leave, run `power_up_guard.sh --check-only`.
+- **Park last.** `leg_post.sh` parks both radios after the reports and the
+  scorers. Before you leave, run `power_up_guard.sh --check-only`.
 - **Screen.** Never use `firefox --kiosk` or any fullscreen the operator cannot
   leave with Esc. The bench video runs in a normal window, and only the YouTube
   player is fullscreen (`youtube_window.ps1`).
@@ -80,8 +80,8 @@ overrides the file for one run of these `legs/` scripts, for example
 | `leg_prep.sh` | Scene check, UART-holder check, health probes, `clear_retained`, pre-brackets, detached base capture. Writes the harness command. Knows the RS-13.1 tags and the range-edge leg names. | both | wakes the receivers (RXCONT); does not transmit |
 | `link_sample.sh` | During a leg: the first `link_stats` message that has frames (P7). | base broker | none |
 | `leg2d_switch.sh` | Leg 2d only: the override publishes at T+60 s and T+180 s, plus the acks. | base broker | **the base transmits** (0x63 commands) |
-| `leg_post.sh` | Collects the capture, post-brackets, `rs12_leg_report --capture`, `frag_gap_report`, P2/P4 and the tractor-log, then **parks** (with retries). | both | parks; never transmits |
-| `leg_replay.py` | PC only: replays a base capture (seq gaps per codec run, resync episodes, last DIGEST). `py -3 leg_replay.py <leg> <image_bw500\|image_bw250> [--evidence-dir DIR \| --capture FILE]`; it reads `<DIR>/leg<leg>_base.jsonl` (default DIR: `$EVIDENCE_DIR`, which only the scripts export, so pass `--evidence-dir` from a plain shell). `leg_post.sh` runs it for you. | none | none |
+| `leg_post.sh` | Collects the capture, post-brackets, `rs12_leg_report --capture`, `frag_gap_report`, P2/P4 and the tractor-log, each written whole to `legs/`; copies the archive's `tractor_ocd_reset.log`, `inject.log`, `inject_trigger.txt` as `leg<X>_*`; runs the RS-13 scorers and `bracket_deltas.py` (a failing scorer never stops it: see the `scorer exit codes:` line); then **parks** (with retries). | both | parks; never transmits |
+| `leg_replay.py` | PC only: replays a base capture (seq gaps per codec run, resync episodes, last DIGEST). `py -3 leg_replay.py <leg> <image_bw500\|image_bw250> [--evidence-dir DIR \| --capture FILE]`; it reads `<DIR>/leg<leg>_base.jsonl` (default DIR: `$EVIDENCE_DIR`, which only the scripts export, so pass `--evidence-dir` from a plain shell). `leg_post.sh` runs it for you and keeps its output as `leg<X>_replay.txt`. On a capture with no VECTOR frame (mono_g4) it prints `digest_ok n/a (no VECTOR frame)`. | none | none |
 
 ## A session
 
@@ -147,19 +147,35 @@ $DTS_CARRIER_HZ = <your same-day pick, in Hz>
 ```bash
 # 3. while frames flow (Git Bash):
 bash link_sample.sh 2a
-# 4. after the harness prints "[EVIDENCE] archived to ...": collect, report, park
+# 4. after the harness prints "[EVIDENCE] archived to ...": collect, report, score, park
 bash leg_post.sh 2a          # or: bash leg_post.sh 2a <archive dir>
 ```
 
 Before step 4, read the `=== LEG CHECKS ===` block just above the
 `[EVIDENCE]` line. `TRACTOR_L072_RESET landed` is expected. `failed` or
 `unknown` means the tractor's counters may carry over from before the leg;
-`deltas.py` handles that (BENCH_RUNBOOK, "A leg"). `failed (... not this leg's ...)` means the
+`../bracket_deltas.py` handles that (`leg_post.sh` writes `leg<X>_deltas.txt`;
+BENCH_RUNBOOK, "A leg"). `failed (... not this leg's ...)` means the
 leg-start reset was never spawned (the spawn's output is quoted).
 `failed (... killed by SIGHUP ... openocd never started)` points at the
-hangup race (candidate (c) in BENCH_RUNBOOK, "L072 resets at leg start").
-Keep that leg's archived `tractor_ocd_reset.log`. `BASE_L072_RESET unverified`
-prints on every leg: score the base brackets post − pre.
+hangup race (candidate (c) in BENCH_RUNBOOK, "L072 resets at leg start"),
+which the pushed `../ocd_reset.sh` closes since the bench kit of 2026-10-19
+(not yet flown). A `killed by SIGHUP after openocd started` reason (banner
+present) is a hangup that reached openocd itself after it installed its own
+SIGHUP handler; it is not the A2c2 nohup window.
+Keep that leg's archived `tractor_ocd_reset.log` (`leg_post.sh` copies it to
+`leg<X>_tractor_ocd_reset.log`). `BASE_L072_RESET unverified` prints on every
+leg: score the base brackets post − pre.
+
+LEG CHECKS also prints `CLOCKS board minus PC: ...` and
+`LOG_WINDOW after_stop (...)` (bench kit 2026-10-19): the harness now stops
+the frame source, the injector, then tx_smoke (after `-StopDrainS`, default
+2 s) and rx_smoke, and reads the daemon logs only after that. Every adb push
+is checked and md5-compared with the PC copy; the archive keeps
+`deploy_md5.txt`. A leg that stops at `[DEPLOY]` with `adb push FAILED` or
+`md5 MISMATCH` and `No daemon was started.` transmitted nothing: remove the
+root-owned file or folder in `/tmp/lifetrac_strict` or `/tmp/lifetrac_p0c` on
+that board with sudo and re-run (BENCH_RUNBOOK, "A leg").
 
 **Step 5 is the park.**
 - `leg_post.sh` parks both radios last. It retries a `PARK_TRANSIENT` after
@@ -188,6 +204,9 @@ A few cautions about the harness command:
   and archives `inject.log` and `inject_trigger.txt`. Do not start injectors
   by hand from the console tail. `leg_prep.sh` does not write `-InjectCmd`;
   add it to the line yourself.
+- For a saturated multi-fragment FHSS leg add `-StopDrainS 4` (the drain
+  between the feed stop and the tx_smoke stop; default 2 s). `leg_prep.sh`
+  does not write it.
 
 ### The four RS-13 legs
 
@@ -219,7 +238,8 @@ followed by a `_suffix` (`A2a_r2`). Since 2026-10-19 only the `A2*` tags are
 planned: they are to fly on the antennas (the §8.6 command-delivery row and
 the A16 confirmation), on the operator's explicit GO for the round (RS13_RANGE_EDGE_LEG.md, "Safety and GO rules"). The `leak_*`, `B*`, `C*` and
 `*close` tags need the conducted attenuator path, which the bench does not
-have, so they are not planned. `leg_prep.sh` still accepts them.
+have, so they are not planned. `leg_prep.sh` still accepts them, with a NOTE
+that the bench has no attenuator path.
 
 | tag | prep | harness | base capture |
 |---|---|---|---|
@@ -241,14 +261,30 @@ have, so they are not planned. `leg_prep.sh` still accepts them.
   - a profile or `--boot-mode` that contradicts the tag.
 - It keeps `--duration`, `--reactive-fire`, `--fps` and `--strict` /
   `--no-strict` overrides, and prints each as a NOTE.
-- Set `EVIDENCE_DIR` to `bench-evidence/RS_13_range_edge_<date>/legs` in
-  `bench.env` first; otherwise the prep prints a NOTE.
+- Set `EVIDENCE_DIR` in `bench.env` first:
+  `bench-evidence/RS_13_range_edge_<date>/legs`, or for the `A2*` antenna
+  legs `bench-evidence/RS_13_antenna_<date>/legs`; otherwise the prep prints
+  a NOTE. The `A2*` plan line reads `Round A on the antennas (no attenuators
+  since 2026-10-19)`; a conducted-path tag (`leak_*`, `B*`, `C*`, `*close`)
+  also gets a NOTE that the bench has no attenuator path.
 - File names carry the `leg` prefix (`legA2c_*`, `legleak_dts_*`).
 - `--print-harness` shows the plan line (profile, codec, length,
   `-ReactiveFire`, capture) and any NOTE without touching a board.
-- The scoring helpers (`../rs13_rf_extract.py`, `../rs13_probe_score.py`,
-  `../rs13_digest_trace.py`) are PC tools; `leg_post.sh` does not run them
-  yet. RS13_RANGE_EDGE_LEG.md says which to run per leg.
+- `leg_post.sh` runs the per-leg scorers (PC tools) after the reports and
+  before the park, each into its own file:
+  - `../rs13_probe_score.py <archive>` -> `leg<X>_probe_score.txt` (when the
+    base logged `PROBE TX` lines or the leg flew `-ReactiveFire 1`);
+  - `../rs13_rf_extract.py <archive> --lines` -> `leg<X>_rf.txt` (every leg);
+  - `../rs13_rf_extract.py --leak <archive>` -> `leg<X>_leak.txt` (`leak_*`
+    legs);
+  - `../rs13_digest_trace.py leg<X>_base.jsonl` -> `leg<X>_digest_trace.txt`
+    (skipped when the capture's summary counts no VECTOR frame);
+  - `../bracket_deltas.py <legs> <X>` -> `leg<X>_deltas.txt`.
+
+  A scorer that fails never stops the post step or the park; the
+  `scorer exit codes:` line lists every exit code. The pooled runs (R0 or,
+  on the antennas, `--path antenna` over the legs; the §8.6 codec pool; the
+  A16 verdict over 2a + 2a′) stay manual: RS13_RANGE_EDGE_LEG.md.
 
 ## Step 1: camera-only dry run (no radio)
 
@@ -288,6 +324,8 @@ line, also ends INVALID (exit 6): its budget is unverified.
 - `step1_pass.sh` refuses to start while anything holds `/dev/ttymxc3` or a
   `tx_smoke` / `rx_smoke` / `synth_pub` container runs. A tx daemon would put
   the camera frames on the air.
+- Each pass keeps its console in `step1_<tag>_transcript.txt` (appended); the
+  last line is `step1 exit=<rc>`, also after an abort or Ctrl+C (2026-10-19).
 
 ## Where things go
 
@@ -297,7 +335,9 @@ line, also ends INVALID (exit 6): its budget is unverified.
     RS13_VECTOR_LEG.md, "Evidence layout".
   - Set it explicitly for a session that crosses midnight UTC.
   - `leg_prep.sh` and `leg_post.sh` save their own transcripts there
-    (`leg<X>_prep.txt`, `leg<X>_post_transcript.txt`).
+    (`leg<X>_prep.txt`, `leg<X>_post_transcript.txt`); `step1_pass.sh` keeps
+    `step1_<tag>_transcript.txt` (appended), whose last line is
+    `step1 exit=<rc>`.
   - The staging md5s go to `staging_<role>.txt`.
 - **Scratch:** `$BENCH_SCRATCH`, for the harness wrappers and transcripts and
   the LF-clean copies.
@@ -315,7 +355,8 @@ line, also ends INVALID (exit 6): its budget is unverified.
   before/after retained listing to `step1_bench_mqtt_reset.txt`. It also runs
   the scene check and pulls the pass files into the evidence folder. Since
   2026-10-18 it passes `LIFETRAC_REG_PROFILE` and exits 6 when the VECTOR
-  cold-start clamp shows in the boot log.
+  cold-start clamp shows in the boot log. Since 2026-10-19 it keeps its
+  console in `step1_<tag>_transcript.txt`, ending `step1 exit=<rc>`.
 - **`stage_boards.sh`** also stages `/tmp/lifetrac_p0c/08_boot_user_app.cfg`
   LF-clean. The harness's openocd reset of the tractor uses it. The staging
   is md5-checked. It also stages `channel_survey_sniff.py` (not with
@@ -326,6 +367,9 @@ line, also ends INVALID (exit 6): its budget is unverified.
   - picks the boot mode and strictness by tag;
   - knows the range-edge tags; takes `--duration` and `--reactive-fire`; the
     base capture runs the leg + 180 s;
+  - labels the `A2*` tags for the antennas, accepts an
+    `RS_13_antenna_<date>` `EVIDENCE_DIR` for them, and prints a NOTE on a
+    conducted-path tag (2026-10-19);
   - writes the harness command.
 - **`scene_check.sh`** runs its window until 10.5 s after the camera's sixth
   frame, which is the frame the 1.9 / 5 / 10 s pairs are measured from, and
@@ -341,10 +385,14 @@ line, also ends INVALID (exit 6): its budget is unverified.
   - passes `--capture` to `rs12_leg_report.py` (A14);
   - finds the archive by itself;
   - flags a DTS leg flown on 915.000 MHz;
-  - retries the park.
+  - retries the park;
+  - writes the report and gaps files whole (the old `tee | head -8` cut the reports
+    at 1024 B), copies the archive's per-leg files and runs the RS-13
+    scorers (2026-10-19).
 - **`leg_replay.py`** takes `--evidence-dir` or `--capture`. It runs from any
   directory. On the RS-13.1 `2a_r4` capture it reproduces the recorded
-  `leg2a_r4_p2p4.txt` seq-gap line exactly.
+  `leg2a_r4_p2p4.txt` seq-gap line exactly. On a capture with no VECTOR frame
+  it prints `digest_ok n/a` instead of raising a TypeError (2026-10-19).
 - **`power_up_guard.sh`** replaces `guard_both.sh`, `power_up_guard.sh` and
   `tractor_guard_capture.sh`. It adds ssh for the base, `--check-only`, the
   park retry and a refusal to probe while a leg container or a UART holder is
@@ -358,15 +406,14 @@ line, also ends INVALID (exit 6): its budget is unverified.
   over adb. With `BASE_TRANSPORT=ssh` you can stage, guard and check, but you
   cannot fly a leg.
 - **The harness pushes its own copy of the reset cfg.** At every launch it
-  pushes `08_boot_user_app.cfg` from the working tree. The repo's
+  pushes `08_boot_user_app.cfg` from the working tree (and, since 2026-10-19,
+  `../ocd_reset.sh`, which it strips of CRs itself). The repo's
   `.gitattributes` keeps `*.cfg` LF, so this matters only on a checkout made
   before `.gitattributes` landed: there, with `core.autocrlf=true`, the copy
   has CRLF line endings and overwrites the LF copy `stage_boards.sh` staged.
 - **`--capture` is adb-only.** `power_up_guard.sh --capture` calls
   `pull_board_state.sh`, which is adb-only; it reads `BASE_SERIAL` and
   `TRACTOR_SERIAL` from `bench.env`.
-- **`leg_post.sh` does not copy the harness's new archive files** (`inject.log`,
-  `inject_trigger.txt`, `tractor_ocd_reset.log`) into `legs/`, and does not
-  run the RS-13 scoring helpers. Copy and run them by hand. Its console
-  still says the base capture runs "480 s"; it waits on the container
-  (`docker wait`), so a shorter or longer capture is handled.
+- **`leg_post.sh` scores single legs only.** The pooled scorer runs stay
+  manual. It does not copy the archive's `deploy_md5.txt` into `legs/`; that
+  file stays in the archive.

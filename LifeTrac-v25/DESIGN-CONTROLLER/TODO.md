@@ -624,7 +624,7 @@ No-regrets work, correct under every surviving architecture (do first):
   0xFB ENCODE_MODE over LoRa → tractor `camera_service` applies + acks →
   ack rides back over the air → web pill shows pin→actual (amber on
   mismatch). Verified in parts; never as one loop with a real camera_service.
-- [ ] **RS-1.4 AutoRadioPolicy live validation** — set profile selector to
+- [x] **RS-1.4 AutoRadioPolicy live validation** — set profile selector to
   Auto, attenuate/detune to force timeouts, watch it degrade DTS→FHSS and
   promote back after the 60 s health dwell. Policy is unit-tested
   (`test_web_ui_radio_profile.py`); zero air evidence yet.
@@ -1220,13 +1220,13 @@ No-regrets work, correct under every surviving architecture (do first):
   trustworthy after that lands. **2026-10-18 (legkit, no radio):** the tractor SWD reset is now
   judged at leg end from its openocd log (`TRACTOR_L072_RESET`, archived; BENCH_RUNBOOK, "A leg"),
   and the base gpio163 pulse output is captured and reported unverified. Still open: a post-reset
-  VER/boot-count gate, a base reset that works (RS-5.2), and md5 checks after each push.
+  VER/boot-count gate and a base reset that works (RS-5.2). The md5 check after each push is done offline (bench kit 2026-10-19, first leg to confirm): every `adb push` must print `N file(s) pushed` and exit 0, then each pushed file is md5-compared on the board with the PC copy; a failed push or an md5 mismatch stops the leg at `[DEPLOY]` before any daemon starts (a file md5sum does not report is a warning only; `deploy_md5.txt` in the archive; BENCH_RUNBOOK, "A leg").
 - [ ] **RS-5.2 Deploy gpio — tractor gpio163 dead** — L072 reset on the tractor works only via the
   fragile OpenOCD/SWD path (7–10 s, occasionally hangs). Root-cause the GPIO (pinmux? blown pad?) or add
   a hardware NRST jumper on the carrier. Largest single bench-fragility item. **Base too (2026-10-18):**
   gpio163 has not reset the base L072 since 2026-08; the fault is between gpio163 and PF4 (openocd on
   PF4 works on both boards). Tractor first-leg misses: candidates (a)–(d) in BENCH_RUNBOOK, "L072 resets
-  at leg start"; (c)'s signature was seen 2026-10-19 on A2c2 (not a first leg), so its launch fix need not wait; first-leg misses still need a first-leg log.
+  at leg start"; (c)'s signature was seen 2026-10-19 on A2c2 (not a first leg), so its launch fix did not wait: `bench_tools/ocd_reset.sh` (bench kit 2026-10-19, done offline, first leg to confirm); first-leg misses still need a first-leg log.
 - [ ] **RS-5.3 Dev-loop smoke tier** — `-DurationS 30 -NoArchive` harness mode to cut the
   edit→verdict loop from ~9 min to ~4; keep 120 s+archive for evidence runs. **Verified 2026-07-25 —
   half of this already ships.** `-DurationS` is an existing parameter and **already defaults to 30**
@@ -2619,8 +2619,8 @@ conflicts. Every leg needs GO; radios stay parked between legs.
   BW500 / bench 915) and the two-phase switch are unchanged; #124's gate
   work is transparent to the UI.
 
-- [ ] **RS-12.17 — `_stats_worker` dies mid-leg on a `None` gap-sample list
-  (found 2026-09-15 during leg U).** `image_rx_daemon.py:1723` takes
+- [x] **RS-12.17 — `_stats_worker` dies mid-leg on a `None` gap-sample list
+  (found 2026-09-15 during leg U; FIXED in PR #126, `52ac74f3`: the by-class block now sits inside `if samples:`, SIL `base_station/tests/test_air_gap_by_class_sil.py`).** `image_rx_daemon.py:1723` takes
   `samples = getattr(self, "_gap_samples", None)` and guards the air-gap
   block with `if samples:`, but the RS-11.1 `air_gap_by_class` block
   (~:1798) reuses `samples` while sitting **inside the phase-telemetry
@@ -2765,7 +2765,7 @@ conflicts. Every leg needs GO; radios stay parked between legs.
   2026-10-18 (RS_12_15_clock_authority_2026-09-14/ERRATA.md): the tractor L072 restarted at the start of legs P
   and Q2, the two legs flown without a flash before them; no figure was affected. Leg R's negative loss line was
   a log-window artifact, not a reset. The 09-14 loss figures depend on the counting method (O's 0.3 % reads 2.2 %
-  over the shared window); rs12_leg_report.py should score loss over the window both logs cover (ERRATA §3).
+  over the shared window); rs12_leg_report.py should score loss over the window both logs cover (ERRATA §3). Done 2026-10-19 (bench kit, no radio): a `shared-window loss` line under the old line, which now ends `[whole logs]`; on the committed archives it reproduces both columns of the ERRATA §3 table.
   Round 4 review (after the legs): leading-grid originator now hands STALE (epoch-drift barrier kept; forged
   epoch+2 host-pinned REJECTED); wire-sync enforces the 10 new offsets; PRODUCTION build/firmware.bin rebuilt +
   committed (589c1203). Boards run bench 5a160e4a (flown); PR-head bench = 0c1bb0a9 -- delta not exercised on air
@@ -3587,12 +3587,12 @@ explicit GO)
   on the antennas, as the 2026-10-18 RS-12.15 legs did. Order: (1) here, then (2) and (3), the next two items. Leg lines: `legs/leg_prep.sh <leg name>`.
   - [x] (1) **Done 2026-10-19** ([RESULTS](bench-evidence/RS_13_range_edge_2026-10-19/RESULTS.md)): §8.6 command delivery, VECTOR vs `mono_g4`, and the on-air check of the A16 fix (#143). The receive-only spot-check (51 channels, 49 hot) picked 927.5 MHz;
     the DTS legs A2c, A2a, A2c2, A2a2 flew 300 s each there (`-ReactiveFire 1 -ProbeEcho 0 -TxBatch 0`), FRF readback OK on both boards every leg. Command delivery: VECTOR 433/433 vs `mono_g4` 418/420, Fisher p = 0.242, NOT WORSE. P3 loss: 1/1228 vs 1/1230, p = 1.
-    A16 not exercised: the one VECTOR loss (A2a2 row 268) opened no DIGEST mismatch or resync, 0 loss-opened episodes (thin; A16 item). Max K 1, no gap > 3 s; VECTOR encoder p95 247.2 / 261.3 ms (step-1 reference 221.8 ms, Images item).
+    A16 not exercised: the one VECTOR loss (A2a2 row 268) opened no DIGEST mismatch or resync, 0 loss-opened episodes (thin; A16 item). Max K 1, no gap > 3 s; VECTOR encoder p95 247.2 / 261.3 ms (step-1 reference 221.8 ms, Images item). Correction 2026-10-20 (RESULTS, Anomalies): both `mono_g4` misses (PROBE seq 210) reached the tractor's radio after its log had been read (tractor `radio_rx_ok` 211 = base Δ`radio_tx_ok` 211 on A2c and A2c2), so 420/420 at the radio; the scored 418/420 and the verdict stand.
   - [-] not planned (no attenuation equipment, operator 2026-10-19): Round A's conducted 0 dB step and leakage check, and the Round B / C 3 dB walks of `bench_tools/RS13_RANGE_EDGE_LEG.md` (#143). The procedure stays for reference. No range data comes from the bench.
-  - [x] Scoring helpers (2026-10-18, no radio; 41 SIL tests in `base_station/tests/test_rs13_scoring_sil.py`):
+  - [x] Scoring helpers (2026-10-18, no radio; 41 SIL tests in `base_station/tests/test_rs13_scoring_sil.py`, 53 since 2026-10-19):
     `bench_tools/rs13_rf_extract.py` (level, R0, leakage, tracking, closing), `rs13_probe_score.py` (§8.6
     command delivery) and `rs13_digest_trace.py` (A16; replaces RS-13.1's `scripts/digest_trace.py`). They
-    reproduce the RS-0.12 probe figures, the RS-13.1 A19 level (−64 dBm) and the old digest_trace rows.
+    reproduce the RS-0.12 probe figures, the RS-13.1 A19 level (−64 dBm) and the old digest_trace rows. 2026-10-19: `bench_tools/bracket_deltas.py` (the kit copy of RS-12.15's `scripts/deltas.py`) judges `tx_first_anchor` by the leg's delta, reads the base streak as a since-boot mark, and applies the FHSS-only RS-12.15 criteria on FHSS legs only (SIL: `base_station/tests/test_bracket_deltas_sil.py`, 14 cases; an FHSS leg with no command (0/0, the RS-13 FHSS walk) scores delivery N/A). `rs13_probe_score.py` pools per (profile, codec) and prints a `tail:` line. `rs13_rf_extract.py --path antenna` gives the level only. `test_rs13_scoring_sil.py` now has 53 tests.
 - [ ] FHSS command-delivery and switch legs ("2d on profile 1"), after the
   RS-12.15 reverse-delivery firmware fix. Before it they would measure that
   defect, not VECTOR. Unblocked 2026-10-18: both boards run `e083ae46`, and
@@ -3600,8 +3600,8 @@ explicit GO)
   (RS-12.15 above).
 - [ ] A live web_ui leg (UI-driven switch, web_ui as an uplink actor), after the
   base image rebuild (done 2026-10-14, `0413f3c4dac3`).
-- [~] **Bench-kit follow-ups found 2026-10-15 / 10-18** (no radio;
-  the 2026-10-18 fixes are in code; first real-board runs 2026-10-19, [RESULTS](bench-evidence/RS_13_range_edge_2026-10-19/RESULTS.md)):
+- [~] **Bench-kit follow-ups found 2026-10-15 / 10-18 / 10-19** (no radio;
+  the 2026-10-18 fixes are in code; first real-board runs 2026-10-19, [RESULTS](bench-evidence/RS_13_range_edge_2026-10-19/RESULTS.md); the 2026-10-19 fixes, branch `bench-kit-fixes-2026-10-19`, are in code and tested offline only, not yet run on a board):
   - [x] ~~`legs/step1_pass.sh` should pass `LIFETRAC_REG_PROFILE`~~ Fixed 2026-10-18 (1 = bw250, 2 =
     bw500). A pass whose boot log shows the `VECTOR budget` clamp line (the old grep missed it) prints a
     WARNING, keeps its files, ends `INVALID` and exits 6. First tractor run 2026-10-19 (bw500): `byte_budget=243 B/frame`, no clamp line, exit 0 `done` (Images item); the exit-6 path did not fire.
@@ -3620,22 +3620,22 @@ explicit GO)
     0→23→50→122→158 over legs V, W, W2, X, [deltas](bench-evidence/RS_12_15_reverse_delivery_2026-10-18/legs/)).
     The fault is between gpio163 (x8h7 line 3) and PF4: openocd on PF4 does reset it. The harness prints
     `BASE_L072_RESET unverified` and archives `base_gpio163_output=`; score base brackets post − pre
-    ([`deltas.py`](bench-evidence/RS_12_15_reverse_delivery_2026-10-18/scripts/deltas.py)). Next steps:
+    ([`bracket_deltas.py`](firmware/x8_lora_bootloader_helper/bench_tools/bracket_deltas.py)). Next steps:
     BENCH_RUNBOOK, "L072 resets at leg start". 2026-10-19: `unverified` on all four legs.
   - **Tractor L072 reset: judged at leg end since 2026-10-18** (`TRACTOR_L072_RESET`, `tractor_ocd_reset.log`, a
     per-leg `OCD_LEG=` tag). It missed on the first leg after each flash reboot (V; O, Q, R, S, T, U) and landed on P
     and Q2 ([ERRATA](bench-evidence/RS_12_15_clock_authority_2026-09-14/ERRATA.md) §1). First real run 2026-10-19: landed on A2c, A2a, A2a2; on A2c2 it matched candidate (c)'s signature, killed by SIGHUP before openocd started (`OCD_EXIT=129`, no openocd banner, [log](bench-evidence/RS_13_range_edge_2026-10-19/legs/legA2c2_tractor_ocd_reset.log); its counters carried over, `legA2c2_deltas.txt`).
-    A2c2 was not the first leg after a boot, so that miss did not need a fresh boot; whether the first-leg misses are (c) too is unknown. Open: the fix (run the reset from a pushed LF-only script with `trap '' HUP`, or under setsid; BENCH_RUNBOOK, "L072 resets at leg start").
+    A2c2 was not the first leg after a boot, so that miss did not need a fresh boot; whether the first-leg misses are (c) too is unknown. Fix done offline (bench kit 2026-10-19), first leg to confirm: the harness pushes `bench_tools/ocd_reset.sh` (LF-only), which sets `trap '' HUP` before it forks, and `inject_watch.sh start` does the same before its `nohup`; the offline test reproduces A2c2 with the old inline form and shows the script land (BENCH_RUNBOOK, "L072 resets at leg start", candidate (c)).
   - Seen again for RS-12.21: the post-leg parks took up to three attempts per board (`PARK_TRANSIENT` / `PARK_FAIL`
     while the scan SM was still walking) before `PARK_OK` (`legs/leg*_park.txt`); the end-of-round check read
     `0x80` on both ([check](bench-evidence/RS_12_15_reverse_delivery_2026-10-18/legs/session_end_radio_check.txt)). 2026-10-19: `PARK_OK` on the first attempt on both boards after every leg (`legs/legA2*_park.txt`).
   - [x] `legs/leg_prep.sh` writes every range-edge leg (profile, codec, probes and length from the tag; `--duration`,
     `--reactive-fire`; capture = leg + 180 s; legs/README.md, "Range-edge legs"), and `legs/stage_boards.sh` stages
     `channel_survey_sniff.py` (2026-10-18, no board). 2026-10-19: of these tags only A2c, A2a, A2c2, A2a2 were still planned; all four flew from it that day (first real run, `legs/legA2*_prep.txt`).
-  - [ ] `legs/leg_replay.py`: TypeError at line 68 (`dr.last_ts` None) after its first line
-    on a capture with no VECTOR frame (leg 2c). `legs/leg_post.sh`: copy the archive's
-    `inject.log`, `inject_trigger.txt`, `tractor_ocd_reset.log` and run the RS-13 scoring
-    helpers.
+  - [x] ~~`legs/leg_replay.py`: TypeError at line 68 (`dr.last_ts` None) after its first line on a capture with no VECTOR frame; `legs/leg_post.sh`: copy the archive's files and run the RS-13 scoring helpers.~~ Fixed 2026-10-19 (no board). `leg_replay.py` prints `digest_ok n/a (no VECTOR frame)`. `leg_post.sh` writes its report and gaps files whole: the old `tee | head -8` cut legs W, X and the four A2* reports at 1024 B. It keeps `leg<X>_replay.txt` and shows a non-zero exit, copies `tractor_ocd_reset.log`, `inject.log` and `inject_trigger.txt`, and runs the scorers into `leg<X>_{probe_score,rf,leak,digest_trace,deltas}.txt` with a `scorer exit codes:` line. `step1_pass.sh` keeps `step1_<tag>_transcript.txt`, ending `step1 exit=<rc>`. `leg_prep.sh` labels the A2* tags for the antennas and accepts an `RS_13_antenna_<date>` EVIDENCE_DIR. Not yet run on the boards.
+  - [x] Harness leg end, pushes and clocks: done offline (bench kit 2026-10-19), first leg to confirm (BENCH_RUNBOOK, "A leg"). Log order: it stops the frame source, then the injector, waits out `-StopDrainS` (default 2 s), stops tx_smoke, then rx_smoke, and reads the daemon logs after the stop (`log_window=after_stop`, `stop_drain_s=` in params.txt; the 10-19 legs' +1 base send and `received > sent` were the old read-while-running window). Checked pushes: adb's `N file(s) pushed` line and exit status, then a board md5 of every pushed file against the PC copy (`deploy_md5.txt`, `tractor_deploy_md5=` / `base_deploy_md5=`); a failed push or an md5 mismatch stops the leg at `[DEPLOY]` before any daemon starts (an unreported md5 is a warning only), and the 25 `RemoteException` blocks per transcript should be gone (first leg to confirm). Clock offsets: `tractor_clock_offset_s=` / `base_clock_offset_s=` with their rtt in params.txt and a `CLOCKS` line in LEG CHECKS, read only (no clock is set). SIGHUP: `ocd_reset.sh`, tractor reset item above.
+  - [x] Report and dry-run fixes 2026-10-19 (no radio): `tools/rs12_leg_report.py` prints a `shared-window loss` line (ERRATA §3), its FIRMWARE DROP subtracts the base's own count (the received > sent clamp had replaced it with the TX count: A2c and A2a printed 6, now 5 and 4), and it notes the log window when params.txt lacks `log_window=after_stop`. `tools/vector_dry_run.py` held non-VECTOR key frames to VECTOR's epoch-start limit (A2c rows 490 and 572 were counted over; a `mono_g4` key frame now gets the full limit).
+  - [ ] First flown leg on the 2026-10-19 kit: confirm base brackets == base sends on air, received <= sent, TRACTOR_L072_RESET landed with banner, deploy_md5 all ok, no `RemoteException` block in the transcript, both clock offsets numeric (and see whether FIRMWARE DROP falls to about the rx_urc_lost level, 0-2 on the 10-18/10-19 legs: a prediction, not a measurement).
 - [ ] **Production camera unit, 40 B VECTOR cold budget** (found 2026-10-18,
   no radio). The tractor image `b2a3c8070240` has no `lora_proto.py` (its
   build context is `firmware/tractor_x8`), so without the bench's `/work`

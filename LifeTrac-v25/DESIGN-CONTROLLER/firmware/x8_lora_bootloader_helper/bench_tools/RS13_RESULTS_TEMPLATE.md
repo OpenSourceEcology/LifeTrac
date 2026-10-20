@@ -106,7 +106,7 @@ reports; every `PARK_TRANSIENT` and its re-park ~60 s later
 |---|---|---|---|---|---|---|
 | P1 | dry-run checks on the base capture (`RESULT:` line as written; failing check names; `store:` line orphans / digest mismatched / resync; final `digest_ok`) | | | n/a | window checks | |
 | P2 | frames published / s (`published frame_id` lines ÷ 300; a 1-fps FHSS leg also from lock: `n_frag` ÷ `span` of `frag_gap_report.py`, A7) | | | | n/a | |
-| P3 | loss: `capture seq gaps` line of `rs12_leg_report.py --capture` (the loss of record, A14; 1-fps FHSS: from lock + the `counting from seq 1` figure, A7); the report's counter `loss` line; Δtx_ok ↔ Δrx_ok; comparison basis (interleaved legs or the margin stated before the legs, A15) | | | | n/a | |
+| P3 | loss: `capture seq gaps` line of `rs12_leg_report.py --capture` (the loss of record, A14; 1-fps FHSS: from lock + the `counting from seq 1` figure, A7); the report's `shared-window loss` line (the `loss … [whole logs]` line is the old whole-log figure); Δtx_ok ↔ Δrx_ok; comparison basis (interleaved legs or the margin stated before the legs, A15) | | | | n/a | |
 | P4 | max fragments per frame (`done (pipelined): K fragments ok`: max K, count of K = 1 lines, ABORTED lines) | | | n/a | window | |
 | P5 | lock-loss gaps > 3 s (`frag_gap_report.py`) | n/a | | n/a | n/a | |
 | P6 | switch: first ack JSON; publish stamp → first codec-6 payload (s) vs the bound incl. the encoder p95 (A9); return ack JSON; return command on air (`command TX … (on air)`, base log) and codec-1 resumed after (s) vs (1 + n) camera periods + 1 fragment airtime, n = codec-6 frames received after the on-air line (amended 2026-10-10, A18); stamp and publish in one board call (A13) | n/a | n/a | n/a | | |

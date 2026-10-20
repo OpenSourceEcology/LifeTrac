@@ -291,6 +291,7 @@ this bench; it needs a distance test (top-level TODO.md, S-HW.2).
     `legs/leg<X>_gaps.txt`). The tractor's 211 against 209
     decoded commands is that unlogged send plus the late PROBE seq 210
     (Command delivery, above).
+
 - **A stale `rx_smoke` container was removed.** The survey command removed
   a stale, exited `rx_smoke` container on the base. The first line of
   `legs/spot_check_2026-10-19.jsonl` is the name that `docker rm` printed.
@@ -309,6 +310,102 @@ this bench; it needs a distance test (top-level TODO.md, S-HW.2).
   holds. Not investigated.
 - **The prep files call these legs "Round A, 0 dB step".** That is
   `leg_prep.sh`'s tag label. No step chain was used.
+
+**Correction (2026-10-20; the bench kit fixes on branch
+`bench-kit-fixes-2026-10-19`, checked on the committed evidence, no
+radio).** The text above stays as written; these points correct
+how parts of it read.
+
+- **The +1 base send is a PROBE sent after the harness read the base log,
+  not the log's one-send undercount of ERRATA §2.** The harness that flew
+  these legs read `docker logs` of tx_smoke (tractor) and then rx_smoke
+  (base) while both daemons still ran, and stopped them afterwards; the post
+  brackets were read after the stop. So the tractor's log ends first, the
+  base's next, and both before the brackets. On every leg the base fired one
+  more PROBE after its log had been read: base brackets / `base sends on air`
+  A2c 211/210, A2a 217/216, A2c2 211/210, A2a2 218/217. The 2026-10-18 legs
+  flew `-ReactiveFire 0` (the base sent only injector commands) and agree
+  exactly: V 23/23, W 27/27, W2 72/72, X 36/36
+  (`RS_12_15_reverse_delivery_2026-10-18/legs/leg<X>_{pre,post}_base.txt`,
+  `leg<X>_gaps.txt`).
+- **Both `mono_g4` misses reached the tractor's radio.** On A2c and A2c2 the
+  tractor L072's leg `radio_rx_ok` (211) equals the base's Δ`radio_tx_ok`
+  (211): the tractor's radio received every base send, both seq-210 PROBEs
+  included, after the tractor's log had been read. At the radio, `mono_g4`
+  delivery was 420/420 (on A2a and A2a2 too the tractor's `radio_rx_ok`, 217
+  and 218, equals the base's Δ`radio_tx_ok`). The scored figure stays 418/420, since
+  the rule scores the tractor's log, and the verdict, NOT WORSE, is
+  unchanged. `rs13_probe_score.py` now prints a `tail:` line per leg:
+  `[210]` on A2c and A2c2, `none` on A2a and A2a2.
+- **The `received > sent` under Evidence limitations (A2c 612 > 611, A2a 609 > 607), like the P3 detail's counter `loss` line, is the
+  same window.** The fixed `tools/rs12_leg_report.py` prints a
+  `shared-window loss` line (ERRATA §3 method): 0/611, 0/607, 1/609 (0.2 %)
+  and 1/612 (0.2 %) for A2c, A2a, A2c2 and A2a2. These are the same losses
+  as the seq-gap figures (0/616, 0/612, 1/614, 1/616), which stay the loss
+  of record. With `--capture`, the report's received > sent warning now
+  names the capture seq-gap line first. Its FIRMWARE DROP line now subtracts
+  the base's own count: 5, 4, 5 and 4 (A2c and A2a printed 6 because the
+  received > sent clamp had replaced the base's count with the TX count).
+  The remaining 4-5 is the log window plus the URCs the L072 lost
+  (`rx_urc_lost` 1, 0, 0 and 2). The tractor brackets show the same: leg
+  `radio_tx_ok` 617 / 613 / 615 / 617 against 611 / 607 / 609 / 612
+  fragments in the TX logs. On A2c, A2a and A2a2 the tractor L072 restarted
+  at leg start, so that figure is the post value; only A2c2's 615 is a
+  post − pre delta. The report now prints a log-window note under FIRMWARE
+  DROP on every archive without `log_window=after_stop`.
+- **The leg reports in `legs/` are cut at 1024 B.** Six reports stop at
+  exactly 1024 B as written: `legs/legA2c_report.txt`, `legA2a_report.txt`,
+  `legA2c2_report.txt` and `legA2a2_report.txt` here, and `legW_report.txt`
+  and `legX_report.txt` in `RS_12_15_reverse_delivery_2026-10-18/legs/`.
+  `leg_post.sh` piped `rs12_leg_report.py | tee | head -8`, and head's exit
+  killed tee. Re-running `rs12_leg_report.py` at main `36543a35` on each
+  archive, with the committed brackets (and capture for the A2* legs), gives
+  a full report whose first 1024 B are byte-identical to the committed file.
+  Full sizes: A2c 1165, A2a 1081, A2c2 1046, A2a2 1046, W 1185, X 1119 B.
+  Only the tail of the last `RS-12.15:` line is missing: ` | streak_max
+  post=1` on A2c2 and A2a2, everything from `| tx_first_anchor` on for A2a,
+  and on A2c, W and X part of the `consider_remote deltas` / `demotion
+  reset` fields too. The loss lines (`loss`, `capture seq gaps`) and the
+  radio deltas are intact; the gaps reports were not cut. `leg_replay.py`
+  also crashed (TypeError, `dr.last_ts` None) after its first two lines on the
+  `mono_g4` captures A2c and A2c2, hidden by `| head -1`; the p2p4
+  `seq-gap loss` rows are that first line and are correct. `leg_post.sh` now
+  writes each report whole.
+- **`legs/legA2c2_deltas.txt` scored a DTS leg by FHSS rules.** It came from
+  RS-12.15's `scripts/deltas.py`, which applies the FHSS criteria to every
+  leg; its `[FAIL] tractor tx_first_anchor post = 0`, its UNVERIFIED rows and
+  `STOP RULE: UNDETERMINED` are not results (as the A2c2 bullet above says).
+  The kit's `bench_tools/bracket_deltas.py` scores A2c2, and A2c, A2a and
+  A2a2, as DTS: deltas, reset evidence and cross-check only, exit 0. The
+  deltas and A2c2's cross-check are the same (brackets 211/211 vs logs
+  210/209, DISAGREE: the window above). `deltas.py` also judged
+  `tx_first_anchor` by its raw post, which would trip STOP on the second
+  FHSS leg after a missed tractor reset; `bracket_deltas.py` judges the
+  leg's delta. The 2026-10-18 legs are not affected: it gives V, W, W2 and X
+  the same numbers, all PASS. Where this file says to score a leg with
+  `deltas.py`, read `bench_tools/bracket_deltas.py <legs> <leg>`.
+- **The dry run's `one_fragment` count on A2c is a tool bug, not an
+  oversize frame** (the "dry run FAILs on the `mono_g4` captures" bullet
+  above). `vector_dry_run.py` applied VECTOR's 1-byte epoch-start trim
+  (VS1's own cap, VECTOR_SCENE.md §3.1) to every K = 1 frame of any codec. A
+  `mono_g4` key frame goes out under the default copies = 1 as one 0xFE
+  fragment at the full 243 B, so rows 490 and 572 fit. Fixed: a replay of
+  `legs/legA2c_base.jsonl` now reads `over limit: 0` and
+  `[PASS] one_fragment`; no other row of the four replays changes. RS-13.1's
+  leg2d_yt (row 254) and leg2d_r4 (rows 359 and 577) carried the same false
+  flag.
+- **Fixed in the same kit, none flown yet.** The A2c2 reset miss
+  (`OCD_EXIT=129`, no openocd banner, BENCH_RUNBOOK candidate (c)): the
+  harness now pushes `bench_tools/ocd_reset.sh`, which ignores HUP before it
+  forks. The log window: the harness now stops the feed, drains
+  (`-StopDrainS`, default 2 s), stops tx_smoke and then rx_smoke, and reads
+  the logs afterwards (`log_window=after_stop` in params.txt). The "Console
+  noise" bullet: every adb push is now checked and md5-compared, and the 25
+  `RemoteException` blocks are gone. The "Round A, 0 dB step" prep label:
+  `leg_prep.sh` now labels the A2* tags "Round A on the antennas (no
+  attenuators since 2026-10-19)". The RF setup's R0 verdict:
+  `rs13_rf_extract.py --path antenna` prints the level only (RSSI −70.0 dBm
+  / SNR 6.0 dB over the four legs, as above).
 
 ## Bench kit (PR #158): first real-board runs
 
