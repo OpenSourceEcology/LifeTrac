@@ -11,11 +11,18 @@ PROBE TX count. The base's own `probe:` line counts echoes, so with
 
     py -3 rs13_probe_score.py <archive_dir> [<archive_dir> ...]
 
-Prints one block per archive (keep it as legs/leg<X>_probe_score.txt). Given
-legs of both codecs (params.txt cam_extra_env: LIFETRAC_ENCODE_MODE=9 is
-VECTOR, =6 is mono_g4), it pools each codec and prints the VECTOR_SCENE 8.6
-verdict: not worse = VECTOR >= mono_g4, or a two-sided Fisher exact test on
-delivered / undelivered with p >= 0.05.
+Prints one block per archive (keep it as legs/leg<X>_probe_score.txt). Its
+`tail:` line lists the base PROBE seqs sent after the last one the tractor
+logged: they count as undelivered, but at the end of a leg they are often
+end-of-log artefacts (the tractor's log was captured before they landed;
+the harness's log-order fix removes most), so check them before quoting a
+miss. Given legs of both codecs (params.txt cam_extra_env:
+LIFETRAC_ENCODE_MODE=9 is VECTOR, =6 is mono_g4) on one profile, it pools
+each codec per profile (params reg_profile) and prints the comparison: not
+worse = VECTOR >= mono_g4, or a two-sided Fisher exact test on delivered /
+undelivered with p >= 0.05. On DTS (reg_profile=2) that is the
+VECTOR_SCENE 8.6 verdict; on FHSS (reg_profile=1) the same comparison
+prints, labelled FHSS.
 
 Fails closed. Exit 2 when a log is missing or holds no timestamped daemon
 line (the tractor's is checked on a leg that fired probes; the harness
@@ -29,9 +36,10 @@ inside the leg), a base seq repeats, or the tractor logged a seq the base
 never sent (the two logs are not from the same leg). Exit 1 when a leg
 fired no probe (nothing to score; FHSS walk legs are image-only). Any failed
 leg withholds the pooled verdict; so does (exit 1) a leg whose params.txt does
-not show reg_profile=2 and probe_echo=0, or whose codec is neither VECTOR nor
-mono_g4, since the 8.6 comparison pools VECTOR and mono_g4 DTS legs flown with
--ProbeEcho 0 only (its per-leg figures still print). A real tractor log with no PROBE line
+not show probe_echo=0 and a reg_profile of 1 (FHSS) or 2 (DTS), or whose codec
+is neither VECTOR nor mono_g4, and a set of legs that mixes FHSS and DTS, since
+the comparison pools VECTOR and mono_g4 legs of one profile flown with
+-ProbeEcho 0 only (the per-leg figures still print). A real tractor log with no PROBE line
 scores 0 delivered: that is a real result on a dead reverse link (RS-0.12
 B1, 0/86), and the block says so loudly. Timestamps are not used to score:
 the base and tractor clocks are not comparable.
@@ -53,7 +61,10 @@ _MODE = re.compile(r"LIFETRAC_ENCODE_MODE=(\d+)")
 # A daemon log line (Python logging's asctime): proof the file is a daemon log.
 _TS_LINE = re.compile(r"^\ufeff?\d{4}-\d\d-\d\d \d\d:\d\d:\d\d,\d{3} ", re.M)
 CODEC_BY_MODE = {"9": "vector", "6": "mono_g4"}
+# params reg_profile values whose legs pool (host_cfg_keys.h REG_PROFILE_*)
+PROFILE_LABEL = {"1": "FHSS", "2": "DTS"}
 ALPHA = 0.05
+TAIL_SHOWN = 20
 
 
 class ScoreError(Exception):
@@ -151,6 +162,14 @@ def score_leg(rx_text: str, tx_text: str) -> dict:
             f"log ({stray[:10]}): the two logs are not from the same leg")
     on_air = _ON_AIR.findall(rx_text)
     ok = sum(1 for o in on_air if o.startswith("OK"))
+    # The tail: base seqs sent after the last one the tractor logged (in the base's
+    # send order). Undelivered by construction; at the end of a leg, often probes
+    # that landed after the tractor's log was captured. Informational only.
+    tail = tail_after = None
+    if tr_seqs:
+        pos = {s: i for i, s in enumerate(base_seqs)}
+        last = max(pos[s] for s in set(tr_seqs))
+        tail, tail_after = base_seqs[last + 1:], base_seqs[last]
     return {
         "sent": len(base), "delivered": len(set(tr_seqs)),
         "tractor_lines": len(trac), "duplicates": len(tr_seqs) - len(set(tr_seqs)),
@@ -159,6 +178,7 @@ def score_leg(rx_text: str, tx_text: str) -> dict:
         "on_air": ok if on_air else None,
         "failed": len(on_air) - ok if on_air else None,
         "tx_daemon_lines": sum(1 for line in tx_text.splitlines() if line.strip()),
+        "tail": tail, "tail_after": tail_after,
     }
 
 
@@ -204,12 +224,23 @@ def format_leg(name: str, params: dict[str, str], res: dict) -> list[str]:
     if res["failed"]:
         out.append(f"  note: {res['failed']} PROBE(s) never went on air (TX FAILED at the "
                    f"base); they count as undelivered, as the procedure's denominator says")
+    tail = res.get("tail")
+    if tail:
+        shown = ", ".join(str(s) for s in tail[:TAIL_SHOWN]) + (", ..." if len(tail) > TAIL_SHOWN
+                                                                 else "")
+        out.append(f"  tail: {len(tail)} base PROBE seq(s) sent after seq {res['tail_after']}, the "
+                   f"tractor's last logged: [{shown}] (counted undelivered; at a leg's end often "
+                   f"an end-of-log artefact: check before quoting a miss)")
+    elif tail is not None:
+        out.append(f"  tail: none (the tractor logged the base's last PROBE, seq "
+                   f"{res['tail_after']})")
     if res["tractor_lines"] == 0:
         out.append(f"  !! the tractor log has no PROBE line at all ({res['tx_daemon_lines']} "
                    f"non-blank lines): 0 delivered. Real on a dead reverse link; check the "
                    f"tx_daemon.log is this leg's before quoting it")
-    if params.get("reg_profile") not in (None, "2"):
-        out.append("  note: not a DTS leg; the procedure scores command delivery on DTS only")
+    if params.get("reg_profile") not in (None, *PROFILE_LABEL):
+        out.append(f"  note: reg_profile={params['reg_profile']} is neither FHSS (1) nor DTS (2): "
+                   f"this leg pools with no other")
     if params.get("probe_echo") not in (None, "0"):
         out.append("  !! probe_echo is on: the tractor's echo deafens the window the next "
                    "command needs (RS-0.12: 56 % with echo, 91 % without), so this score "
@@ -217,20 +248,27 @@ def format_leg(name: str, params: dict[str, str], res: dict) -> list[str]:
     return out
 
 
-def pooled_verdict(vec: tuple[int, int], mono: tuple[int, int]) -> list[str]:
-    """vec / mono: (delivered, sent) pooled per codec."""
+def pooled_verdict(vec: tuple[int, int], mono: tuple[int, int], profile: str = "2") -> list[str]:
+    """vec / mono: (delivered, sent) pooled per codec, all legs on ``profile``
+    (params reg_profile). DTS ("2") prints the VECTOR_SCENE 8.6 verdict; any
+    other profile the same comparison, labelled with it."""
     (dv, sv), (dm, sm) = vec, mono
     p = fisher_two_sided(dv, sv - dv, dm, sm - dm)
-    out = [f"pooled VECTOR {dv}/{sv} = {_pct(dv, sv)}; pooled mono_g4 {dm}/{sm} = {_pct(dm, sm)}",
+    if profile == "2":
+        pool, head = "pooled ", "command delivery (VECTOR_SCENE 8.6)"
+    else:
+        lab = PROFILE_LABEL.get(profile, f"reg_profile={profile}")
+        pool = f"pooled {lab} "
+        head = (f"command delivery, {lab} legs (the VECTOR_SCENE 8.6 comparison; the procedure "
+                f"scores 8.6 on DTS)")
+    out = [f"{pool}VECTOR {dv}/{sv} = {_pct(dv, sv)}; {pool}mono_g4 {dm}/{sm} = {_pct(dm, sm)}",
            f"two-sided Fisher exact on delivered / undelivered: p = {p:.3g}"]
     if dv * sm >= dm * sv:
-        out.append("command delivery (VECTOR_SCENE 8.6): NOT WORSE (VECTOR >= mono_g4)")
+        out.append(f"{head}: NOT WORSE (VECTOR >= mono_g4)")
     elif p >= ALPHA:
-        out.append(f"command delivery (VECTOR_SCENE 8.6): NOT WORSE (VECTOR below mono_g4, "
-                   f"Fisher p = {p:.3g} >= {ALPHA})")
+        out.append(f"{head}: NOT WORSE (VECTOR below mono_g4, Fisher p = {p:.3g} >= {ALPHA})")
     else:
-        out.append(f"command delivery (VECTOR_SCENE 8.6): WORSE (VECTOR below mono_g4, "
-                   f"Fisher p = {p:.3g} < {ALPHA})")
+        out.append(f"{head}: WORSE (VECTOR below mono_g4, Fisher p = {p:.3g} < {ALPHA})")
     return out
 
 
@@ -240,9 +278,10 @@ def main(argv: list[str] | None = None) -> int:
                     help="harness archive dir(s): radio_monitor_<stamp>_<sha>")
     a = ap.parse_args(argv)
     rc = 0
-    pools: dict[str, list[int]] = {}
-    unlike: list[str] = []                   # legs not shown to be DTS with -ProbeEcho 0
+    pools: dict[tuple[str, str], list[int]] = {}     # (reg_profile, codec) -> [delivered, sent]
+    unlike: list[str] = []                   # legs not shown to be FHSS / DTS with -ProbeEcho 0
     other: list[str] = []                    # legs that are neither VECTOR nor mono_g4
+    scored: list[str] = []                   # every scored leg, with its profile and echo
     for arch in a.archive:
         name = os.path.basename(os.path.normpath(arch))
         try:
@@ -262,34 +301,47 @@ def main(argv: list[str] | None = None) -> int:
         for line in format_leg(name, params, res):
             print(line)
         codec = leg_codec(params)
-        pool = pools.setdefault(codec, [0, 0])
+        prof = params.get("reg_profile", "?")
+        pool = pools.setdefault((prof, codec), [0, 0])
         if codec not in ("vector", "mono_g4"):
             other.append(f"{name} ({codec})")
         pool[0] += res["delivered"]
         pool[1] += res["sent"]
-        if params.get("reg_profile") != "2" or params.get("probe_echo") != "0":
-            unlike.append(f"{name} (reg_profile={params.get('reg_profile', '?')}, "
-                          f"probe_echo={params.get('probe_echo', '?')})")
+        leg = f"{name} (reg_profile={prof}, probe_echo={params.get('probe_echo', '?')})"
+        scored.append(leg)
+        if prof not in PROFILE_LABEL or params.get("probe_echo") != "0":
+            unlike.append(leg)
     if len(a.archive) > 1:
+        codecs = {c for _, c in pools}
+        profiles = sorted({p for p, _ in pools})
+        both = "vector" in codecs and "mono_g4" in codecs
         if rc:
             print("pooled verdict withheld: a leg above could not be scored")
-        elif other and "vector" in pools and "mono_g4" in pools:
+        elif other and both:
             print("pooled verdict withheld: the 8.6 comparison pools VECTOR and mono_g4 legs "
                   "only (params cam_extra_env LIFETRAC_ENCODE_MODE=9 / 6), and these legs are "
                   "neither: " + "; ".join(other) + ". The per-leg figures above stand")
             rc = 1
-        elif unlike and "vector" in pools and "mono_g4" in pools:
-            print("pooled verdict withheld: the 8.6 comparison pools DTS legs flown with "
-                  "-ProbeEcho 0 only (params reg_profile=2, probe_echo=0), and these legs are "
-                  "not shown to be: " + "; ".join(unlike) + ". The per-leg figures above stand")
+        elif unlike and both:
+            print("pooled verdict withheld: the comparison pools legs flown with -ProbeEcho 0 "
+                  "on FHSS or DTS only (params probe_echo=0, reg_profile=1 or 2), and these legs "
+                  "are not shown to be: " + "; ".join(unlike) + ". The per-leg figures above stand")
             rc = 1
-        elif "vector" in pools and "mono_g4" in pools:
-            for line in pooled_verdict(tuple(pools["vector"]), tuple(pools["mono_g4"])):
+        elif len(profiles) > 1 and both:
+            print(f"pooled verdict withheld: the legs mix reg_profile {' and '.join(profiles)} ("
+                  + "; ".join(scored) + "); the comparison pools the legs of one profile. The "
+                  "per-leg figures above stand")
+            rc = 1
+        elif both:
+            prof = profiles[0]
+            for line in pooled_verdict(tuple(pools[(prof, "vector")]),
+                                       tuple(pools[(prof, "mono_g4")]), prof):
                 print(line)
         else:
-            print("pooled: " + "; ".join(f"{c} {d}/{s} = {_pct(d, s)}"
-                                         for c, (d, s) in pools.items())
-                  + " -- no VECTOR_SCENE 8.6 comparison (it needs VECTOR and mono_g4 legs)")
+            print("pooled: " + "; ".join(
+                f"{PROFILE_LABEL.get(p, f'reg_profile={p}')} {c} {d}/{s} = {_pct(d, s)}"
+                for (p, c), (d, s) in pools.items())
+                + " -- no VECTOR_SCENE 8.6 comparison (it needs VECTOR and mono_g4 legs)")
     return rc
 
 

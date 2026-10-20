@@ -9,14 +9,20 @@ Pins, for the three helpers RS13_RANGE_EDGE_LEG.md scores legs with:
   `docker logs`) fail closed (exit 2, pooled verdict withheld); a leg with
   no probe exits 1; a dead reverse link scores 0 and says so; the pooled
   VECTOR / mono_g4 verdict and the two-sided Fisher exact p (checked against
-  the textbook tea-tasting table).
+  the textbook tea-tasting table); pools per (reg_profile, codec): DTS legs
+  get the 8.6 verdict, FHSS legs the same comparison labelled FHSS, and only
+  a mix of profiles (or an unknown one, or echo on) withholds it; the
+  ``tail:`` line lists the base seqs sent after the tractor's last logged
+  PROBE without changing the delivered count.
 * rs13_rf_extract.py: the median of the 10-s ``rx_rf:`` window medians, the
   minimums and n; ``None`` axes; garbled or self-contradicting lines fail
   closed; a crashed or stopped stats thread and frames with no window give
   no level (exit 1); R0 over legs with its range check and the mixed-profile
   refusal; the FRF readback at the pick (a 915 MHz read-back under a 927.5
   pick, one board off, MISMATCH, a failed force-write); the leakage check;
-  the RSSI tracking rule in both regions and the closing check.
+  the RSSI tracking rule in both regions and the closing check; --path
+  antenna prints the level with no R0 verdict and refuses the conducted-only
+  checks.
 * rs13_digest_trace.py: strict capture loading (meta profile, garbled
   lines); seq-gap rows that sum to rs12_leg_report's loss of record (wrap,
   codec switch, duplicate); the A16 rule on hand-built rows (PASS, late or
@@ -265,6 +271,87 @@ class ProbeScoreTests(unittest.TestCase):
         # A leg that fired no probe needs no tractor log: still exit 1, not 2.
         res = ps.score_leg(f"{_ts(0)} INFO x: started\n", "")
         self.assertEqual(res["sent"], 0)
+
+    def test_tail_lists_probes_after_the_tractors_last(self) -> None:
+        # 2026-10-19 A2c / A2c2's shape: seq 210 sent after the tractor's log was taken.
+        res = ps.score_leg(_base_log(range(1, 211)), _tractor_log(range(1, 210)))
+        self.assertEqual((res["sent"], res["delivered"], res["tail"], res["tail_after"]),
+                         (210, 209, [210], 209))
+        text = "\n".join(ps.format_leg("A2c2", {"reg_profile": "2"}, res))
+        self.assertIn("delivered 209/210 = 99.5 %", text)              # unchanged by the tail
+        self.assertIn("tail: 1 base PROBE seq(s) sent after seq 209, the tractor's last logged: "
+                      "[210] (counted undelivered;", text)
+        # Misses inside the leg are not tail; only the seqs after the last logged one are.
+        res = ps.score_leg(_base_log(range(1, 11)), _tractor_log([1, 3, 6]))
+        self.assertEqual((res["delivered"], res["tail"], res["tail_after"]), (3, [7, 8, 9, 10], 6))
+        res = ps.score_leg(_base_log(range(1, 11)), _tractor_log(range(1, 11)))
+        self.assertEqual(res["tail"], [])
+        self.assertIn("tail: none (the tractor logged the base's last PROBE, seq 10)",
+                      "\n".join(ps.format_leg("x", {}, res)))
+        # A long tail is shortened; a dead link has no tail line (its !! line says it).
+        res = ps.score_leg(_base_log(range(1, 51)), _tractor_log([1]))
+        text = "\n".join(ps.format_leg("x", {}, res))
+        self.assertIn("tail: 49 base PROBE seq(s) sent after seq 1", text)
+        self.assertIn("[2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, ...]",
+                      text)
+        res = ps.score_leg(_base_log(range(1, 87)), _tractor_log([]))
+        self.assertIsNone(res["tail"])
+        self.assertNotIn("tail:", "\n".join(ps.format_leg("x", {}, res)))
+
+    def test_fhss_legs_pool_and_compare_labelled_fhss(self) -> None:
+        vec = {"reg_profile": 1, "reactive_fire": 1, "probe_echo": 0,
+               "cam_extra_env": "-e LIFETRAC_ENCODE_MODE=9"}
+        mono = dict(vec, cam_extra_env="-e LIFETRAC_ENCODE_MODE=6")
+        with tempfile.TemporaryDirectory() as root:
+            a = _archive(root, "Fv", vec, _base_log(range(1, 11)), _tractor_log(range(1, 10)))
+            b = _archive(root, "Fm", mono, _base_log(range(1, 11)), _tractor_log(range(1, 9)))
+            rc, out = _run(ps.main, [a, b])
+        self.assertEqual(rc, 0, out)
+        self.assertIn("pooled FHSS VECTOR 9/10 = 90.0 %; pooled FHSS mono_g4 8/10 = 80.0 %", out)
+        self.assertIn("command delivery, FHSS legs (the VECTOR_SCENE 8.6 comparison; the procedure "
+                      "scores 8.6 on DTS): NOT WORSE (VECTOR >= mono_g4)", out)
+        self.assertNotIn("command delivery (VECTOR_SCENE 8.6)", out)
+        self.assertNotIn("not a DTS leg", out)
+        self.assertNotIn("withheld", out)
+        last = ps.pooled_verdict((50, 100), (90, 100), "1")[-1]
+        self.assertTrue(last.startswith("command delivery, FHSS legs"), last)
+        self.assertIn(": WORSE (VECTOR below", last)
+        self.assertNotIn("NOT", last)
+        self.assertEqual(ps.pooled_verdict((90, 100), (85, 100)),
+                         ps.pooled_verdict((90, 100), (85, 100), "2"))
+
+    def test_only_a_mix_of_profiles_withholds(self) -> None:
+        dts = {"reg_profile": 2, "reactive_fire": 1, "probe_echo": 0,
+               "cam_extra_env": "-e LIFETRAC_ENCODE_MODE=9"}
+        fhss = dict(dts, reg_profile=1)
+        mono = "-e LIFETRAC_ENCODE_MODE=6"
+        with tempfile.TemporaryDirectory() as root:
+            legs = [_archive(root, "Dv", dts, _base_log(range(1, 11)), _tractor_log(range(1, 10))),
+                    _archive(root, "Dm", dict(dts, cam_extra_env=mono), _base_log(range(1, 11)),
+                             _tractor_log(range(1, 10))),
+                    _archive(root, "Fv", fhss, _base_log(range(1, 11)), _tractor_log(range(1, 10))),
+                    _archive(root, "Fm", dict(fhss, cam_extra_env=mono), _base_log(range(1, 11)),
+                             _tractor_log(range(1, 10)))]
+            rc, out = _run(ps.main, legs)
+            self.assertEqual(rc, 1, out)
+            self.assertIn("pooled verdict withheld: the legs mix reg_profile 1 and 2 (Dv "
+                          "(reg_profile=2, probe_echo=0); Dm", out)
+            self.assertNotIn("NOT WORSE", out)
+            # One codec only: per (profile, codec) figures, no comparison and no refusal.
+            rc, out = _run(ps.main, [legs[0], legs[2]])
+            self.assertEqual(rc, 0, out)
+            self.assertIn("pooled: DTS vector 9/10 = 90.0 %; FHSS vector 9/10 = 90.0 % -- no "
+                          "VECTOR_SCENE 8.6 comparison", out)
+            # reg_profile 0 (bench-only fixed 915 MHz) pools with nothing.
+            zero = dict(dts, reg_profile=0)
+            z = [_archive(root, "Zv", zero, _base_log(range(1, 11)), _tractor_log(range(1, 10))),
+                 _archive(root, "Zm", dict(zero, cam_extra_env=mono), _base_log(range(1, 11)),
+                          _tractor_log(range(1, 10)))]
+            rc, out = _run(ps.main, z)
+        self.assertEqual(rc, 1, out)
+        self.assertIn("note: reg_profile=0 is neither FHSS (1) nor DTS (2)", out)
+        self.assertIn("are not shown to be: Zv (reg_profile=0, probe_echo=0); Zm", out)
+        self.assertNotIn("NOT WORSE", out)
 
 
 # ---------------------------------------------------------------- rf extract
@@ -522,6 +609,54 @@ class RfExtractTests(unittest.TestCase):
                             rf.main([a] + bad)
                         finally:
                             sys.stderr = old
+
+    def test_antenna_path_prints_the_level_only(self) -> None:
+        dts = {"reg_profile": 2, "force_frf_hz": 927500000}
+        ok = "  FRF readback: 0xE7E000 = 927.500 MHz (OK)\n"
+        with tempfile.TemporaryDirectory() as root:
+            # 2026-10-18's shape: hot on the antennas (-61 dBm), which the conducted
+            # window would call OUT OF RANGE with pad advice.
+            a = _archive(root, "V", dts, _rf_log([-61, -60, -61]), ok)
+            b = _archive(root, "W", dts, _rf_log([-62, -61, -62]), ok)
+            rc, out = _run(rf.main, [a, b])                      # default: conducted, as before
+            self.assertEqual(rc, 0, out)
+            self.assertIn("R0 over 2 legs", out)
+            self.assertIn("OUT OF RANGE: above -65 dBm", out)
+            self.assertNotIn("path=antenna", out)
+            rc, out = _run(rf.main, [a, b, "--path", "conducted"])
+            self.assertIn("OUT OF RANGE: above -65 dBm", out)
+            rc, out = _run(rf.main, [a, b, "--path", "antenna"])
+            self.assertEqual(rc, 0, out)
+            self.assertIn("V: reg_profile=2 force_frf_hz=927500000 encode_mode=- duration_s=? "
+                          "path=antenna", out)
+            self.assertIn("row: RSSI med / min -61.0 / -64 dBm", out)
+            self.assertIn("level over 2 legs (median of the legs' medians): RSSI -61.5 dBm / SNR "
+                          "8.0 dB; antenna path: the level only", out)
+            for verdict in ("R0 over", "OUT OF RANGE", "in range", "target -65 to -75",
+                            "fixed middle"):
+                self.assertNotIn(verdict, out)
+            # a single archive: the level lines, no summary
+            rc, out = _run(rf.main, [a, "--path", "antenna", "--lines"])
+            self.assertEqual(rc, 0, out)
+            self.assertNotIn("level over", out)
+            self.assertIn("    rx_rf +   10.0 s", out)
+            # the withheld lines name the level, not R0
+            fhss = _archive(root, "C", {"reg_profile": 1}, _rf_log([-60]), "")
+            rc, out = _run(rf.main, [a, fhss, "--path", "antenna"])
+            self.assertEqual(rc, 2, out)
+            self.assertIn("level withheld: the legs mix reg_profile 1 and 2; the level is per "
+                          "profile", out)
+            stale = _archive(root, "U", dts, _rf_log([-64], pub_until=200.0), ok)
+            rc, out = _run(rf.main, [a, stale, "--path", "antenna"])
+            self.assertEqual(rc, 1, out)
+            self.assertIn("level withheld: an archive above gave no level", out)
+            # the conducted-only checks are refused on the antennas
+            for bad in (["--leak"], ["--r0", "-67", "--closing"], ["--r0", "-67", "--step", "9"],
+                        ["--path", "air"]):
+                with self.assertRaises(SystemExit) as cm, redirect_stdout(io.StringIO()), \
+                        mock.patch("sys.stderr", io.StringIO()):
+                    rf.main([a, "--path", "antenna"] + bad if bad[0] != "--path" else [a] + bad)
+                self.assertEqual(cm.exception.code, 2)
 
 
 # ---------------------------------------------------------------- digest trace
