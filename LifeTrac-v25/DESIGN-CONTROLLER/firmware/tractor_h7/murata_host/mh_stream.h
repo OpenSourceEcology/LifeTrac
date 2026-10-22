@@ -62,6 +62,14 @@ bool mh_stream_send_cfg_get_req(mh_stream_t *stream,
 bool mh_stream_send_stats_dump_req(mh_stream_t *stream,
                                    uint16_t *out_seq);
 
+/* TX_FRAME_REQ: hand one LoRa packet body to the L072. The L072 answers
+ * with TX_DONE_URC (same tx_id) or ERR_PROTO_URC (same seq). */
+bool mh_stream_send_tx_frame_req(mh_stream_t *stream,
+                                 uint8_t tx_id,
+                                 const uint8_t *data,
+                                 uint8_t data_len,
+                                 uint16_t *out_seq);
+
 const mh_stream_counters_t *mh_stream_counters(const mh_stream_t *stream);
 
 #ifdef __cplusplus

@@ -250,10 +250,26 @@ Method G bench diagnostics are compiled in by default and emit decoded URC
 summaries when the sketch installs its USB `Serial` log sink. Define
 `LIFETRAC_MH_BENCH_LOG=0` only for a size-constrained production build.
 
-When Method G is enabled, `tractor_h7.ino` routes `setup()` + `loop()` through
-`murata_host/mh_runtime` and compiles out the legacy RadioLib/RS-485/Modbus
-sketch body. Do not set `LIFETRAC_USE_METHOD_G_HOST` without also defining
-`LIFETRAC_MH_SERIAL`.
+When Method G is enabled, `tractor_h7.ino` runs the full control application
+(arbitration, Modbus master, AES-GCM, IP-107 TX queue) over the L072: received
+packets arrive as `RX_FRAME_URC`, and the TX queue sends one `TX_FRAME_REQ` at
+a time, released by `TX_DONE_URC`, a matching `ERR_PROTO_URC`, `BOOT_URC` or a
+timeout (`murata_host/mh_link.h`, TODO H7-4). Only RadioLib is compiled out. Do
+not set `LIFETRAC_USE_METHOD_G_HOST` without also defining `LIFETRAC_MH_SERIAL`.
+
+Method G-only switches:
+
+* `LIFETRAC_MH_PROBE_ONLY=1` keeps the pre-H7-4 link probe: `mh_runtime` alone
+  (ping, version, stats), no control application and no `TX_FRAME_REQ`.
+* `LIFETRAC_X8_LINK` (default `0` under Method G, `1` otherwise) enables the
+  `Serial1` X8↔H747 KISS link. Leave it off when `LIFETRAC_MH_SERIAL=Serial1`.
+* `LIFETRAC_MH_TX_SLOT_MS` (default `200`) is the slot allowance added to the
+  SF9 time-on-air ceiling for the TX gate timeout.
+* The SF ladder is idle over Method G: the L072 owns its PHY, so the tractor
+  stays on rung 0 and never sends `CMD_LINK_TUNE` (follow-up H7-4a).
+
+`firmware/tractor_h7/bench/methodg_sil/run.sh` builds this path on a PC against
+fakes of the Arduino core, the L072 and the Opta and runs it end to end.
 
 ---
 

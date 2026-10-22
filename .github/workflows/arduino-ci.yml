@@ -201,6 +201,20 @@ jobs:
             murata_host/mh_stats.c \
             -o build/mh_runtime_health_vectors
           ./build/mh_runtime_health_vectors
+      - name: Build and run Method G TX gate vectors (H7-4)
+        working-directory: LifeTrac-v25/DESIGN-CONTROLLER/firmware/tractor_h7
+        run: |
+          mkdir -p build
+          cc -std=gnu11 -DLIFETRAC_USE_METHOD_G_HOST=1 -Wall -Wextra -Werror -Imurata_host \
+            bench/h7_host_proto/mh_link_vectors.c \
+            murata_host/mh_link.c \
+            -o build/mh_link_vectors
+          ./build/mh_link_vectors
+      - name: Method G control-path SIL (H7-4)
+        # Builds the real tractor_h7.ino for Method G against host fakes of
+        # the Arduino core, the L072 (Serial3) and the Opta (Modbus), then
+        # drives arbitration, E-stop, link loss and the TX gate end to end.
+        run: sh LifeTrac-v25/DESIGN-CONTROLLER/firmware/tractor_h7/bench/methodg_sil/run.sh
 
   h7-host-driver-loopback:
     runs-on: ubuntu-24.04
@@ -495,7 +509,7 @@ jobs:
         run: |
           ELF_OFF=/tmp/tractor_h7_off/tractor_h7.ino.elf
           nm --defined-only "$ELF_OFF" > /tmp/tractor_h7_off/nm_off.txt
-          if grep -E "mh_runtime_|mh_uart_arduino_" /tmp/tractor_h7_off/nm_off.txt; then
+          if grep -E "mh_runtime_|mh_uart_arduino_|mh_link_" /tmp/tractor_h7_off/nm_off.txt; then
             echo "Method G runtime symbols leaked into default build"
             exit 1
           fi
@@ -513,6 +527,13 @@ jobs:
             echo "Method G runtime symbols missing from enabled build"
             exit 1
           fi
+          # H7-4: the control application must drive the L072, not just ping it.
+          for sym in mh_runtime_submit_tx mh_runtime_set_rx_handler mh_link_gate_on_frame; do
+            if ! nm --defined-only "$ELF_ON" | grep -q "$sym"; then
+              echo "Method G build is missing $sym (control application not linked to the L072)"
+              exit 1
+            fi
+          done
 
   # Round 17 (2026-04-28): M4 watchdog co-processor build. FQBN uses the
   # ``target_core=cm4`` board menu option (the Portenta core does not

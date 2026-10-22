@@ -297,6 +297,40 @@ bool mh_stream_send_stats_dump_req(mh_stream_t *stream,
     return true;
 }
 
+bool mh_stream_send_tx_frame_req(mh_stream_t *stream,
+                                 uint8_t tx_id,
+                                 const uint8_t *data,
+                                 uint8_t data_len,
+                                 uint16_t *out_seq) {
+    /* L072 handle_tx_frame(): payload = tx_id, length, data[length]. */
+    uint8_t payload[2U + 255U];
+    uint16_t seq;
+
+    if (stream == NULL || (data == NULL && data_len > 0U)) {
+        return false;
+    }
+
+    payload[0] = tx_id;
+    payload[1] = data_len;
+    if (data_len > 0U) {
+        memcpy(&payload[2], data, data_len);
+    }
+    seq = alloc_seq(stream);
+    if (!stream_send_inner(stream,
+                           HOST_TYPE_TX_FRAME_REQ,
+                           0U,
+                           seq,
+                           payload,
+                           (uint16_t)(2U + data_len))) {
+        return false;
+    }
+
+    if (out_seq != NULL) {
+        *out_seq = seq;
+    }
+    return true;
+}
+
 const mh_stream_counters_t *mh_stream_counters(const mh_stream_t *stream) {
     if (stream == NULL) {
         return NULL;

@@ -29,6 +29,11 @@ typedef struct mh_runtime_state_s {
     uint8_t ping_nonce;
     mh_runtime_log_sink_t log_sink;
     void *log_ctx;
+    mh_link_gate_t tx_gate;
+    mh_runtime_rx_handler_t rx_handler;
+    void *rx_ctx;
+    mh_runtime_tx_handler_t tx_handler;
+    void *tx_ctx;
 #if (LIFETRAC_MH_BENCH_LOG)
     uint32_t next_summary_ms;
 #endif
@@ -153,9 +158,16 @@ static void runtime_emit_summary_log(mh_runtime_state_t *runtime) {
 }
 #endif
 
+static void runtime_note_tx_event(mh_runtime_state_t *runtime, mh_link_event_t event) {
+    if (event != MH_LINK_EV_NONE && runtime->tx_handler != NULL) {
+        runtime->tx_handler(event, runtime->tx_ctx);
+    }
+}
+
 static bool runtime_on_frame(const murata_host_frame_t *frame, void *user_ctx) {
     uint32_t now_ms;
     bool handled;
+    mh_link_rx_t rx;
     mh_runtime_state_t *runtime = (mh_runtime_state_t *)user_ctx;
 
     if (runtime == NULL || frame == NULL) {
@@ -164,6 +176,11 @@ static bool runtime_on_frame(const murata_host_frame_t *frame, void *user_ctx) {
 
     now_ms = mh_uart_if_now_ms(&runtime->uart_if);
     handled = mh_runtime_health_on_frame(&runtime->health, frame, now_ms);
+
+    runtime_note_tx_event(runtime, mh_link_gate_on_frame(&runtime->tx_gate, frame));
+    if (runtime->rx_handler != NULL && mh_link_rx_parse(frame, &rx)) {
+        runtime->rx_handler(&rx, runtime->rx_ctx);
+    }
 
 #if (LIFETRAC_MH_BENCH_LOG)
     if (handled) {
@@ -177,6 +194,10 @@ static bool runtime_on_frame(const murata_host_frame_t *frame, void *user_ctx) {
 bool mh_runtime_begin(void *serial_port, uint32_t baud) {
     mh_runtime_log_sink_t saved_log_sink = g_runtime.log_sink;
     void *saved_log_ctx = g_runtime.log_ctx;
+    mh_runtime_rx_handler_t saved_rx_handler = g_runtime.rx_handler;
+    void *saved_rx_ctx = g_runtime.rx_ctx;
+    mh_runtime_tx_handler_t saved_tx_handler = g_runtime.tx_handler;
+    void *saved_tx_ctx = g_runtime.tx_ctx;
 
     if (serial_port == NULL) {
         return false;
@@ -185,7 +206,12 @@ bool mh_runtime_begin(void *serial_port, uint32_t baud) {
     memset(&g_runtime, 0, sizeof(g_runtime));
     g_runtime.log_sink = saved_log_sink;
     g_runtime.log_ctx = saved_log_ctx;
+    g_runtime.rx_handler = saved_rx_handler;
+    g_runtime.rx_ctx = saved_rx_ctx;
+    g_runtime.tx_handler = saved_tx_handler;
+    g_runtime.tx_ctx = saved_tx_ctx;
     mh_runtime_health_reset(&g_runtime.health);
+    mh_link_gate_init(&g_runtime.tx_gate);
 
     if (!mh_uart_arduino_init(&g_runtime.uart_if,
                               &g_runtime.uart_state,
@@ -227,6 +253,51 @@ void mh_runtime_set_log_sink(mh_runtime_log_sink_t sink, void *ctx) {
     g_runtime.log_ctx = ctx;
 }
 
+void mh_runtime_set_rx_handler(mh_runtime_rx_handler_t handler, void *ctx) {
+    g_runtime.rx_handler = handler;
+    g_runtime.rx_ctx = ctx;
+}
+
+void mh_runtime_set_tx_handler(mh_runtime_tx_handler_t handler, void *ctx) {
+    g_runtime.tx_handler = handler;
+    g_runtime.tx_ctx = ctx;
+}
+
+bool mh_runtime_tx_busy(void) {
+    return mh_link_gate_busy(&g_runtime.tx_gate);
+}
+
+bool mh_runtime_submit_tx(const uint8_t *data, uint8_t len, uint32_t timeout_ms) {
+    uint8_t tx_id;
+    uint16_t seq = 0U;
+    uint32_t now_ms;
+
+    if (!g_runtime.started || mh_link_gate_busy(&g_runtime.tx_gate)) {
+        return false;
+    }
+
+    tx_id = mh_link_gate_next_tx_id(&g_runtime.tx_gate);
+    now_ms = mh_uart_if_now_ms(&g_runtime.uart_if);
+    /* Arm the gate before the write: a short write may still have put a
+     * whole frame on the wire, and a URC for it must find the gate armed.
+     * A failed write releases it again through the timeout. */
+    mh_link_gate_on_submit(&g_runtime.tx_gate, tx_id, g_runtime.stream.next_seq,
+                           now_ms, timeout_ms);
+    if (!mh_stream_send_tx_frame_req(&g_runtime.stream, tx_id, data, len, &seq)) {
+        return false;
+    }
+    g_runtime.tx_gate.seq = seq;
+    return true;
+}
+
+bool mh_runtime_get_tx_gate(mh_link_gate_t *out_gate) {
+    if (!g_runtime.started || out_gate == NULL) {
+        return false;
+    }
+    *out_gate = g_runtime.tx_gate;
+    return true;
+}
+
 void mh_runtime_loop(uint32_t now_ms) {
     uint8_t ping_payload[1];
 
@@ -235,6 +306,7 @@ void mh_runtime_loop(uint32_t now_ms) {
     }
 
     mh_stream_poll(&g_runtime.stream, now_ms);
+    runtime_note_tx_event(&g_runtime, mh_link_gate_tick(&g_runtime.tx_gate, now_ms));
 
     if (g_runtime.next_ping_ms == 0U || (int32_t)(now_ms - g_runtime.next_ping_ms) >= 0) {
         ping_payload[0] = g_runtime.ping_nonce++;

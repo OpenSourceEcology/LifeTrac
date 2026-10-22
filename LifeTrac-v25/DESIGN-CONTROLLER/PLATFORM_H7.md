@@ -63,7 +63,7 @@ SERIAL3 (variant `PeripheralPins.c`), confirmed on hardware (TODO H7-1).
 ### 4.1 Control path
 
 - Build `firmware/tractor_h7` for `arduino:mbed_portenta:envie_m7` (already a CI target) with `LIFETRAC_USE_METHOD_G_HOST=1` and `LIFETRAC_MH_SERIAL=Serial3` once H7-1 confirms it.
-- **The gap:** in the Method G build today the sketch runs only the host runtime (`murata_host/mh_runtime.c`: ping, version, stats). Arbitration, Modbus master, AES-GCM and the IP-107 TX queue are compiled only in the legacy RadioLib build, which assumes SPI access to the SX1276 that the Max Carrier does not provide. Joining the control application to Method G (`TX_FRAME_REQ` out, `RX_FRAME_URC` in) is the first real firmware task, and it is the same task the X8's H747 faces.
+- **The gap (closed in software by H7-4, 2026-10-22):** the Method G build used to run only the host runtime (`murata_host/mh_runtime.c`: ping, version, stats), with arbitration, Modbus master, AES-GCM and the IP-107 TX queue compiled only in the legacy RadioLib build, which assumes SPI access to the SX1276 that the Max Carrier does not provide. The control application now runs over Method G: `RX_FRAME_URC` in, `TX_FRAME_REQ` out with one frame at the L072 at a time (`murata_host/mh_link.h`), checked on a PC by `tractor_h7/bench/methodg_sil/`. Still open: the SF ladder over Method G (H7-4a), the Max Carrier RS-485 pin map (H7-4b) and the hardware run (H7-5).
 - X8-only pieces drop out: `sysclock_x8.c`, `linker_script_x8_m7.ld` and the tick overrides (already gated by `LIFETRAC_X8_ENABLE_LEGACY_OVERRIDES`), the X8 `Serial2` shim, and the x8h7 flash-ownership problem of X8OS-3. A standalone H7 boots the image you flashed.
 - `Serial1` in `tractor_h7.ino` carries the X8↔H747 link today (camera select and keyframe requests, around lines 509, 1195 and 1635–1650). On an H7 it becomes the camera link (§5), but see §3: on a Max Carrier the camera link cannot be a spare HD UART.
 
@@ -260,8 +260,14 @@ a profile column in HARDWARE_BOM, and CI jobs for the H7 profile.
 
 ## 10. Suggested order of work
 
-1. Confirm `Serial3` reaches the Murata on Max Carrier + H7 (H7-1).
-2. Build `base_h7_gateway` and run the existing base stack on a PC (H7-2, H7-3).
-3. Join the control application to Method G and bring up a standalone tractor H7 with control and telemetry only (H7-4, H7-5).
-4. Move GPS, IMU, params and logging onto the H7 (H7-11).
-5. Add the camera H7, the P0–P3 scheduler and the pull-model camera protocol (H7-6 to H7-10).
+The X8 stays the main path while this profile is an option, so the order is
+software that helps both profiles first, then bench checks, and only then a
+full H7-only build-out. The working order lives in
+[TODO.md](TODO.md#portenta-h7-only-platform-profile-h7) ("Order of work").
+
+1. Join the control application to Method G (H7-4, software only, done).
+2. Confirm `Serial3` reaches the Murata and the RS-485 pin map on Max Carrier + H7 (H7-1, H7-4b; bench, no RF transmit).
+3. Build `base_h7_gateway` and run the existing base stack on a PC (H7-2, H7-3).
+4. Bring up a standalone tractor H7 with control and telemetry only (H7-5; on-air only after an explicit GO).
+5. Move GPS, IMU, params and logging onto the H7 (H7-11).
+6. Add the camera H7, the P0–P3 scheduler and the pull-model camera protocol (H7-6 to H7-10).
