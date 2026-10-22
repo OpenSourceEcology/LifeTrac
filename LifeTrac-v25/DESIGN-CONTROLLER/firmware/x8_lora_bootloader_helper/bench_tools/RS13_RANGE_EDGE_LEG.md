@@ -1,7 +1,42 @@
 # RS-13 range edge — VECTOR and mono_g4 over a conducted attenuator walk-down
 
-*Procedure, 2026-10-10. Not flown. This is the next radio session after
-RS-13.1, as the RS-13.1 review set it out
+**Status, 2026-10-19: not planned.** The operator decided on 2026-10-19: "We
+are not going to perform any attenuation tests because we do not have the
+proper equipment." The bench has no attenuator path: no fixed SMA pads or
+step attenuator, no conducted shielded path, no 50 Ω terminations.
+
+- **Will not fly:** anything that needs the conducted path. That is the
+  leakage check (`leak_dts`, `leak_fhss`), Round A's conducted 0 dB step,
+  the Round B and Round C 3 dB walks, and their closing checks (`B0close`,
+  `C0close`).
+- **Still planned, on the antennas** (as the 2026-10-18 RS-12.15 legs flew):
+  the receive-only channel spot-check (Prep, item 4), then the interleaved
+  DTS legs `A2c`, `A2a`, `A2c2`, `A2a2` with their scoring
+  ([The 0 dB step](#the-0-db-step)). They measure the §8.6 command-delivery
+  row (`rs13_probe_score.py`) and check the A16 fix on air
+  (`rs13_digest_trace.py`). These two measurements never needed
+  attenuation. They need their own radio GO; they flew on 2026-10-19 ([RESULTS](../../../bench-evidence/RS_13_range_edge_2026-10-19/RESULTS.md); A16 not exercised).
+- **Reading those legs on the antennas.** The RF hardware prerequisite and
+  Prep item 3 (the RF path check) do not apply. R0's −65 to −75 dBm window
+  belongs to the conducted path. Record the level only, and ignore an
+  `OUT OF RANGE` line from `rs13_rf_extract.py` and its pad advice. With no
+  Round B to pool from, a thin A16 confirmation stays thin: say so.
+  Prep item 4's spot-check runs on the antennas, not on a conducted path.
+  `leg_prep.sh` still labels these tags "Round A, 0 dB step" and prints a
+  NOTE unless `EVIDENCE_DIR` is under `bench-evidence/RS_13_range_edge_<date>/`:
+  keep that folder (Prep item 6). In the [template](#results-template), fill
+  in Software, Firmware, the spot-check, Round A and the §8.6 rows, and mark
+  RF setup, the leakage check, Rounds B and C and The edge "not flown: no
+  attenuation equipment (2026-10-19)".
+- **Lost:** the range data (where SF7 / VECTOR runs out, VS frames/s per
+  step). It needs a real distance test instead: a range walk with natural
+  path loss ([TODO.md](../../../../TODO.md), S-HW.2).
+
+The rest of this file stays as reference. It would apply if the equipment is
+ever obtained.
+
+*Procedure, 2026-10-10. Not flown. It was planned as the next radio session
+after RS-13.1, as the RS-13.1 review set it out
 ([RESULTS, "Remaining radio tests"](../../../bench-evidence/RS_13_vector_scene_2026-09-26/RESULTS.md#remaining-radio-tests-review-2026-10-04-after-the-round)).
 It measures two rows of `VECTOR_SCENE.md` §8.6: the range-edge leg ("at each
 3 dB step: VS frames received per second, level reached, command delivery,
@@ -77,10 +112,14 @@ Does not prove:
   - Record that criterion as "not testable at V0", and walk again when the
     ladder lands.
 - **FHSS command delivery and the FHSS switch leg ("2d on profile 1").** These
-  wait for the RS-12.15 reverse-delivery firmware fix. Base→tractor delivery
+  waited for the RS-12.15 reverse-delivery firmware fix. Base→tractor delivery
   on FHSS was 1/17 and 49/281 in legs H/I, so before the fix these legs would
-  measure that defect, not VECTOR. The FHSS walk is image-only
-  (`-ReactiveFire 0`, no base commands).
+  have measured that defect, not VECTOR. The fix is on both boards since
+  2026-10-18 (`e083ae46`; 22/23, 72/72 and 36/36 commands delivered,
+  [RESULTS](../../../bench-evidence/RS_12_15_reverse_delivery_2026-10-18/RESULTS.md)),
+  so these legs are unblocked; they are not part of this walk and still need
+  their own GO. The FHSS walk is image-only (`-ReactiveFire 0`, no base
+  commands).
 - **A distance.** A conducted path has no fading, multipath, foliage, antenna
   gain or height. The edge found here is a path loss at the bench's power. It
   serves to compare codecs and profiles; it is not a range figure.
@@ -104,7 +143,7 @@ The RS-13.1 review put the session after the A16 fix and the code guards
 | A16 fix | Merged. `scripts/a16_sil.py` on its SHA: A16-like **0/100 at both budgets** (bw500 243 B, bw250 203 B), recovery max ≤ ≈ 25 frames, `lossfree_out_of_step_frames` 0. Full `base_station` suite green. The summary JSON goes in the fix PR |
 | code guards | Merged: codec-6 frames are never batched; the VECTOR byte budget is clamped to one fragment until `link_budget` arrives (2a_r4 started at `byte_budget=2436`); no double epoch start on VECTOR entry; no ≥ 1 s TX gap on a mode switch (what such a gap does on FHSS: `make check-rx-grid-policy` sequences 10–11 in `firmware/murata_l072`). `vector_stats` carries the encoder's cumulative counters (`frames`, `epochs_by`, `share_frames`, `share_resends`, `share_repeats`, `carousel_resends`, `del_repeats`; `tractor-log` totals them on its `counters` line), so the A16 confirmation reads the repair directly |
 | images | Tractor `lifetrac-tractor-x8:latest` and base `lifetrac-v25:latest` rebuilt from the merged SHA. The deployed base image `4623980c2dac` predates every VECTOR `web_ui`/store commit |
-| step 0 / step 1 | RS13_VECTOR_LEG.md Steps 0–1 run **from the image's `/app`**, plus a **bw500 video pass**: the step-1 figures that P8 now records for information, per profile |
+| step 0 / step 1 | RS13_VECTOR_LEG.md Steps 0–1 run **from the image's `/app`**, plus a **bw500 video pass**: the step-1 figures that P8 now records for information, per profile. The bw500 pass counts only when `legs/step1_pass.sh` ends `done` (exit 0); exit 6 means camera_service held VECTOR at the 203 B cold-start clamp, not 243 B, or its camera log did not come back to check |
 | staging | Fresh on both boards: under 5 days old, md5-checked against the working tree (RS13_VECTOR_LEG.md Step 0.3) |
 | base services | `web_ui` and `lora_bridge` not running on the base. During VECTOR a stale-tile worker would put a `0x6C` on air at least every 10 s, and `-KfRequestDisable` does not stop it |
 | RF hardware | On hand, assembled and recorded (below), all with the radios parked |
@@ -222,6 +261,10 @@ idea, with a row per leg.
    - Survey: run [`channel_survey_sniff.py`](../channel_survey_sniff.py) on
      the base over 902–928 MHz in 0.5 MHz steps. A dwell of about 30 s
      catches ≥ 4 ticks of the 7.08 s emitter; the full band takes ≈ 27 min.
+     `legs/stage_boards.sh` stages it in `/tmp/lifetrac_strict` (full
+     staging, not `--probes-only`). Run it on the base as in
+     BENCH_QUICKSTART step 5.4, e.g. `--start-hz 902500000 --stop-hz
+     927500000 --step-hz 500000 --dwell-s 30 --interval-s 0.05`.
    - Pick: `tools/survey_compare.py today.jsonl [--prev <last survey>]`. Any
      hot sample (> −75 dBm) disqualifies a channel.
    - Use: the pick goes on **every** profile-2 harness line as
@@ -237,12 +280,25 @@ idea, with a row per leg.
      `--capture`; `frag_gap_report.py`.
    - Pre- and post-brackets on both boards for every leg, as in RS-13.1.
    - Park last; on `PARK_TRANSIENT`, wait about 60 s and park again.
-6. Copy the RS-13.1 scripts this session uses into its own `scripts/` and set
-   their evidence paths. They carry RS-13.1's paths (`E=…RS_13_vector_scene_2026-09-26`)
-   and `leg_prep.sh` hard-codes the capture's `--duration 480`. The scripts
-   are `leg_prep.sh`, `leg_post.sh`, `scene_check.sh`, `stage_boards.sh`,
-   `leg_replay.py`, `digest_trace.py`, `fold_emitter.py`, `streak_check.py`
-   and `youtube_window.ps1`.
+6. Prep and post every leg with `bench_tools/legs` (`leg_prep.sh <leg
+   name>`, `leg_post.sh <leg name>`; [legs/README.md](legs/README.md),
+   "Range-edge legs"). `leg_prep.sh` knows every leg name below and writes
+   its harness line and base capture (duration = leg + 180 s, min-frames,
+   `--strict` on VECTOR legs only). Before the first leg, set
+   `EVIDENCE_DIR=<repo>/LifeTrac-v25/DESIGN-CONTROLLER/bench-evidence/RS_13_range_edge_<date>/legs`
+   in `bench.env`. The scoring helpers are in the bench kit and take paths,
+   so they need no copy: `rs13_rf_extract.py` (R0, RSSI/SNR, crc_dump,
+   leakage check, tracking rule, closing check), `rs13_probe_score.py`
+   (command delivery) and `rs13_digest_trace.py` (A16 confirmation and
+   DIGEST trace). Run them from `firmware/x8_lora_bootloader_helper/bench_tools/`
+   with `py -3`; each exits non-zero on missing or garbled input.
+   `leg_post.sh` does not run them. In their command lines below,
+   `<archive>` (or a leg name in angle brackets) is that leg's harness
+   archive folder and `<legs>` is the session's evidence `legs/` folder
+   (`EVIDENCE_DIR`), both as Windows-style `C:/…` paths. The two RS-13.1
+   analysis scripts still used, `fold_emitter.py` and `streak_check.py`,
+   take their archive paths as arguments; copy them from RS-13.1's
+   `scripts/` into this session's `scripts/` so the record holds what ran.
 
 ## Leg lines
 
@@ -273,12 +329,19 @@ frames that queue behind a stall into multi-fragment trains.
 
 - **FHSS, `mono_g4`**: the same with `-CamExtraEnv "-e LIFETRAC_ENCODE_MODE=6"`.
 
+`legs/leg_prep.sh <leg name>` writes exactly these lines per leg name (with
+the serials, `-HostIp` and the pick from `bench.env`). Walk legs need
+`--duration 120` (coarse) or `--duration 180` (fine); the leakage, Round A,
+`C0v` / `C0m` and closing legs carry their length.
+
 **Base capture** for each leg: RS13_VECTOR_LEG.md Step 2, with
 `--profile image_bw500` on DTS and `image_bw250` on FHSS.
 
 - `--duration`: the leg's length plus 180 s.
 - `--min-frames`: 500 / 300 / 200 for 300 / 180 / 120 s legs.
-- `--strict`: on VECTOR legs only.
+- `--strict`: on VECTOR legs only (not on the leakage legs).
+
+`leg_prep.sh` starts this capture with these values.
 
 At lossy steps `min_frames` and `applied_ratio` fail by design. There the
 per-step numbers are the result, not the `RESULT:` line.
@@ -313,7 +376,17 @@ the round's GO.
 3. **Pass:** the base decodes no frame on either leg. There must be no
    `published frame_id` line, `rx_frames_seen` must stay 0 in `link_stats`,
    and the base capture must be empty. Record any `crc_dump:` lines; their
-   RSSI is the leakage level.
+   RSSI is the leakage level. `py -3 rs13_rf_extract.py --leak <archive>`
+   checks the archive side: no `published frame_id`, no `frag_arrival`, no
+   `rx_rf` window, `rx_frames` 0, with the stats thread reporting
+   `rx_frames=` to the end of the log. It prints the crc_dump RSSI and exits
+   1 on a decoded frame. It prints `NOT SCORED` (exit 1) when there is no
+   `rx_frames=` line, the stats thread, the receive worker or the receiver
+   crashed (`fatal: cannot open L072 HostLink`), its lines stop before the
+   log does or cover less than the leg's `duration_s` (params.txt must give
+   it as a positive number), or a DTS leg has no `FRF readback: ... (OK)`
+   at the pick on both boards: nothing decoded is then no evidence. link_stats `rx_frames_seen` and the empty base capture
+   are still checked by hand.
 4. **Fail** (any frame decoded): leakage reaches the receiver at or above its
    sensitivity, so the walk would measure the leakage path. Improve the
    shielding (seams, cable entries, ferrites, separation) and repeat. There is
@@ -332,9 +405,9 @@ command delivery compare pooled legs (RS-13.1 A15).
 | what | rule | source |
 |---|---|---|
 | P1–P5, P7, P8 | As in RS13_VECTOR_LEG.md, amended 2026-10-10: P8 is the absolute 350 ms bound at 2 fps. **P3 interleaved:** pooled seq-gap loss of 2a + 2a′ against 2c + 2c′, two-sided Fisher exact p ≥ 0.05, or a margin stated in RESULTS before the legs. These legs carry probes, so their image loss compares only with each other, not with RS-13.1's probe-free legs | RS13_VECTOR_LEG.md Step 2 |
-| R0 | Per leg, the median of the base's 10-s `rx_rf:` RSSI medians, and the same for SNR. R0 is the median over the four legs and must sit in −65 to −75 dBm. If it does not, change the fixed middle pad (radios parked) before Round B and re-measure with one 120 s VECTOR leg. The 0 dB legs stand, with their level recorded | archive `rx_daemon.log` |
-| command delivery (§8.6) | Per leg: the distinct PROBE seqs in the tractor's `LoRa cmd: PROBE seq=N … (rx#M)` lines that also appear in the base's `PROBE TX seq=N … (tx#K)` lines, over the base's PROBE TX count. Pool VECTOR (2a + 2a′) and `mono_g4` (2c + 2c′). **Not worse** = VECTOR ≥ `mono_g4`, or two-sided Fisher exact on delivered / undelivered p ≥ 0.05. Ignore the base's own `probe:` line: with `-ProbeEcho 0` it counts echoes and reads 0 %. Keep the score as `legs/<leg>_probe_score.txt` | archive `tx_daemon.log` (tractor), `rx_daemon.log` (base) |
-| A16 confirmation (2a, 2a′, bw500) | Every resync episode opened by an **isolated** lost frame (no other loss within 25 frames after it) ends **by DIGEST** (`digest` in the dry-run `resync:` episodes line) within **≈ 25 frames of the lost frame**, counted in capture rows from the seq gap to the episode's end. That is the `a16_sil.py` acceptance figure; a lost DEL's ghost alone holds the base out of step for TTL_FRAMES = 20 applied frames. No such episode ends at an epoch start more than 25 frames after its loss. `scripts/digest_trace.py` over each episode shows the base's live count back at the encoder's DIGEST `n_live` within those frames, with no later row where the encoder counts more live shapes than the base. Record the base's `ttl_dropped`, and `tractor-log`'s `counters` line, which covers the leg (the harness starts a fresh `camera_service` for each): at V0 one frame in four gets the repair share (`share_frames` ≈ `frames` ÷ 4), with its re-sends, the carousel re-sends and the DEL repeats beside it. `counters: none on these lines` means a `camera_service` older than the counters: check the image. The final `digest_ok` is not `False` (`leg_replay.py`'s `last DIGEST checked` beside it) | capture summary, `leg_replay.py`, `digest_trace.py` |
+| R0 | Per leg, the median of the base's 10-s `rx_rf:` RSSI medians, and the same for SNR. R0 is the median over the four legs and must sit in −65 to −75 dBm. If it does not, change the fixed middle pad (radios parked) before Round B and re-measure with one 120 s VECTOR leg (e.g. `leg_prep.sh B0v --duration 120`). The 0 dB legs stand, with their level recorded | `py -3 rs13_rf_extract.py <A2c> <A2a> <A2c2> <A2a2>` (archives): the per-leg `row:` lines and `R0 over 4 legs ...`, with the −65 to −75 dBm verdict |
+| command delivery (§8.6) | Per leg: the distinct PROBE seqs in the tractor's `LoRa cmd: PROBE seq=N … (rx#M)` lines that also appear in the base's `PROBE TX seq=N … (tx#K)` lines, over the base's PROBE TX count. Pool VECTOR (2a + 2a′) and `mono_g4` (2c + 2c′). **Not worse** = VECTOR ≥ `mono_g4`, or two-sided Fisher exact on delivered / undelivered p ≥ 0.05. Ignore the base's own `probe:` line: with `-ProbeEcho 0` it counts echoes and reads 0 %. `py -3 rs13_probe_score.py <archive> > <legs>/leg<X>_probe_score.txt` per leg; `py -3 rs13_probe_score.py <A2a> <A2a2> <A2c> <A2c2>` pools by codec (read from params.txt) and prints the Fisher p and the verdict; it withholds the verdict (exit 1) unless every leg's params show `reg_profile=2`, `probe_echo=0` and a VECTOR or `mono_g4` codec | archive `tx_daemon.log` (tractor), `rx_daemon.log` (base) |
+| A16 confirmation (2a, 2a′, bw500) | Every resync episode opened by an **isolated** lost frame (a seq gap of one frame, and no other loss within 25 frames after it) ends **by DIGEST** (`digest` in the dry-run `resync:` episodes line) within **≈ 25 frames of the lost frame**, counted in capture rows from the seq gap to the episode's end. That is the `a16_sil.py` acceptance figure; a lost DEL's ghost alone holds the base out of step for TTL_FRAMES = 20 applied frames. No such episode ends at an epoch start more than 25 frames after its loss. `py -3 rs13_digest_trace.py <legs>/legA2a_base.jsonl <legs>/legA2a2_base.jsonl` prints the table rows of the A16 confirmation, the per-episode trace (keep it as `<legs>/leg<X>_digest_trace.txt`) and the pooled verdict with the thin count; its trace shows the base's live count back at the encoder's DIGEST `n_live` within those frames, with no later row where the encoder counts more live shapes than the base. A loss-opened episode that is not scored (not isolated, or leg loss > 10 %) is still traced in full, across the next loss. If it ends at an epoch start more than 25 rows after its loss, or the encoder still counts more live shapes than the base after the last equal count, the tool flags it: `!! A16 shape` in its row and beside the verdict. Read that trace before quoting the verdict. When it is not isolated, its back-in-step cell reads `n/a (next loss at row N)` or `n/a (burst of N frames)`. The tool refuses (exit 2) a capture with a second meta line, a line that is not JSON with a ts and hex, a payload the replay cannot parse or a VECTOR body the store rejects. Record the base's `ttl_dropped`, and `tractor-log`'s `counters` line, which covers the leg (the harness starts a fresh `camera_service` for each): at V0 one frame in four gets the repair share (`share_frames` ≈ `frames` ÷ 4), with its re-sends, the carousel re-sends and the DEL repeats beside it. `counters: none on these lines` means a `camera_service` older than the counters: check the image. The final `digest_ok` is not `False` (`leg_replay.py`'s `last DIGEST checked` beside it) | capture summary, `leg_replay.py`, `rs13_digest_trace.py` |
 | emitter fold | `scripts/fold_emitter.py` on every archive with ≥ 5 lost frames. A significant fold at 7.07–7.09 s (random-frame null p < 0.05) means the RS-11.6 emitter still reaches the link: re-check the carrier and the shielding before Round B | archive `rx_daemon.log` |
 
 A clean carrier at 0 dB may lose only a handful of frames. If 2a and 2a′
@@ -391,12 +464,12 @@ may fall on different days:
 | seq-gap loss | The `capture seq gaps` line of `rs12_leg_report.py --capture` (the loss of record, RS-13.1 A14). FHSS: from the first frame heard, with the `first frame heard at seq N` head and the `counting from seq 1` figure (RS-13.1 A7) | leg report |
 | longest silence | `frag_gap_report.py` `max_gap` and `gaps>3s`, for both codecs | archive |
 | epoch starts | `epoch starts: N received, M applied` (VECTOR) | capture summary |
-| resync and recovery | The dry-run `resync:` episodes line: count, frames and seconds per episode, and what ended each (digest, epoch start, or still open at the end). The in-step share is 1 − resync frames ÷ frames received. Isolated-loss episodes are scored by the A16 rule at steps with loss ≤ 10 %. At heavier loss, overlapping losses legitimately stretch episodes: record them, do not score them | capture summary, `leg_replay.py` |
+| resync and recovery | The dry-run `resync:` episodes line: count, frames and seconds per episode, and what ended each (digest, epoch start, or still open at the end). The in-step share is 1 − resync frames ÷ frames received. Isolated-loss episodes are scored by the A16 rule at steps with loss ≤ 10 %. At heavier loss, overlapping losses legitimately stretch episodes: record them, do not score them (`rs13_digest_trace.py <legs>/leg<X>_base.jsonl`; its table classes each episode as PASS, FAIL, not scored, join or no loss) | capture summary, `leg_replay.py`, `rs13_digest_trace.py` |
 | store | `orphans`, `digest` checked / mismatched, `ttl_dropped`; the final `scene:` line (horizon mode, layers, `digest_ok`) | capture summary |
 | level reached | The VS header's LL field: per-frame `L<n>` in the capture rows, `scene: … level`, and `tractor-log`'s `levels seen`. V0 is expected everywhere, because no ladder is built; anything else is an anomaly | capture, `tractor-log` |
-| command delivery | DTS only, scored as in Round A, with the probe count beside it. Probes fire only on a received frame, so at lossy steps fewer fire, and delivery is conditional on a forward link that just worked | archive logs |
-| RSSI / SNR | From the base's `rx_rf:` 10-s windows: the median of the medians, the minimum, and n. Also the `crc_dump:` count with its RSSI/SNR. The tractor's tx daemon logs no RSSI, so its receive level is inferred: the path is passive and reciprocal, and both radios transmit at 14 dBm | archive `rx_daemon.log` |
-| tractor | `radio_tx_ok` (post-bracket); on FHSS, `tx_stream_streak_max` (≥ 8 = time authority, RS-13.1 A11); `drop_full` / `drop_stale` | brackets, `tx_daemon.log` |
+| command delivery | DTS only, scored as in Round A, with the probe count beside it. Probes fire only on a received frame, so at lossy steps fewer fire, and delivery is conditional on a forward link that just worked (`rs13_probe_score.py`) | archive logs |
+| RSSI / SNR | From the base's `rx_rf:` 10-s windows: the median of the medians, the minimum, and n. Also the `crc_dump:` count with its RSSI/SNR. The tractor's tx daemon logs no RSSI, so its receive level is inferred: the path is passive and reciprocal, and both radios transmit at 14 dBm. `py -3 rs13_rf_extract.py <archive> --lines > <legs>/leg<X>_rf.txt`; its `row:` line gives median of the window medians / minimum of the window minimums, CRC err and n | archive `rx_daemon.log` |
+| tractor | `radio_tx_ok` (post-bracket); on FHSS, `tx_stream_streak_max` (≥ 8 = time authority, RS-13.1 A11); `drop_full` / `drop_stale`. The harness's `TRACTOR_L072_RESET` line (also `tractor_l072_reset=` in params.txt): on `failed` or `unknown` the counters may carry over, so score that leg's tractor brackets with `bench-evidence/RS_12_15_reverse_delivery_2026-10-18/scripts/deltas.py` (BENCH_RUNBOOK, "A leg") | brackets, `tx_daemon.log`, harness transcript |
 | encoder | `vector_stats` `ms_total` p95, against the amended P8 bound; the `counters` line (epoch starts per cause, the A16 repair counters) | `tractor-log` on the archived `camera_service.log` |
 
 **RSSI tracking rule.** This is the walk's validity check. If two
@@ -411,6 +484,9 @@ void for the edge.
 - Near the edge LoRa loss rises steeply, from a few percent to most frames
   within one or two steps. A slow, ragged decline over many steps points to
   leakage or a moving connector.
+- `py -3 rs13_rf_extract.py <archive> --r0 <R0> --step <dB> --floor <pick floor>
+  [--prev-snr <previous step's median SNR> --prev-step <dB>]` applies the rule
+  to one leg.
 
 ### Stop rules
 
@@ -424,11 +500,16 @@ void for the edge.
 - **Closing check** after every walk (`B0close`, `C0close`): the step chain
   back to 0 dB, then one 120 s VECTOR leg. Its median RSSI must be within
   2 dB of R0, and its loss no worse than the 0 dB legs'. If not, a connector
-  moved, and the later steps are suspect: say so.
+  moved, and the later steps are suspect: say so
+  (`py -3 rs13_rf_extract.py <B0close archive> --r0 <R0> --closing`).
 - **Abort the round, park, record, and fly nothing more without a new GO** if
   any of these happens:
   - a DTS leg without `FRF readback: … (OK)` at the pick on both boards, or
-    any `FRF force-write failed`;
+    any `FRF force-write failed` (`rs13_rf_extract.py <archive>` prints
+    `!! DTS leg without FRF readback: ... (OK) at the pick ...` when either
+    board has no read-back, a read-back off the pick or not OK (MISMATCH),
+    or a failed force-write; the pick is params `force_frf_hz`, or 915 MHz
+    when it is 0; the line is a flag, not an exit code);
   - the leakage check failing;
   - the tracking rule failing on two consecutive steps;
   - a board reboot, a watchdog reset or a UART-holder conflict;
@@ -459,21 +540,27 @@ bench-evidence/RS_13_range_edge_<date>/
   RESULTS.md                                   from the template below
   legs/rf_setup.txt rf_setup_*.jpg atten_log.csv
   legs/spot_check_<date>.jsonl spot_check_<date>_compare.txt
-  legs/leak_dts_* leak_fhss_*                  base capture, reports, park
+  legs/legleak_dts_* legleak_fhss_*            base capture, reports, park (leg_prep and leg_post
+                                               prefix every file with `leg`)
   legs/legA2c_* legA2a_* legA2c2_* legA2a2_*   RS13_VECTOR_LEG.md's per-leg set: scene, health,
                                                pre/post brackets, base capture (.jsonl/.json/.txt),
                                                report (--capture), gaps, park
   legs/legB<step><v|m>_* legC<step><v|m>_*     the same per walk leg
-  legs/leg<X>_probe_score.txt                  DTS legs: tractor ∩ base PROBE seqs
-  legs/leg<X>_rf.txt                           rx_rf + crc_dump extract
+  legs/leg<X>_probe_score.txt                  DTS legs: tractor ∩ base PROBE seqs (rs13_probe_score.py <archive>)
+  legs/leg<X>_rf.txt                           rx_rf + crc_dump extract (rs13_rf_extract.py <archive> --lines)
   legs/leg<X>_digest_trace.txt                 VECTOR legs with a resync episode
+                                               (rs13_digest_trace.py legs/leg<X>_base.jsonl)
   legs/session_end_park_<date>.txt             radio_state.py, both boards, per round
-  scripts/                                     the copied RS-13.1 scripts with this session's paths
+  scripts/                                     the copied RS-13.1 analysis scripts (fold_emitter.py,
+                                               streak_check.py)
 ```
 
 The harness archives (`bench-evidence/radio_monitor_<stamp>_<sha>/`) stay where
-the harness puts them; RESULTS names each one per leg. Use Windows-style
-`C:/…` paths for the Python tools and `adb pull` (RS-13.1 A6).
+the harness puts them; RESULTS names each one per leg. Each holds the
+openocd log of the tractor's leg-start reset (`tractor_ocd_reset.log`; the
+verdict is `tractor_l072_reset=` in its `params.txt`). `leg_post.sh` does
+not copy that log into `legs/`. Use Windows-style `C:/…` paths for the
+Python tools and `adb pull` (RS-13.1 A6).
 
 ## Traps
 
@@ -483,7 +570,8 @@ the harness puts them; RESULTS names each one per leg. Use Windows-style
   centre outside 902.25–927.75 MHz.
 - **Two harness defaults are wrong for this session.** `-ReactiveFire`
   defaults to 0, so DTS legs pass `1` explicitly. `-TxBatch` defaults to 1,
-  so every leg passes `0`.
+  so every leg passes `0`. `leg_prep.sh` writes both on every range-edge
+  line.
 - **SNR saturates and RSSI flattens.** Read RSSI in the strong region and
   SNR near the floor (Numbers).
 - **Lossy steps fail the capture checks.** `min_frames` and `applied_ratio`
@@ -551,7 +639,8 @@ Procedure: firmware/x8_lora_bootloader_helper/bench_tools/RS13_RANGE_EDGE_LEG.md
 | photos | `legs/rf_setup_*.jpg` |
 
 Leakage check: `leak_dts` <archive>, `leak_fhss` <archive>; frames decoded
-<0 required>; `crc_dump:` lines <n, RSSI>; <PASS | FAIL, what was fixed>.
+<0 required>; `crc_dump:` lines <n, RSSI>; `rs13_rf_extract.py --leak`
+<PASS | FAIL | NOT SCORED per leg>; <PASS | FAIL, what was fixed>.
 
 Spot-check: `legs/spot_check_<date>.jsonl`; pick <Hz>; floor at the pick <dBm>;
 <minutes> before the first DTS leg; `FRF readback: … (OK)` on both boards on
@@ -559,7 +648,8 @@ every DTS leg <yes / list>.
 
 ## Round A — the 0 dB step (DTS @ <pick>)
 
-Flight order: 2c, 2a, 2c′, 2a′. Harness lines: <paste>.
+Flight order: 2c, 2a, 2c′, 2a′. Harness lines: <paste>. Tractor reset per leg
+(`TRACTOR_L072_RESET`): <landed / failed or unknown: scored with deltas.py>.
 
 | # | criterion | 2c | 2a | 2c′ | 2a′ | pass? |
 |---|---|---|---|---|---|---|
@@ -579,7 +669,7 @@ Command delivery (§8.6): VECTOR <x/y = %> vs mono_g4 <x/y = %>, Fisher p <p>,
 
 A16 confirmation (bw500):
 
-| leg | loss at row | episode (start-end, frames, s) | ended by | back in step (digest_trace, frames after the loss) | isolated? | pass? |
+| leg | loss at row | episode (start-end, frames, s) | ended by | back in step (`rs13_digest_trace.py`, frames after the loss) | isolated? | pass? |
 |---|---|---|---|---|---|---|
 
 Base `ttl_dropped` <n>; encoder counters per leg (`tractor-log` `counters` line) <frames, share frames, share re-sends (repeat-once), carousel re-sends, DEL repeats>. Episodes scored <n>
@@ -614,14 +704,14 @@ Closing check `C0close`: <…>.
 
 | measure | criterion | result |
 |---|---|---|
-| Base command delivery during VECTOR | not worse than during `mono_g4` | DTS 0 dB: <…>; per step: <…>; FHSS: not measured — waits for the RS-12.15 reverse-delivery fix |
+| Base command delivery during VECTOR | not worse than during `mono_g4` | DTS 0 dB: <…>; per step: <…>; FHSS: not measured (the FHSS walk is image-only; the command-delivery leg is separate, unblocked by RS-12.15 since 2026-10-18) |
 | Fragment loss | not worse than `mono_g4` on the same workload and profile | Round A P3 <…>; per step: <…> |
 | Range-edge leg | at each 3 dB step: VS frames/s, level reached, command delivery, the same for `mono_g4`; VS1 keeps an L0 picture and STATUS where `mono_g4` delivers no complete frame | per-step tables above; level <V0 throughout>; the L0/STATUS clause **not testable at V0** (no ladder built) |
 
 ## What these legs did NOT test
 
 - V1–V3 (the ladder) and with it the §8.6 L0/STATUS clause; self-select (D-VS6b), B4, B5
-- FHSS command delivery and the FHSS switch leg (RS-12.15 reverse-delivery fix first)
+- FHSS command delivery and the FHSS switch leg (separate legs; unblocked by the RS-12.15 reverse-delivery fix, on both boards since 2026-10-18)
 - the mode switch (no 2d leg); web_ui in the loop; the production stack (B1, RS-9.2/9.4, RS-11.7)
 - a distance: conducted path, no fading or antenna effects
 - <anything cut on the day>

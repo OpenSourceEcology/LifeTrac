@@ -1209,39 +1209,39 @@ No-regrets work, correct under every surviving architecture (do first):
 
 ### RS-5 — Harness & bench tooling
 
-- [ ] **RS-5.1 Harness NRST + deploy verification** — the inter-run reset is
-  fire-and-forget (`gpio163` pulse piped to `Out-Null`; tractor SWD reset
-  backgrounded) and the file push is unverified (`adb push | Out-Null`).
-  Failed-reset produced run 23's 120 s false negative; a stale push
-  crash-looped both daemons for all of run 28. Add: post-reset VER +
-  uptime/boot-count gate on both L072s, and board-side `md5sum` vs local
-  compare after push — abort loudly on either mismatch.
-  **2026-07-25:** the gate half-exists — BOOT_URC already carries
-  `reset_cause` + `clock_source_id` after the 500 ms safe-mode boot window,
-  which is exactly the post-reset assert wanted here. Caveat: reset-cause
-  decode mis-orders PINRSTF/PORRSTF (RS-4.13c), so "external reset" vs
-  "power-on" is only trustworthy after that lands.
-- [ ] **RS-5.2 Deploy gpio — tractor gpio163 dead** — L072 reset on the
-  tractor works only via the fragile OpenOCD/SWD path (7–10 s, occasionally
-  hangs). Root-cause the GPIO (pinmux? blown pad?) or add a hardware NRST
-  jumper on the carrier. Largest single bench-fragility item.
-- [ ] **RS-5.3 Dev-loop smoke tier** — `-DurationS 30 -NoArchive` harness
-  mode to cut the edit→verdict loop from ~9 min to ~4; keep 120 s+archive
-  for evidence runs.
-  **Verified 2026-07-25 — half of this already ships.** `-DurationS` is an
-  existing parameter and **already defaults to 30**
+- [ ] **RS-5.1 Harness NRST + deploy verification** — the inter-run reset is fire-and-forget
+  (`gpio163` pulse piped to `Out-Null`; tractor SWD reset backgrounded) and the file push is
+  unverified (`adb push | Out-Null`). Failed-reset produced run 23's 120 s false negative; a stale
+  push crash-looped both daemons for all of run 28. Add: post-reset VER + uptime/boot-count gate on
+  both L072s, and board-side `md5sum` vs local compare after push — abort loudly on either mismatch.
+  **2026-07-25:** the gate half-exists — BOOT_URC already carries `reset_cause` + `clock_source_id`
+  after the 500 ms safe-mode boot window, which is exactly the post-reset assert wanted here. Caveat:
+  reset-cause decode mis-orders PINRSTF/PORRSTF (RS-4.13c), so "external reset" vs "power-on" is only
+  trustworthy after that lands. **2026-10-18 (legkit, no radio):** the tractor SWD reset is now
+  judged at leg end from its openocd log (`TRACTOR_L072_RESET`, archived; BENCH_RUNBOOK, "A leg"),
+  and the base gpio163 pulse output is captured and reported unverified. Still open: a post-reset
+  VER/boot-count gate, a base reset that works (RS-5.2), and md5 checks after each push.
+- [ ] **RS-5.2 Deploy gpio — tractor gpio163 dead** — L072 reset on the tractor works only via the
+  fragile OpenOCD/SWD path (7–10 s, occasionally hangs). Root-cause the GPIO (pinmux? blown pad?) or add
+  a hardware NRST jumper on the carrier. Largest single bench-fragility item. **Base too (2026-10-18):**
+  gpio163 has not reset the base L072 since 2026-08; the fault is between gpio163 and PF4 (openocd on
+  PF4 works on both boards). Tractor first-leg misses: candidates (a)–(d) in BENCH_RUNBOOK, "L072 resets
+  at leg start"; (c)'s signature was seen 2026-10-19 on A2c2 (not a first leg), so its launch fix need not wait; first-leg misses still need a first-leg log.
+- [ ] **RS-5.3 Dev-loop smoke tier** — `-DurationS 30 -NoArchive` harness mode to cut the
+  edit→verdict loop from ~9 min to ~4; keep 120 s+archive for evidence runs. **Verified 2026-07-25 —
+  half of this already ships.** `-DurationS` is an existing parameter and **already defaults to 30**
   ([`run_live_radio_monitor.ps1:14`](firmware/x8_lora_bootloader_helper/run_live_radio_monitor.ps1)),
-  threaded through the monitor loop and the summary record. Only `-NoArchive`
-  is missing, so the remaining work is one switch guarding the archive step —
-  materially smaller than the item implied.
-- [ ] **RS-5.4 Harness robustness from runs 31–33** — rely on `MONITOR
-  COMPLETE` in the log (parent PS can hang after the child exits; console
-  shared with the publisher); never run host-side adb concurrent with the
-  harness's polling (wedges adb + everything behind it); injectors run ON
-  the base board (`docker exec` into `rx_smoke`), not on the host.
-- [ ] **RS-5.5 Bidirectional-load test mode** — harness knob that generates
-  continuous keyframe-request + profile-flip traffic during a stream, so
-  RS-1.2-class bugs surface on demand instead of by accident.
+  threaded through the monitor loop and the summary record. Only `-NoArchive` is missing, so the
+  remaining work is one switch guarding the archive step — materially smaller than the item implied.
+- [ ] **RS-5.4 Harness robustness from runs 31–33** — rely on `MONITOR COMPLETE` in the log (parent PS
+  can hang after the child exits; console shared with the publisher); never run host-side adb concurrent
+  with the harness's polling (wedges adb + everything behind it); injectors run ON the base board (runs
+  31–33: `docker exec` into `rx_smoke`), not on the host: since 2026-10-18 the harness starts them
+  (`-InjectCmd`, `bench_tools/inject_watch.sh`, container `bench_inject`; the first_frame watch runs on the board).
+- [ ] **RS-5.5 Bidirectional-load test mode** — harness knob that generates continuous
+  keyframe-request + profile-flip traffic during a stream, so RS-1.2-class bugs surface on demand
+  instead of by accident. **Partly covered (2026-10-18):** `-InjectCmd "dual_inject.py <s>"`
+  gives on-demand two-opcode command load from the first frame; no profile-flip traffic yet.
 - [ ] **RS-5.8 Stage 1 quant's camera "restore" steals the L072 UART on the
   tractor — found 2026-07-25** — `run_stage1_standard_quant_end_to_end.ps1`
   ends with "Restoring lifetrac-camera.service (post-quant)", which starts a
@@ -1380,8 +1380,8 @@ No-regrets work, correct under every surviving architecture (do first):
   daemon from starting at boot without a GO. So they were retired, not
   repaired: `disable` without `--now`, `reset-failed`, unit files moved to
   `/etc/lifetrac-retired/20261012T212515Z/`; then the dead video-test
-  containers removed and the tractor's video-test compose file renamed. No
-  board was rebooted, so the next boot is not yet observed. Record:
+  containers removed and the tractor's video-test compose file renamed. The
+  first boot after it (2026-10-18) confirmed it on both boards (RS-5.19). Record:
   [`bench-evidence/board_state_2026-10-12_unit_retirement/README.md`](bench-evidence/board_state_2026-10-12_unit_retirement/README.md);
   rules: [BENCH_BOARDS.md](firmware/x8_lora_bootloader_helper/bench_tools/BENCH_BOARDS.md),
   "Retired boot units". Follow-ups RS-5.11 – RS-5.20; none needs a radio GO.
@@ -1438,8 +1438,8 @@ No-regrets work, correct under every surviving architecture (do first):
   `HIL_RUNBOOK.md:45`, `:815`, `hil/_common.ps1:100` and
   `FIRMWARE_UPDATES.md:50` tell the reader to watch
   `journalctl -u lifetrac-base`. Rewrite them when RS-5.11 lands.
-- [~] **RS-5.18 Disarm the base's video-test compose file — done in the bench
-  kit 2026-10-14 (operator OK); not yet run on the base.**
+- [x] **RS-5.18 Disarm the base's video-test compose file — DONE 2026-10-14
+  (bench kit, operator OK; run on the base the same day).**
   - `deploy_base.sh` ships only `base_station/ firmware/ Dockerfile
     docker-compose.yml`: no `docker-compose.video-test.yml`, no `deploy/`
     (an old `deploy/` goes with the clean; the backup keeps it).
@@ -1447,9 +1447,9 @@ No-regrets work, correct under every surviving architecture (do first):
     the deployed tree to `docker-compose.video-test.yml.RETIRED-<PC UTC
     date>`, only while every container made from that file is exited, and
     never runs `docker compose` on it.
-  - Until the next `deploy_base.sh` run the copy on the base stays armed
-    (BENCH_BOARDS.md "Retired boot units", rule 7). Close this item when that
-    run's log shows the rename.
+  - First real run, at `f6e4b463`: the log shows the rename to
+    `docker-compose.video-test.yml.RETIRED-2026-10-14`, and the tree after it has no `deploy/`
+    ([log](bench-evidence/bench_session_2026-10-14/boot_deploy_images/12_deploy_base.txt), [after](bench-evidence/bench_session_2026-10-14/boot_deploy_images/13_base_post_deploy.txt)).
 - [~] **RS-5.19 First run of the 10-12 guards on the real boards** — checked
   read-only on both boards on 2026-10-12
   ([base](bench-evidence/board_state_2026-10-12_unit_retirement/base/20_provision_check.txt),
@@ -1464,20 +1464,20 @@ No-regrets work, correct under every surviving architecture (do first):
   `/dev/null`) and requires `job=` exactly; `alias`, `indirect`,
   `generated`, `transient` and the `-runtime` forms are refused with a
   message, never changed.
-  **Still unrun on a board:**
-  - the apply path (the `is-enabled` words after a real `disable`), and the
-    new refusals, so far exercised only against a fake board;
-  - `deploy_base.sh` itself, now with the video-test guard and rename
-    (RS-5.18).
-
-  At the first run, capture `systemctl --version` on the base (only the
-  tractor's, 250, is on record), each retired unit's `is-enabled` reply, and
-  `ls -l docker-compose.video-test.yml*` in the deployed tree before and
-  after. All of these fail closed; they first run at the next deploy, or on a
-  second board pair. Not checked by the retire item: units moved by hand
-  without a `daemon-reload`, and dangling `multi-user.target.wants` links
-  (the `units_gone` guard in BENCH_BOARDS.md catches those).
-- [~] **RS-5.20 The tractor's compose files reached the base** (found
+  **Run on the boards since:** the stricter `--check` read `ok` for the retire item on both boards
+  on 2026-10-14 ([base](bench-evidence/bench_session_2026-10-14/boot_deploy_images/00_prov_check_base.txt), [tractor](bench-evidence/bench_session_2026-10-14/boot_deploy_images/00_prov_check_tractor.txt))
+  and at the first boot after the retirement, 2026-10-18 ([base](bench-evidence/bench_session_2026-10-14/power_cycle_2026-10-18/02_prov_check_base.txt), [tractor](bench-evidence/bench_session_2026-10-14/power_cycle_2026-10-18/02_prov_check_tractor.txt)).
+  `deploy_base.sh` ran for real on 2026-10-14 with the video-test guard and
+  rename (RS-5.18). Captured with it: `systemctl --version` on the base,
+  250 (250.5+), and `ls -l` of the deployed tree top before and after
+  ([before](bench-evidence/bench_session_2026-10-14/boot_deploy_images/11_base_pre_deploy.txt), [after](bench-evidence/bench_session_2026-10-14/boot_deploy_images/13_base_post_deploy.txt)).
+  **Still unrun on a board:** the apply path (the `is-enabled` words after a
+  real `disable`; no retired unit's `is-enabled` reply is captured yet) and
+  the new refusals, so far exercised only against a fake board. Both fail
+  closed; they first run on a second board pair. Not checked by the retire
+  item: units moved by hand without a `daemon-reload`, and dangling
+  `multi-user.target.wants` links (BENCH_BOARDS.md's `units_gone` guard).
+- [x] **RS-5.20 The tractor's compose files reached the base** (found
   2026-10-14) — `firmware/tractor_x8/docker-compose.video-test.yml`,
   `docker-compose.video-test.v2.yml` and `mosquitto.video-test.conf` shipped
   to the base inside `firmware/`, which the base Dockerfile COPYs in full.
@@ -1485,7 +1485,7 @@ No-regrets work, correct under every surviving architecture (do first):
   `restart: unless-stopped` and publish no ports, so no broker blocks a
   manual `up` of them on the base. The tractor's production
   `docker-compose.yml` maps `/dev/ttymxc3` the same way.
-  **Done in the bench kit 2026-10-14; not yet run on the base.**
+  **Done in the bench kit 2026-10-14; run on the base the same day.**
   `deploy_base.sh` leaves `firmware/tractor_x8/docker-compose*.yml` and
   `mosquitto.video-test.conf` out of the tarball, so they are in neither the
   tree nor the image, and removes an old copy from the deployed tree (also
@@ -1493,13 +1493,13 @@ No-regrets work, correct under every surviving architecture (do first):
   if a YAML file in the tarball, other than the base's own
   `docker-compose.yml`, names a `ttymxc` UART or `LIFETRAC_LORA_DEVICE`
   outside a comment, or uses `privileged` (any value),
-  `device_cgroup_rules` or all of `/dev`. The files stay in
-  git: the tractor image is built from its own archive. Close this item when
-  the next deploy's tree has none of them. Renaming or deleting them in git
-  is left to the design owner. Still on the base for a while:
+  `device_cgroup_rules` or all of `/dev`. The files stay in git: the tractor
+  image is built from its own archive. Renaming or deleting them in git is
+  left to the design owner. **Closed 2026-10-14:** the deployed tree held all
+  four files before the `f6e4b463` deploy and none after it ([before](bench-evidence/bench_session_2026-10-14/boot_deploy_images/11_base_pre_deploy.txt), [after](bench-evidence/bench_session_2026-10-14/boot_deploy_images/13_base_post_deploy.txt)).
   `build_tractor_image.sh` unpacks the tractor tree, compose files included,
-  under `/home/fio/lifetrac_build/` for the build and removes it afterwards;
-  a failed build leaves it there.
+  under `/home/fio/lifetrac_build/` and removes it just before its base-side
+  `saved` line, which that day's build reached ([log](bench-evidence/bench_session_2026-10-14/boot_deploy_images/20_build_tractor_image.txt)).
 
 ### RS-6 — Keyframe elimination (K-phases, now LoRa-only)
 
@@ -2569,36 +2569,36 @@ base image = main `3a0cb524` (behind both PRs). PRs #125 (firmware) and
 #124 (host) are green and mergeable — **merge first**, #125 then #124; both
 edit TODO.md, so merge main into the flight branch before #124 if it
 conflicts. Every leg needs GO; radios stay parked between legs.
-  1. ~~Confirmation leg on `0c1bb0a9`~~ **DONE 2026-09-15 (leg U).** Both
-     boards flashed to the shipped build, same camera workload as leg T:
-     **537 frames published over 268 s (2.00 fps) vs leg T's 477, ZERO
-     lock-loss gaps**, air loss 11.1 % (678 TX → 603 decoded), tractor
-     `clk_demotion_kept`=5 / `reset`=0 / `tx_first_anchor`=1, and the
-     **first `fhss_dec_rej_locked_out` ever captured on air (1)**. The
-     flown-vs-shipped gap is closed; no further leg needed for #125.
-     NOTE: the leg report first printed "99.8 % loss / published=1" — an
-     artifact of the daemon stats thread crashing 1 frame in (RS-12.17),
-     not a result. Evidence: RESULTS.md "Leg U" section.
+  1. ~~Confirmation leg on `0c1bb0a9`~~ **DONE 2026-09-15 (leg U).** Both boards
+     flashed to the shipped build, same camera workload as leg T: **537 frames
+     published over 268 s (2.00 fps) vs leg T's 477, ZERO lock-loss gaps**, air
+     loss 10.5 % (674 fragments sent → 603 decoded; first quoted 11.1 % against
+     `radio_tx_ok` 678, which counts the command plane too), tractor
+     `clk_demotion_kept`=5 / `reset`=0 / `tx_first_anchor`=1, and the **first
+     `fhss_dec_rej_locked_out` ever captured on air (1)**. The flown-vs-shipped gap
+     is closed; no further leg needed for #125. NOTE: the leg report first printed
+     "99.8 % loss / published=1" — an artifact of the daemon stats thread crashing
+     1 frame in (RS-12.17), not a result. Evidence: RESULTS.md "Leg U" section.
   2. **Deploy the merged base tree** (recipe in the runbook) so the base's
      daemons carry the shared gate without the harness push.
   3. **RS-12.16 items 1–3 implemented + SIL green before the bench**, then
      RS-1.4 live: selector = Auto, force loss, watch DTS→FHSS inside the
      dead-air window and the promote-back after 60 s healthy.
-  4. **Residual 20.7 % on the camera keyframe storm** (leg T): analysis
-     first — train length vs the profile-1 slot budget, command load — no
-     code until the mechanism is named.
-  Prep every session: camera aimed at the screen (two `/dev/video1` frames
-  1 s apart must differ), moving content via Firefox kiosk, stop
-  `lifetrac-camera.service` + `docker stop tractor-camera`, clear retained on
-  the base broker, `rs115` pre-brackets both boards, re-push
-  `/tmp/lifetrac_strict` + `/tmp/lifetrac_p0c` after ANY reboot.
+  4. **Residual 20.9 % (first quoted 20.7 %) on the camera keyframe
+     storm** (leg T): analysis first — train length vs the profile-1
+     slot budget, command load — no code until the mechanism is named.
+  Prep every session: camera aimed at the screen (two `/dev/video1` frames 1 s apart must
+  differ), moving content in a normal browser window with the player fullscreen (Esc leaves it; never
+  `firefox --kiosk`, BENCH_RUNBOOK prep 7; was: via Firefox kiosk, since banned), stop `lifetrac-camera.service` +
+  `docker stop tractor-camera`, clear retained on the base broker, `rs115` pre-brackets
+  both boards, re-push `/tmp/lifetrac_strict` + `/tmp/lifetrac_p0c` after ANY reboot.
 
 - [ ] **RS-12.16 — Auto radio-profile policy is blind to the failures we
   measured (added 2026-09-14, from the RS-12.15 camera A/B).**
-  `web_ui.AutoRadioPolicy` judges the link from link_stats sample age
-  (≤ 20 s) and reassembler timeouts (≤ 2.5 per 10 s). Replayed against leg S
-  (old fw, camera, 39.0 % loss, lock-loss blackouts of 53.2 s + 21.9 s):
-  peak timeout rate 1.0 per 10 s, sample age never stale (the daemon
+  `web_ui.AutoRadioPolicy` judges the link from link_stats sample age (≤ 20 s)
+  and reassembler timeouts (≤ 2.5 per 10 s). Replayed against leg S (old fw,
+  camera, 40.2 % loss (first quoted 39.0 %), lock-loss blackouts of 53.2 s +
+  21.9 s): peak timeout rate 1.0 per 10 s, sample age never stale (the daemon
   publishes zero-samples through dead air) → the policy would have read the
   whole leg HEALTHY. Timeouts are a weak signal with parity + the 09-12 stale
   horizon: lost frames produce silence, not timeouts. Also: before PR #125
@@ -2756,20 +2756,20 @@ conflicts. Every leg needs GO; radios stay parked between legs.
   keyframe workload (I/J), not drivable this session (ffmpeg wiped). So v2's
   mechanism is proven feed-independently by the counters; the behavioral A/B
   awaits a camera-motion leg. Radios parked 0x80.
-  BEHAVIORAL A/B DONE 2026-09-14 on the CAMERA (operator aimed it at the
-  screen; railroad video via Firefox kiosk): leg S (old fw) reproduced the
-  break -- 39.0 % loss, 2 lock-loss gaps (53.2 s + 21.9 s = 75 s dead);
-  leg T (v2, same workload) ELIMINATED it -- 0 gaps, 20.7 % loss. Combined
-  with leg R's counters (clk_demotion_kept=19/reset=0) the fix is proven
-  mechanistically AND behaviorally. Boards on v2, parked. RS-12.15 v2
-  recommended for production. Evidence RS_12_15_clock_authority_2026-09-14
-  /RESULTS.md (GO-validation + Camera behavioral A/B sections).**
-  Round 4 review (after the legs): leading-grid originator now hands STALE
-  (epoch-drift barrier kept; forged epoch+2 host-pinned REJECTED); wire-sync
-  enforces the 10 new offsets; PRODUCTION build/firmware.bin rebuilt + committed
-  (589c1203). Boards run bench 5a160e4a (flown); PR-head bench = 0c1bb0a9 --
-  delta not exercised on air (0 SNAPPED on the originator), confirmation leg
-  optional at the next GO. Staged on both boards.
+  BEHAVIORAL A/B DONE 2026-09-14 on the CAMERA (operator aimed it at the screen; railroad video via Firefox
+  kiosk, since banned): leg S (old fw) reproduced the break -- 40.2 % loss (events-based; first quoted 39.0 %), 2
+  lock-loss gaps (53.2 s + 21.9 s = 75 s dead); leg T (v2, same workload) ELIMINATED it -- 0 gaps, 20.9 % loss
+  (first quoted 20.7 %). Combined with leg R's counters (clk_demotion_kept=19/reset=0) the fix is proven
+  mechanistically AND behaviorally. Boards on v2, parked. RS-12.15 v2 recommended for production. Evidence
+  RS_12_15_clock_authority_2026-09-14/RESULTS.md (GO-validation + Camera behavioral A/B sections).** Errata
+  2026-10-18 (RS_12_15_clock_authority_2026-09-14/ERRATA.md): the tractor L072 restarted at the start of legs P
+  and Q2, the two legs flown without a flash before them; no figure was affected. Leg R's negative loss line was
+  a log-window artifact, not a reset. The 09-14 loss figures depend on the counting method (O's 0.3 % reads 2.2 %
+  over the shared window); rs12_leg_report.py should score loss over the window both logs cover (ERRATA §3).
+  Round 4 review (after the legs): leading-grid originator now hands STALE (epoch-drift barrier kept; forged
+  epoch+2 host-pinned REJECTED); wire-sync enforces the 10 new offsets; PRODUCTION build/firmware.bin rebuilt +
+  committed (589c1203). Boards run bench 5a160e4a (flown); PR-head bench = 0c1bb0a9 -- delta not exercised on air
+  (0 SNAPPED on the originator), confirmation leg optional at the next GO. Staged on both boards.
 - [~] **RS-12.15 v1 — FHSS clock authority: FIRMWARE IMPLEMENTED + FLASHED
   2026-09-14 (commit 23ba5122, branch rs12-15-clock-authority, PR pending);
   BEHAVIORAL A/B still PENDING. A self-anchored originator (own-TX clock,
@@ -2789,50 +2789,50 @@ conflicts. Every leg needs GO; radios stay parked between legs.
   on new fw, OR an RFCO_SUMMARY capture showing the originator now logs
   consider_remote=LOCKED_OUT on received commands (feed-independent proof).
   The reverse-delivery half below still stands.**
-- [~] **RS-12.15 (reverse-delivery half) — the tractor's RX does not follow
+- [x] **RS-12.15 (reverse-delivery half) — the tractor's RX does not follow
   the slot clock between trains (opened 2026-09-12 from RS-12.12/14 data).**
   **FIX CODED 2026-10-14 (de2ae16 + f9cc98b; review fixes 65963c1, 1b45cfa),
-  SIL green, bench images built 2026-10-14. NOT flashed (needs the GO).** On v2 the
+  SIL green, merged in #152 (`3c8ced60`); ON AIR 2026-10-18 (below).** On v2 the
   self-anchored TX clock survives demotion, but `sx1276_rx_slot_follow` still
   ran only while LOCKED, so between trains the tractor listened on its last TX
   channel or the scan walker's (v2 legs R/T/U: 19/72, 2/43, 7/49 commands
-  heard). Fix: follow =
-  (LOCKED && adopted) || originator authority. While streaming (>= 8 own TX
-  each < 1 s apart) the tractor's own clock drives its receiver in any scan
-  state and the walker leaves the synth alone. Followers are unchanged (they
-  never hold authority). The rule reads a fresh ms clock. LOCKED on the own
-  grid without authority (the RS-13 decay window) no longer follows. The final
-  scan FAIL still commits FAILED and sends its fault, but it no longer parks
-  the receiver under authority (the follower would re-arm only at the next
-  slot boundary). A walker step skipped under authority still starts a fresh
-  window for the FAIL sub-byte's IRQ and CRC flags.
+  heard). Fix: follow = (LOCKED && adopted) || originator authority. While
+  streaming (>= 8 own TX each < 1 s apart) the tractor's own clock drives its
+  receiver in any scan state and the walker leaves the synth alone. Followers
+  are unchanged (they never hold authority). The rule reads a fresh ms clock.
+  LOCKED on the own grid without authority (the RS-13 decay window) no longer
+  follows. The final scan FAIL still commits FAILED and sends its fault, but
+  it no longer parks the receiver under authority (the follower would re-arm
+  only at the next slot boundary). A walker step skipped under authority
+  still starts a fresh window for the FAIL sub-byte's IRQ and CRC flags.
   `check-rx-reverse-delivery` (10 SIL sequences, real sx1276_rx.c/tx.c): 17/59
   -> 59/59 between trains, 15/28 -> 28/28 (leg H shape), 159/182 -> 182/182
   (leg I shape), 10/33 -> 33/33 in scan FAILED, 0/1 -> 1/1 with a command on
   air at the final FAIL; FAIL sub-bytes after a CRC error match main's; the
   follower's radio calls are identical to pre-fix; the remaining misses are
-  half-duplex collisions.
-  Limit: authority only, so at 1 fps, or ~3.5 s after a >= 1 s stall, it is
-  the old behaviour.
+  half-duplex collisions. Limit: authority only, so at 1 fps, or ~3.5 s after
+  a >= 1 s stall, it is the old behaviour.
   **BENCH (no radio) — DONE 2026-10-14:** bench `e083ae46a64686031b39866eca42e094`,
   production `148de24e1f9acce417c46c2c69a5be6b` (24 972 B each, same after a clean rebuild; the
   toolchain re-made 0c1bb0a9 / 589c1203 on main first); README, `l072-bench-md5.yml`, `build/firmware.bin`.
-  **ON-AIR (needs GO):** flash BOTH L072s with the bench image (Verify OK,
-  radio_state 4); profile 1, 300 s legs, STATS pre/post on both nodes.
-  (V) camera A/B vs legs T/U: -TxFeed camera -RegProfile 1 -DurationS 300
-      -KfRequestDisable 0 + keyframe injector 15 s x 20, moving scene, aim verified.
-  (W) synth A/B vs leg R: dual injector 2 fps / 3000 B.
-  (X) FAILED: synth 2 fps, command plane silent >= 150 s (KF requests off, no
-      injector) until the tractor emits the final RX_SCAN_FAILED fault, then the
-      injector for 120 s (if base background traffic keeps LOCKing it, FAILED is
-      unreachable: record that).
-  PASS: tractor radio_rx_ok / base radio_tx_ok >= 60 % on V, W and post-FAILED X
-  (v2: 26 / 4.7 / 14 %; SIL 81-95 % on an ideal channel); tractor
-  clk_demotion_reset = 0, tx_first_anchor = 1, fhss_dec_snapped = 0,
-  fhss_dec_rej_epoch_drift = 0; base tx_stream_streak_max < 8; 0 base
-  lock-loss gaps > 3 s, max frag gap <= 1 s, fragment loss not worse than leg U
-  (10.5 %) / leg R. Tractor clk_demotion_reset > 0 or tx_first_anchor > 1 means
-  it adopted an echo (apparent lead or decay window): stop.
+  **ON-AIR — DONE 2026-10-18** (operator's GO; [RESULTS.md](bench-evidence/RS_12_15_reverse_delivery_2026-10-18/RESULTS.md)):
+  both L072s flashed with bench `e083ae46` (tractor 15:50Z, base 15:52Z; Verify
+  OK, flash_rc=0; STATS-OK, radio_state 4), profile 1; delivered = tractor
+  d(radio_rx_ok) / base d(radio_tx_ok) from the brackets (`scripts/deltas.py`).
+  (V) camera + kf_inject 15 x 20, A/B vs T/U: **22/23 = 95.7 %**, loss 0.6 %
+      (6/949), max gap 0.8 s, 608 published, tractor clk_demotion_kept 20.
+  (W) as flown: the injector (reading the harness's 2-line tail) fired 2 min 41 s
+      late, after the scan failed out (0x00-0x83); all 27 later commands heard (27/27); loss 10.6 %.
+  (W2) W re-flown, trigger from rx_smoke's own log, dual_inject 250, A/B vs R:
+      **72/72 = 100 %**, loss 3.7 % (45/1230), max gap 0.5 s, kept 72.
+  (X) 480 s, KF requests off: scan faults 0x00/0x01/0x02/0x83 ~30 s apart, the
+      last 117 s after MONITORING; then dual_inject 120: **36/36** (0x63 only) heard
+      in scan FAILED, loss 6.5 % (130/2010), max gap 0.6 s, kept 0 (no LOCK while FAILED).
+  Every leg: tractor clk_demotion_reset 0, tx_first_anchor 1 (no echo adopted),
+  fhss_dec_snapped 0, fhss_dec_rej_epoch_drift 0; base tx_stream_streak_max 1; no
+  gap over 3 s; stop rule never tripped. The 2026-10-14 plan and PASS/STOP criteria (>= 60 % delivered vs
+  v2's 26 / 4.7 / 14 %, max gap <= 1 s, loss not worse than leg U's 10.5 %, ...; in full: `git show 3c8ced60:LifeTrac-v25/DESIGN-CONTROLLER/TODO.md`, lines 2820-2835, restated in RESULTS.md "Scored legs") are met
+  on V, W2 and X; W as flown had 10.6 % with its injector late, and W2 re-flew it. Boards stay on `e083ae46`.
   Open for the design owner: closing the decay window (a grid-policy change
   that touches the F6 recovery tier; the 1 fps gap is the same question); a
   lead tolerance in the originator's leading-grid test if validation shows the
@@ -3393,7 +3393,7 @@ Design: [VECTOR_SCENE.md](VECTOR_SCENE.md). Research and review record: [2026-09
 explicit GO)
 
 - [~] **A16 — loss repair on a saturated stream (first item). Fix merged
-  2026-10-11 (#143; SIL only, not yet on air):**
+  2026-10-11 (#143; SIL only; flown on air 2026-10-19 but not exercised):**
   - **What it does.** Every DEL is repeated once in the next frame. Every
     fourth frame a 25 % repair share goes to re-sends (repeat-pending shapes
     included, oldest statement first). In the store, a DEL naming an absent id
@@ -3414,9 +3414,10 @@ explicit GO)
     `tools/vector_dry_run.py tractor-log` totals them on a `counters` line.
     The payloads are byte-identical with and without them (encoder A/B over
     3,300 photo frames plus 1,280 A16, trigger-sweep and masked frames).
-  - **Still open:**
-    - the repair share at V2 (VECTOR_SCENE.md §4.5.4 open item);
-    - on-air confirmation at the range-edge 0 dB step (radio GO).
+  - **Still open:** the repair share at V2 (VECTOR_SCENE.md §4.5.4 open item); on-air confirmation. The on-air check flew 2026-10-19
+    in the VECTOR legs A2a, A2a2 ([RESULTS](bench-evidence/RS_13_range_edge_2026-10-19/RESULTS.md)) but did not exercise the fix: `bench_tools/rs13_digest_trace.py` found 0 loss-opened episodes, thin (digest 598 and 568 checked, 0 mismatched; the one loss, A2a2 row 268, opened no mismatch or resync). It still needs a lossy link: a distance test (no attenuation). Neither
+    RS-13.1 A16 episode would be scored under the 25-row isolation rule (second loss 13 rows / 7.0 s
+    later on 2a_r4, the 7.07 s emitter grid at 2 fps; 11 rows / 6.0 s on 2d_r4); the tool traces both and flags them `!! A16 shape`.
   - The original analysis:
   - A lost DEL leaves a ghost, which holds the base store in resync for
     ≥ 20 frames.
@@ -3457,21 +3458,61 @@ explicit GO)
 - [ ] **A8 — relabel on air:** 12–14 relabels per 5-minute leg on the railroad
   video. Count exact triggers camera-only, and state a target rate before
   tuning. Exact counts now come from `vector_stats` `epochs_by` (the
-  `tractor-log` `counters` line); still to do: the camera-only pass on the
-  video (with the step 0/1 pass below), and the target rate.
+  `tractor-log` `counters` line). **Camera-only counts 2026-10-15** (the step 1
+  passes of the Images item, 2 fps, ≈ 125 s and 251–253 encoded frames per
+  pass, [`step1/`](bench-evidence/bench_session_2026-10-14/step1/)):
+  - bw250 video: relabel 0 of 3 epoch starts (first 1, safety 2);
+  - bw500 video: relabel 19 of 24 (first 1, horizon 4);
+  - both landscape passes: relabel 0 of 3 (first 1, safety 2).
+
+  The two video passes saw different stretches of the video (10 s change
+  29.26 % and 38.58 %), and the bw500 pass encoded at the 203 B clamp (Images
+  item), so they are not a bw250 / bw500 comparison. Still to do: the target
+  rate.
 - [~] **Procedure:** amendments merged in #143
   (`RS13_VECTOR_LEG.md`, "Amendments 2026-10-10"; they apply from the next
   round). The P6 cap and P8 bound need the design owner's sign-off:
   - P8 as an absolute bound, p95 ≤ the 350 ms budget (A17);
   - P6's return clause to count the in-flight frame (A18);
   - write the FHSS P6 bound on paper.
-- [ ] **Images.**
-  - Rebuild the tractor image from the SHA that carries the A16 fix and the
-    `vector_stats` counters, then run step 0/1 camera-only from `/app`. Add a
-    bw500 video pass as the P8 reference for bw500 legs.
-  - Rebuild the base image too. The deployed `4623980c2dac` (d3751286)
-    predates all VECTOR web_ui/store code, and its stale-tile worker would put
-    a `0x6C` on air every ≥ 10 s during VECTOR. Never start `lora_bridge`.
+- [x] **Images — both rebuilt and step 0/1 run 2026-10-14/15; the bw500 video
+  pass at 243 B re-run 2026-10-19, closed** (no radio; record
+  [`bench_session_2026-10-14/`](bench-evidence/bench_session_2026-10-14/); the re-run in [`RS_13_range_edge_2026-10-19/legs/`](bench-evidence/RS_13_range_edge_2026-10-19/legs/)).
+  Planned: rebuild both images from a SHA with the A16 fix and the
+  `vector_stats` counters (the deployed base `4623980c2dac`, `d3751286`,
+  predated all VECTOR web_ui/store code), then run step 0/1 camera-only from
+  `/app`, with a bw500 video pass as the P8 reference for bw500 legs. Never
+  start `lora_bridge`.
+  - **Base:** first real `deploy_base.sh` run, at `f6e4b463`:
+    `lifetrac-v25:latest` = `0413f3c4dac3` (`:previous` = `4623980c2dac`);
+    the broker recreated on `eclipse-mosquitto:2` `0db28dca6f11`
+    ([log](bench-evidence/bench_session_2026-10-14/boot_deploy_images/12_deploy_base.txt),
+    [after](bench-evidence/bench_session_2026-10-14/boot_deploy_images/13_base_post_deploy.txt)).
+  - **Tractor:** `build_tractor_image.sh` built `b2a3c8070240` on the base
+    (numpy 2.4.6, cv2 5.0.0), then its first adb call failed: adb 37 ends
+    lines with `\r\r\n` and `adb_sh` stripped one `\r` (fixed in `fb96439c`).
+    `--push-only` then loaded it on the tractor (`:previous` =
+    `2727dfd36f9f`)
+    ([build](bench-evidence/bench_session_2026-10-14/boot_deploy_images/20_build_tractor_image.txt),
+    [push](bench-evidence/bench_session_2026-10-14/boot_deploy_images/21_push_tractor_image.txt)).
+  - **Step 0:** the encoder suites inside the image, 47 tests OK
+    ([log](bench-evidence/bench_session_2026-10-14/boot_deploy_images/30_step0_encoder_suites_in_image.txt)).
+  - **Step 1** camera-only from the image's `/app`, all four passes PASS
+    ([`step1/`](bench-evidence/bench_session_2026-10-14/step1/)). Encoder
+    `ms_total` p95: bw250 video 275.1 ms (relabel 0), bw500 video 260.4 ms
+    (`epochs_by` first 1, forced 0, horizon 4, safety 0, relabel 19 over 251
+    frames; A8 above), bw250 landscape 248.3 ms, bw500 landscape 261.5 ms;
+    both landscapes end with L2 = 0 (informational, as in RS-13.1).
+  - **Caveat: both bw500 passes encoded at the 203 B cold-start clamp, not
+    243 B.** `legs/step1_pass.sh` passes `LIFETRAC_FRAGMENT_PROFILE` but not
+    `LIFETRAC_REG_PROFILE`, so camera_service logged "VECTOR budget 203 B (one
+    fragment) until link_budget arrives (provisional 243 B)"
+    ([log](bench-evidence/bench_session_2026-10-14/step1/step1_camera_service_bw500_moving.log));
+    frame bytes max 203 on every pass. The bw500 video pass is therefore not
+    yet the P8 reference for bw500 legs (superseded 2026-10-19: the re-run below is).
+  - [x] **Done 2026-10-19:** the bw500 video pass (camera-only) re-run at 243 B with the fixed `step1_pass.sh` (its first run on the tractor),
+    exit 0 `done` on the console ([RESULTS](bench-evidence/RS_13_range_edge_2026-10-19/RESULTS.md)). Bootcheck `byte_budget=243 B/frame (… phy=image_bw500)`, no `VECTOR budget … until link_budget` line in the camera log;
+    251 VECTOR frames, wire p95 242 B / max 243 B, dry run PASS; encoder p50 / p95 / max 199.7 / 221.8 / 227.7 ms; epoch starts 6 (first 1, safety 1, relabel 4). It is the P8 reference for bw500 legs ([`legs/step1_*bw500_moving*`](bench-evidence/RS_13_range_edge_2026-10-19/legs/)).
 - [ ] **RS-13.2 desk check:** the browser on the production compose (base:
   `mosquitto` + rebuilt `web_ui` only), replaying the round-4 captures. Merged in
   #143:
@@ -3481,8 +3522,19 @@ explicit GO)
 
   Running it needs the base image rebuilt with the renderer fixes of
   2026-10-14 (store, `web_ui`, `vector_renderer.js`, `app.js`; Step 1 checks
-  the image for them). The PC rehearsal found renderer gaps F1–F10
-  (Appendix A):
+  the image for them). **Status 2026-10-18: set up, never replayed, torn
+  down.** Step 1's image check found the fixes in `0413f3c4dac3` (counts 2 /
+  2 / 3, both files present;
+  [log](bench-evidence/bench_session_2026-10-14/desk_check/logs/step1_image_check.txt)).
+  On 2026-10-15 the bench broker was stopped at 00:47:31Z and the desk stack
+  (`mosquitto` + `web_ui`) brought up
+  ([log](bench-evidence/bench_session_2026-10-14/desk_check/logs/step3_bringup.txt)),
+  but the round-4 captures were never replayed. After the 2026-10-18 power
+  cycle (`/tmp/rs13_2` gone with `/tmp`) it was torn down by project name and
+  the bench broker started again at 15:37:28Z
+  ([log](bench-evidence/bench_session_2026-10-14/desk_check/logs/step8_teardown_after_reboot.txt)).
+  Re-stage it from Step 2 when it is wanted. The PC rehearsal found renderer
+  gaps F1–F10 (Appendix A):
   - **Fixed 2026-10-14** (checked on the PC in Chromium at 1280×720 and
     1920×1080 over the 2a A16 window, plus console injections):
     - F1/F2: the banner and chips sit below the button bar and beside open
@@ -3531,21 +3583,72 @@ explicit GO)
     - the status line ("design proposal, not implemented"), DECISIONS.md's
       "None of these decisions is implemented", and §8.6's test table (no
       `test_vector_sync.py`) are out of date.
-- [ ] **Next radio session = the range-edge session** (on GO, after the items
-  above). The procedure merged in #143:
-  `bench_tools/RS13_RANGE_EDGE_LEG.md`.
-  - a receive-only channel spot-check, then `-ForceFrfHz <pick>` on every DTS
-    leg;
-  - a 0 dB step with VECTOR and mono_g4 interleaved (2c, 2a, 2c′, 2a′) and
-    `-ReactiveFire 1 -ProbeEcho 0`, which gives the §8.6 command-delivery row
-    (never measured in RS-13.1) and the A16-fix confirmation;
-  - the 3 dB attenuator steps at V0 over a conducted, shielded path;
-  - `-TxBatch 0` throughout.
+- [~] **Next radio session = the antenna legs** (re-scoped 2026-10-19). Each needs its own explicit GO; (1) flew 2026-10-19, (2) and (3) have not. They fly
+  on the antennas, as the 2026-10-18 RS-12.15 legs did. Order: (1) here, then (2) and (3), the next two items. Leg lines: `legs/leg_prep.sh <leg name>`.
+  - [x] (1) **Done 2026-10-19** ([RESULTS](bench-evidence/RS_13_range_edge_2026-10-19/RESULTS.md)): §8.6 command delivery, VECTOR vs `mono_g4`, and the on-air check of the A16 fix (#143). The receive-only spot-check (51 channels, 49 hot) picked 927.5 MHz;
+    the DTS legs A2c, A2a, A2c2, A2a2 flew 300 s each there (`-ReactiveFire 1 -ProbeEcho 0 -TxBatch 0`), FRF readback OK on both boards every leg. Command delivery: VECTOR 433/433 vs `mono_g4` 418/420, Fisher p = 0.242, NOT WORSE. P3 loss: 1/1228 vs 1/1230, p = 1.
+    A16 not exercised: the one VECTOR loss (A2a2 row 268) opened no DIGEST mismatch or resync, 0 loss-opened episodes (thin; A16 item). Max K 1, no gap > 3 s; VECTOR encoder p95 247.2 / 261.3 ms (step-1 reference 221.8 ms, Images item).
+  - [-] not planned (no attenuation equipment, operator 2026-10-19): Round A's conducted 0 dB step and leakage check, and the Round B / C 3 dB walks of `bench_tools/RS13_RANGE_EDGE_LEG.md` (#143). The procedure stays for reference. No range data comes from the bench.
+  - [x] Scoring helpers (2026-10-18, no radio; 41 SIL tests in `base_station/tests/test_rs13_scoring_sil.py`):
+    `bench_tools/rs13_rf_extract.py` (level, R0, leakage, tracking, closing), `rs13_probe_score.py` (§8.6
+    command delivery) and `rs13_digest_trace.py` (A16; replaces RS-13.1's `scripts/digest_trace.py`). They
+    reproduce the RS-0.12 probe figures, the RS-13.1 A19 level (−64 dBm) and the old digest_trace rows.
 - [ ] FHSS command-delivery and switch legs ("2d on profile 1"), after the
   RS-12.15 reverse-delivery firmware fix. Before it they would measure that
-  defect, not VECTOR.
+  defect, not VECTOR. Unblocked 2026-10-18: both boards run `e083ae46`, and
+  on profile 1 it delivered 95.7 % to 100 % of the base's commands per leg
+  (RS-12.15 above).
 - [ ] A live web_ui leg (UI-driven switch, web_ui as an uplink actor), after the
-  base image rebuild.
+  base image rebuild (done 2026-10-14, `0413f3c4dac3`).
+- [~] **Bench-kit follow-ups found 2026-10-15 / 10-18** (no radio;
+  the 2026-10-18 fixes are in code; first real-board runs 2026-10-19, [RESULTS](bench-evidence/RS_13_range_edge_2026-10-19/RESULTS.md)):
+  - [x] ~~`legs/step1_pass.sh` should pass `LIFETRAC_REG_PROFILE`~~ Fixed 2026-10-18 (1 = bw250, 2 =
+    bw500). A pass whose boot log shows the `VECTOR budget` clamp line (the old grep missed it) prints a
+    WARNING, keeps its files, ends `INVALID` and exits 6. First tractor run 2026-10-19 (bw500): `byte_budget=243 B/frame`, no clamp line, exit 0 `done` (Images item); the exit-6 path did not fire.
+  - [x] ~~`legs/scene_check.sh` starts its 10.5 s window before the camera's first frame~~
+    ([`preflight_moving`](bench-evidence/bench_session_2026-10-14/step1/preflight_moving_scene.txt)
+    reached 7.2 s). Fixed 2026-10-18: the window runs until 10.5 s after the sixth frame
+    (the 10 s pair's reference), at most 20 s after the first; no frame within 20 s, or
+    fewer than 10, fails with a `NO-FRAMES` reason; the stale `/tmp/scene_check.jpg` is
+    removed first. First run 2026-10-19: every scene file has the new line ("camera: first frame 0.5 s after opening /dev/video1",
+    the sixth frame 0.2 s and the last 10.7 s after the first); 10 s change: preflight 57.01 %, legs 11.51 / 17.07 / 9.53 / 18.15 % (min 8 %).
+  - [x] ~~The harness has no injector hook~~ (leg W's console-tail trigger fired 2 min 41 s late). Done 2026-10-18,
+    not yet flown: `-InjectCmd "<script.py> args" [-InjectOn first_frame|fault:<code>[:<sub>|:final]]`, triggered
+    on the base from rx_smoke's own log (`bench_tools/inject_watch.sh`) or by a ~2 s PC poll of tractor FAULT
+    lines; archived `inject.log`, `inject_trigger.txt` (BENCH_RUNBOOK, "A leg").
+  - **Base L072 reset: the gpio163 pulse does not reset it** (since at least 2026-08-02; base `radio_tx_ok`
+    0→23→50→122→158 over legs V, W, W2, X, [deltas](bench-evidence/RS_12_15_reverse_delivery_2026-10-18/legs/)).
+    The fault is between gpio163 (x8h7 line 3) and PF4: openocd on PF4 does reset it. The harness prints
+    `BASE_L072_RESET unverified` and archives `base_gpio163_output=`; score base brackets post − pre
+    ([`deltas.py`](bench-evidence/RS_12_15_reverse_delivery_2026-10-18/scripts/deltas.py)). Next steps:
+    BENCH_RUNBOOK, "L072 resets at leg start". 2026-10-19: `unverified` on all four legs.
+  - **Tractor L072 reset: judged at leg end since 2026-10-18** (`TRACTOR_L072_RESET`, `tractor_ocd_reset.log`, a
+    per-leg `OCD_LEG=` tag). It missed on the first leg after each flash reboot (V; O, Q, R, S, T, U) and landed on P
+    and Q2 ([ERRATA](bench-evidence/RS_12_15_clock_authority_2026-09-14/ERRATA.md) §1). First real run 2026-10-19: landed on A2c, A2a, A2a2; on A2c2 it matched candidate (c)'s signature, killed by SIGHUP before openocd started (`OCD_EXIT=129`, no openocd banner, [log](bench-evidence/RS_13_range_edge_2026-10-19/legs/legA2c2_tractor_ocd_reset.log); its counters carried over, `legA2c2_deltas.txt`).
+    A2c2 was not the first leg after a boot, so that miss did not need a fresh boot; whether the first-leg misses are (c) too is unknown. Open: the fix (run the reset from a pushed LF-only script with `trap '' HUP`, or under setsid; BENCH_RUNBOOK, "L072 resets at leg start").
+  - Seen again for RS-12.21: the post-leg parks took up to three attempts per board (`PARK_TRANSIENT` / `PARK_FAIL`
+    while the scan SM was still walking) before `PARK_OK` (`legs/leg*_park.txt`); the end-of-round check read
+    `0x80` on both ([check](bench-evidence/RS_12_15_reverse_delivery_2026-10-18/legs/session_end_radio_check.txt)). 2026-10-19: `PARK_OK` on the first attempt on both boards after every leg (`legs/legA2*_park.txt`).
+  - [x] `legs/leg_prep.sh` writes every range-edge leg (profile, codec, probes and length from the tag; `--duration`,
+    `--reactive-fire`; capture = leg + 180 s; legs/README.md, "Range-edge legs"), and `legs/stage_boards.sh` stages
+    `channel_survey_sniff.py` (2026-10-18, no board). 2026-10-19: of these tags only A2c, A2a, A2c2, A2a2 were still planned; all four flew from it that day (first real run, `legs/legA2*_prep.txt`).
+  - [ ] `legs/leg_replay.py`: TypeError at line 68 (`dr.last_ts` None) after its first line
+    on a capture with no VECTOR frame (leg 2c). `legs/leg_post.sh`: copy the archive's
+    `inject.log`, `inject_trigger.txt`, `tractor_ocd_reset.log` and run the RS-13 scoring
+    helpers.
+- [ ] **Production camera unit, 40 B VECTOR cold budget** (found 2026-10-18,
+  no radio). The tractor image `b2a3c8070240` has no `lora_proto.py` (its
+  build context is `firmware/tractor_x8`), so without the bench's `/work`
+  mount `camera_service` holds VECTOR to its `n_fragments * 40` = 40 B
+  fallback until a `link_budget` arrives: the boot-started unit logged
+  "VECTOR budget 40 B (one fragment) until link_budget arrives (provisional
+  None B)"
+  ([log](bench-evidence/bench_session_2026-10-14/power_cycle_2026-10-18/01_tractor_camera_stop.txt)).
+  No harm today (it boots in mode 0 and is stopped at every bench power-up).
+  Before any production VECTOR leg, put `lora_proto.py` in the tractor
+  image, or make `camera_service.py` (its link-budget code imports
+  `lora_proto` itself) and `x8_image_pipeline/fragment.py` stop depending on
+  it.
 - [ ] Production-stack VECTOR legs, after B1, RS-9.2/9.4 and a production-legal
   DTS carrier (RS-11.7). The boards run the bench (register-write diag) L072
   build.
@@ -3573,8 +3676,8 @@ explicit GO)
 - [x] `web_ui.py`: codec-6 frames to the store, `_tile_stale_worker` gated off in VECTOR, `"vector"` choice with its 60–100 detail dial, `settings.html` (#135). The deployed base image predates it (RS-13.2 item above)
 - [~] **B1** deploy the daemons in the stock compose/systemd config (RS-4.8): not done, every on-air result is from the bench harness. **B6** numpy/OpenCV declared in `firmware/tractor_x8/requirements.txt`; image `2727dfd36f9f` built with them on the base X8 (cv2 5.0)
 - [ ] **B4** D-VS6 encode floor in `AutoRadioPolicy` (lock loss now; loss-driven once the RS-12.20 gap detector lands); D-VS6b tractor self-select; **B5** AE/AWB lock
-- [x] Bench legs `bench-evidence/RS_13_vector_scene_2026-09-26/RESULTS.md` (RS-13.1, #139): camera workload, p2 and p1, 1 fps and 2 fps, frames published, fragment loss and the switch against `mono_g4`; no storm signature on FHSS. **Command delivery was not measured** (no base commands on 2a/2b/2c) — it moves to the range-edge session's 0 dB step above
-- [ ] Range-edge leg with the RF attenuator (3 dB steps): level reached, VS frames/s and command delivery per step, against `mono_g4`; first field-range data for the campaign (`VECTOR_SCENE.md` §8.6)
+- [x] Bench legs `bench-evidence/RS_13_vector_scene_2026-09-26/RESULTS.md` (RS-13.1, #139): camera workload, p2 and p1, 1 fps and 2 fps, frames published, fragment loss and the switch against `mono_g4`; no storm signature on FHSS. **Command delivery was not measured** (no base commands on 2a/2b/2c) — it moves to the antenna DTS legs above (2026-10-19; it was the range-edge session's 0 dB step); measured there 2026-10-19 on DTS: VECTOR 433/433 vs `mono_g4` 418/420, Fisher p = 0.242, not worse ([RESULTS](bench-evidence/RS_13_range_edge_2026-10-19/RESULTS.md)); FHSS still to measure
+- [-] Range-edge leg with the RF attenuator (3 dB steps): not planned (no attenuation equipment, operator 2026-10-19). It was to give the level reached, VS frames/s and command delivery per step, against `mono_g4`, and the campaign's first field-range data (`VECTOR_SCENE.md` §8.6). Range data now needs a real distance test with natural path loss.
 
 **Phase 3 — self-model**
 
@@ -3596,7 +3699,7 @@ explicit GO)
 - [ ] **Base (`lora_proto.py`, `image_rx_daemon.py`, `web_ui.py`):** opcodes `0x6D RUNG_REQ`, `0x6E RUNG_ACK` (with `status`), `0x6F RUNG_CONF`, `0x70 RUNG_HELLO` (alternating slots), `0x71 LINK_HB`; every base copy 1.0 s apart through the shared command gate; the flow (apply instant carried in `RUNG_CONF`, per-copy DTS delay, lease on the new rung), `T_conf` 10 s / `T_revert` 5 s (600 ms once the drive plane is on air) / `T_lease` 15 s / `T_cool` 60 s / `T_hb` 5 s / `T_deaf` 10 s; parked rendezvous listening when deaf; rung ladder in `AutoRadioPolicy` (down at < 3 dB margin for 2 windows with the vector ladder at V2 and the tractor stopped; up after 6 windows; profile switch resets the rung); "rung" chip beside the profile selector; audit events
 - [ ] **Tractor (`image_tx_daemon.py`, `camera_service.py`):** ACK/HELLO handling (own slots, lease), scheduled apply, `tractor/link_budget` republished per rung, retained `tractor/link_rx` status (last command heard, SNR, rung, queue depth) for `camera_service`, the beacon sweep when deaf, `T_deaf` 60 s rendezvous fallback (12 missed heartbeats; bench-only until D-VS9)
 - [ ] **SIL:** `test_rung_switch_sil.py` modelled on `test_link_tune_sil.py`: every failure row of §4.6.8 including the lost-reply sequence (converges within `T_revert` + `T_lease`), timers counted from the apply instant and the 1.0 s gate, hysteresis, no request while moving, budget update after a switch, schema-2 header field round trip
-- [ ] **Bench legs:** (1) switch leg at each rung pair, scored on proven-switch time and frames lost during the switch; (2) rendezvous leg (park one board mid-session; re-found within `T_deaf` + 10.5 s); (3) the range-edge attenuator walk-down with rung changes allowed
+- [ ] **Bench legs:** (1) switch leg at each rung pair, scored on proven-switch time and frames lost during the switch; (2) rendezvous leg (park one board mid-session; re-found within `T_deaf` + 10.5 s); (3) ~~the range-edge attenuator walk-down with rung changes allowed~~ not planned (no attenuation equipment, operator 2026-10-19); a distance test with rung changes allowed would replace it
 
 **Control plane (D-VS9):** revive firmware Batch 2 (reserved control slot, mute gate, skip/ditto) sized per rung, and fix the FHSS reverse direction (reserved reverse slot or base clock authority) before the drive plane ships; see `VECTOR_SCENE.md` §7.4.
 
@@ -4150,7 +4253,7 @@ Major implementation-plan-level tasks not already enumerated in Phases 2–5 abo
 - [ ] **L-V4.** TAKE CONTROL preemption — within next M7 tick (≤ 20 ms).
 - [ ] **L-V5.** Replay rejection — captured-frame retransmit rejected + logged.
 - [ ] **L-V6.** Tamper rejection — bit-flipped frame rejected via GCM tag + logged.
-- [ ] **L-V7.** Adaptive SF ladder — step-attenuator sweep, no hunting, 30 s clean before step-up.
+- [ ] **L-V7.** Adaptive SF ladder — step-attenuator sweep, no hunting, 30 s clean before step-up. (2026-10-19: no attenuation equipment, operator; the sweep is not planned. A range walk with natural path loss is the alternative.)
 - [ ] **L-V8.** R-6 telemetry fragmentation round-trip — 120 B payload survives bit-identical via fragment+reassemble.
 - [ ] **L-V9.** R-7 retune cost recorded; burst-batching code path validated under image load if > 5 ms.
 - [ ] **L-V10.** L5 FHSS spectrum-analyser compliance — 8 channels, ≤ 12.5 % dwell, no OOB, EIRP ≤ +36 dBm.

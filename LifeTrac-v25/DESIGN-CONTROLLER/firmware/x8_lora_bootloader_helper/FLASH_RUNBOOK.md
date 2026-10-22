@@ -35,13 +35,24 @@ The build is reproducible byte for byte, but only with the exact toolchain:
 **Arm GNU Toolchain 12.2.MPACBTI-Rel1** (`arm-none-eabi-gcc --version` →
 `12.2.1 20230214`). On the bench PC it is installed at
 `C:\Program Files (x86)\Arm GNU Toolchain arm-none-eabi\12.2 mpacbti-rel1\`,
-with WinLibs `mingw32-make` run from PowerShell. Expected md5s at `main`
-`bb4a2071` (`firmware/murata_l072` unchanged since):
+with WinLibs `mingw32-make` run from PowerShell. Expected md5s at `13f20aa1`
+(#152, the RS-12.15 reverse-delivery fix; merged as `main` `3c8ced60` with
+the `firmware/murata_l072` source unchanged):
 
 | build | md5 | size |
 |---|---|---|
-| bench `build/firmware_bench_diag.bin` (on both boards since 2026-09-15) | `0c1bb0a9573f813137f941dfa47177d0` | 24 860 B |
-| production `build/firmware.bin` (committed) | `589c120323c2d5e7ef9f459d7a4ba42d` | 24 860 B |
+| bench `build/firmware_bench_diag.bin` (on both boards since 2026-10-18) | `e083ae46a64686031b39866eca42e094` | 24 972 B |
+| production `build/firmware.bin` (committed) | `148de24e1f9acce417c46c2c69a5be6b` | 24 972 B |
+
+Before #152 the pair was bench `0c1bb0a9573f813137f941dfa47177d0`, on both
+boards 2026-09-15 → 2026-10-18, and production
+`589c120323c2d5e7ef9f459d7a4ba42d`, 24 860 B each (reproduced at `main`
+`bb4a2071` and again at `f6e4b463`). The
+rollback copy of the bench build is
+[`firmware_bench_diag_0c1bb0a9.bin`](../../bench-evidence/RS_13_vector_scene_2026-09-26/firmware/firmware_bench_diag_0c1bb0a9.bin).
+The 2026-10-18 flash of both boards is recorded in
+[`RS_12_15_reverse_delivery_2026-10-18/firmware_flash/`](../../bench-evidence/RS_12_15_reverse_delivery_2026-10-18/firmware_flash/)
+(Verify OK, `flash_rc=0` on both), with a copy of the flashed image.
 
 Other compilers (Arduino's bundled 7-2017q4, which `build.ps1` picks first;
 Ubuntu's `gcc-arm-none-eabi`, which the main CI job uses) build working

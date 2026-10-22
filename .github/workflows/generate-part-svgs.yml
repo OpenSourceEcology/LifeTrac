@@ -23,7 +23,7 @@ jobs:
       contents: read
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
         ref: ${{ github.head_ref || github.ref_name }}
@@ -106,7 +106,7 @@ jobs:
     
     # output/ is git-ignored, so the SVGs are only available as an artifact
     - name: Upload part SVGs
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: part-svgs
         path: LifeTrac-v25/DESIGN-STRUCTURAL/output/svg/parts/

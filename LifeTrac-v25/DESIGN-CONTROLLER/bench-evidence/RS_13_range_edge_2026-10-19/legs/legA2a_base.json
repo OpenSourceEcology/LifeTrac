@@ -1,0 +1,122 @@
+{
+  "profile": "image_bw500",
+  "one_fragment_limit": 243,
+  "frames": {
+    "total": 612,
+    "vector": 612,
+    "other": 0,
+    "parse_errors": 0,
+    "by_codec": {
+      "vector": 612
+    }
+  },
+  "wire": {
+    "min": 105,
+    "p50": 230.0,
+    "p95": 242.0,
+    "max": 243,
+    "over_limit": 0
+  },
+  "epoch_starts": 15,
+  "epoch_starts_applied": 15,
+  "arrival": {
+    "span_s": 305.5158591270447,
+    "fps_mean": 1.9998961813171336,
+    "gap_p50_s": 0.5005860328674316,
+    "gap_p95_s": 0.5477352142333984,
+    "gap_max_s": 0.6353039741516113,
+    "first_applied_t_rel_s": 0.0,
+    "frames_before_first_apply": 0
+  },
+  "store": {
+    "frames_rx": 612,
+    "frames_bad": 0,
+    "frames_applied": 612,
+    "epoch_behind": 0,
+    "orphans": 0,
+    "digest_checks": 598,
+    "digest_mismatch": 0,
+    "bad_version": 0,
+    "epochs": 15,
+    "handovers": 14,
+    "ttl_dropped": 0,
+    "resync_events": 0,
+    "resync_digest_ends": 0,
+    "records_applied": 24880,
+    "resync": false,
+    "bad_reasons": {},
+    "epoch": 14,
+    "shapes": 29,
+    "cached_shapes": 0
+  },
+  "resync_episodes": [],
+  "scene": {
+    "epoch": 14,
+    "level": 0,
+    "badge": 7,
+    "digest_ok": true,
+    "horizon_mode": "none",
+    "layers": {
+      "L1": 25,
+      "L2": 0,
+      "L3": 4,
+      "L4": 0
+    },
+    "cal_rev": null,
+    "anchor_age_ms": 55571,
+    "handover": false
+  },
+  "checks": [
+    [
+      "parse_ok",
+      true,
+      "0 unparseable payload(s)"
+    ],
+    [
+      "all_vector",
+      true,
+      "0 non-vector frame(s): {'vector': 612}"
+    ],
+    [
+      "one_fragment",
+      true,
+      "0 over 243 B (epoch starts 242 B); max 243 B"
+    ],
+    [
+      "store_clean",
+      true,
+      "frames_bad=0 "
+    ],
+    [
+      "no_orphans",
+      true,
+      "orphans=0"
+    ],
+    [
+      "digest",
+      true,
+      "598 checked, 0 mismatched, scene digest_ok=True"
+    ],
+    [
+      "epoch_seen",
+      true,
+      "15 epoch start(s) applied of 15 received"
+    ],
+    [
+      "first_apply",
+      true,
+      "0 frame(s) before the first apply"
+    ],
+    [
+      "applied_ratio",
+      true,
+      "612/612 applied = 100.0% (need >= 90%)"
+    ],
+    [
+      "min_frames",
+      true,
+      "612 vector frame(s), need >= 500"
+    ]
+  ],
+  "pass": true
+}

@@ -1,0 +1,36 @@
+## date
+2026-10-14T23:55:32Z
+## systemctl --version
+systemd 250 (250.5+)
++PAM -AUDIT -SELINUX -APPARMOR +IMA -SMACK +SECCOMP -GCRYPT -GNUTLS +OPENSSL +ACL +BLKID +CURL -ELFUTILS -FIDO2 -IDN2 -IDN -IPTC +KMOD +LIBCRYPTSETUP +LIBFDISK -PCRE2 -PWQUALITY +P11KIT -QRENCODE -BZIP2 -LZ4 +XZ -ZLIB +ZSTD -BPF_FRAMEWORK +XKBCOMMON +UTMP +SYSVINIT default-hierarchy=hybrid
+## DEPLOYED_FROM
+deployed-from=d3751286 2026-09-15T22:28Z
+## tree top
+-rw-rw-rw-    1 fio  fio      78 May 26 14:53 .env
+-rw-r--r--    1 root root     41 Sep 15 22:28 DEPLOYED_FROM.txt
+-rw-rw-r--    1 root root   1551 Sep 15 22:28 Dockerfile
+drwxrwxr-x    2 root root   4096 Sep 15 22:28 deploy
+-rw-rw-r--    1 root root   3919 Sep 15 22:28 docker-compose.video-test.yml
+-rw-r--r--    1 root root   3919 May 27 20:22 docker-compose.video-test.yml.bak_20260527_152255
+-rw-rw-r--    1 root root   3621 Sep 15 22:28 docker-compose.yml
+## firmware/tractor_x8 compose files
+-rw-rw-r--  1 root root  5000 Sep 15 22:28 docker-compose.video-test.v2.yml
+-rw-rw-r--  1 root root  3460 Sep 15 22:28 docker-compose.video-test.yml
+-rw-rw-r--  1 root root  1108 Sep 15 22:28 docker-compose.yml
+-rw-rw-r--  1 root root   258 Sep 15 22:28 mosquitto.video-test.conf
+## images
+lifetrac-tractor-x8:latest 2727dfd36f9f 2 weeks ago
+lifetrac-tractor-x8:rs13-65869517 2727dfd36f9f 2 weeks ago
+python:3.11-slim-bookworm aad78d4fecb5 3 weeks ago
+lifetrac-v25:latest 4623980c2dac 4 weeks ago
+<none>:<none> ed7c058774f4 4 weeks ago
+<none>:<none> 12fe97dece57 4 weeks ago
+<none>:<none> c6ded786130c 2 months ago
+python:3.11-slim 2fe5ff938d2b 3 months ago
+eclipse-mosquitto:2 0db28dca6f11 3 months ago
+## broker
+/design-controller-mosquitto-1 image=sha256:2a23a3e427e44bcc2f028580afcd6232979ff859116eeb899d19dc78e3cabf1c created=2026-07-26T01:14:41.859314802Z restart=unless-stopped
+## disk
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/mmcblk2p2   14G  3.7G  9.3G  29% /var
+/dev/mmcblk2p2   14G  3.7G  9.3G  29% /var

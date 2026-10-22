@@ -1,0 +1,11 @@
+[deploy_base 23:55:18Z] archive f6e4b463 (Merge pull request #151 from OpenSourceEcology/claude/project-thread-e2dnl1): Dockerfile base_station docker-compose.yml firmware
+[deploy_base 23:55:21Z] commit   f6e4b4632296a5c508fb236c58268e4a815315a8
+[deploy_base 23:55:22Z] target   fio@192.168.1.117 (ssh) -> /var/rootdirs/opt/lifetrac/DESIGN-CONTROLLER
+[deploy_base 23:55:22Z] tarball  /c/Users/dorkm/Documents/LifeTrac-bench-archive/deploy/dc_deploy_f6e4b463.tar.gz (1917397 B, md5 fbac273476ed4644c4d69f4c1ed4783a)
+[deploy_base 23:55:22Z] build    yes, locked=1 (commit has lock file: 1)
+[deploy_base 23:55:22Z] broker   docker compose -p design-controller up -d --no-deps mosquitto
+[deploy_base 23:55:22Z] disarm   an old docker-compose.video-test.yml in the tree is renamed docker-compose.video-test.yml.RETIRED-2026-10-14 (refused while a container made from it is not exited)
+[deploy_base 23:55:22Z] disarm   firmware/tractor_x8/docker-compose*.yml and mosquitto.video-test.conf are not shipped; an old copy in the tree is removed (the backup keeps it)
+[deploy_base 23:55:22Z] dry run: board script /c/Users/dorkm/Documents/LifeTrac-bench-archive/deploy/deploy_base_remote.sh
+[deploy_base 23:55:22Z] dry run: would copy the tarball, /c/Users/dorkm/Documents/LifeTrac-bench-archive/deploy/DEPLOYED_FROM_f6e4b463.txt and the script to /home/fio/lifetrac_deploy, then run as root:
+[deploy_base 23:55:22Z]          sh /home/fio/lifetrac_deploy/deploy_base_remote.sh '/home/fio/lifetrac_deploy/dc_deploy_f6e4b463.tar.gz' '/home/fio/lifetrac_deploy/DEPLOYED_FROM_f6e4b463.txt' f6e4b463 f6e4b4632296a5c508fb236c58268e4a815315a8 '/var/rootdirs/opt/lifetrac/DESIGN-CONTROLLER' 'fio' 1 1 1 1 design-controller '/home/fio/lifetrac_deploy' 2026-10-14

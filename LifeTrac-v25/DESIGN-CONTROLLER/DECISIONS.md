@@ -283,7 +283,7 @@ None of these decisions is implemented. Each one lists its options and a **RECOM
 
 ### D-VS6 — Automatic use of the vector mode
 
-**Context:** there is no automatic encode ladder in production; mode selection is operator-only (`base_station/web_ui.py:91-104`). `AutoRadioPolicy` (`base_station/web_ui.py:378-538`) already demotes DTS → FHSS on 10 s dead air or > 25 % loss and promotes back after 60 s healthy; dead air and promote-back were validated on air 2026-09-15, while the loss input is blind to single-fragment frames (RS-12.20). Base → tractor commands on FHSS were delivered 1/17 and 49/281 in the RS-12.12 legs (`TODO.md:2756-2771`).
+**Context:** there is no automatic encode ladder in production; mode selection is operator-only (`base_station/web_ui.py:91-104`). `AutoRadioPolicy` (`base_station/web_ui.py:378-538`) already demotes DTS → FHSS on 10 s dead air or > 25 % loss and promotes back after 60 s healthy; dead air and promote-back were validated on air 2026-09-15, while the loss input is blind to single-fragment frames (RS-12.20). Base → tractor commands on FHSS were delivered 1/17 and 49/281 in the RS-12.12 legs (`TODO.md:2856-2868`).
 
 | Option | Pros | Cons |
 |---|---|---|
@@ -316,11 +316,11 @@ None of these decisions is implemented. Each one lists its options and a **RECOM
 - **Rendezvous:** a deaf base parks on the rendezvous channel; a deaf tractor sweeps `RUNG_HELLO` across the hop set (one channel per slot; every 2 s on DTS); a healthy tractor beacons once per 10 s on the rendezvous channel (12 B on air, 0.7 % of airtime at F2), naming its working rung so a parked base retunes to it directly; the cold-start scan parks there first.
 - **Policy:** down one rung when the SNR margin is below 3 dB for 2 windows and the vector ladder is already at V2 and the tractor is stopped; up one rung after 6 healthy windows; a profile switch resets the rung to the profile's fastest.
 
-**RECOMMENDATION: B, after the range-edge leg of `VECTOR_SCENE.md` §8.6 shows where SF7 runs out.** Ship the L072 key, the schema-2 header field and the beacon first (they are useful for diagnosis alone), then the handshake, then the policy.
+**RECOMMENDATION: B, after field range data from a distance test shows where SF7 runs out.** Ship the L072 key, the schema-2 header field and the beacon first (they are useful for diagnosis alone), then the handshake, then the policy. *Gate changed 2026-10-19:* there will be no attenuation tests, because the bench has no attenuators, so the range-edge leg of `VECTOR_SCENE.md` §8.6 will not run. The decision is unchanged; only its gate moved. The gate was "after the range-edge leg of `VECTOR_SCENE.md` §8.6 shows where SF7 runs out".
 
 ### D-VS9 — Control-plane resilience before the drive plane ships
 
-**Context:** the vector mode is a "look, then move" view, so in degraded signal the stop and steer commands matter more than the picture. Firmware Batch 2 (reserved control slot, mute gate, skip/ditto) was demoted to an optimisation after smooth pacing gave 99.8 % single-copy delivery on DTS (`TODO.md:157-159`); base → tractor delivery on FHSS was 1/17 and 49/281 (`TODO.md:2756-2771`).
+**Context:** the vector mode is a "look, then move" view, so in degraded signal the stop and steer commands matter more than the picture. Firmware Batch 2 (reserved control slot, mute gate, skip/ditto) was demoted to an optimisation after smooth pacing gave 99.8 % single-copy delivery on DTS (`TODO.md:157-159`); base → tractor delivery on FHSS was 1/17 and 49/281 (`TODO.md:2856-2868`).
 
 **RECOMMENDATION:** treat both as prerequisites of RS-9 / Route B rather than optimisations: (1) revive Batch 2 so control has a guaranteed slot every period regardless of image pacing; (2) fix the FHSS reverse direction with a reserved reverse slot or by making the base the hop-clock originator; (3) prefer repetition (3-copy sticky state, ditto in consecutive slots) over any acknowledgement, and never slow the modulation for control. See `VECTOR_SCENE.md` §4.5 and §7.4.
 

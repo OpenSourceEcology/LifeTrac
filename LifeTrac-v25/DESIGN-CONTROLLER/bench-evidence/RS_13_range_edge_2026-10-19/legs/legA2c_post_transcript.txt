@@ -1,0 +1,75 @@
+18:48:25Z == leg A2c post (archive C:/Users/dorkm/Documents/GitHub/LifeTrac-bench-main/LifeTrac-v25/DESIGN-CONTROLLER/bench-evidence/radio_monitor_20261019_134805_1d10f57f)
+18:48:25Z -- waiting for the base capture (rs13_cap_base) to finish its 480 s
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+== vector dry run summary ==
+profile image_bw500: one-fragment limit 243 B (epoch starts 242 B)
+frames: 616 total, 0 vector, 616 other, 0 unparseable; by codec {'mono_g4': 616}
+wire bytes (vector): min 0 / p50 0 / p95 0 / max 0; over limit: 2
+epoch starts: 0 received, 0 applied
+arrival: 0.00 fps mean over 0.0 s; gap p50 0.00 s, p95 0.00 s, max 0.00 s; first applied at never (0 frame(s) before it)
+store: applied 0, bad 0 , epoch_behind 0, orphans 0, digest 0 checked / 0 mismatched, epochs 0, handovers 0, ttl_dropped 0, resync 0 (0 ended by DIGEST), records 0
+resync: none
+scene: none (no frame applied)
+checks:
+  [PASS] parse_ok       0 unparseable payload(s)
+  [FAIL] all_vector     616 non-vector frame(s): {'mono_g4': 616}
+  [FAIL] one_fragment   2 over 243 B (epoch starts 242 B); max 0 B
+  [PASS] store_clean    frames_bad=0 
+  [PASS] no_orphans     orphans=0
+  [PASS] digest         0 checked, 0 mismatched, scene digest_ok=None
+  [FAIL] epoch_seen     0 epoch start(s) applied of 0 received
+  [FAIL] first_apply    0 frame(s) before the first apply
+  [FAIL] applied_ratio  0/0 applied = 0.0% (need >= 90%)
+  [FAIL] min_frames     0 vector frame(s), need >= 500
+RESULT: FAIL
+json report -> /work/legs/legA2c_base.json
+18:50:03Z -- radio quiet check before the brackets and the park
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+base: leg daemons [] ttymxc3 holders []
+tractor: leg daemons [] ttymxc3 holders []
+18:50:05Z -- post-brackets (rs115) both boards
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+radio_rx_ok=5730 radio_crc_err=7 radio_tx_ok=369  (base)
+radio_rx_ok=211 radio_crc_err=0 radio_tx_ok=617  (tractor)
+18:50:10Z -- rs12_leg_report (--capture) + frag_gap_report
+train_gap_ms=40  tx_pipeline_depth=2  synth_budget_b=250  force_frf_hz=927500000  git_sha=1d10f57f  
+  (tx frags_ok counter 608 is stale; using 611 fragments from per-frame TX events)
+  (rx rx_frames counter 610 is stale; using 612 fragments from frag_arrival events)
+  !! received 612 > sent 611: the TX and RX logs disagree on the window; loss shown as 0 — check the seq-gap figure
+loss 0/611 = 0.0%   crc_dumps=2  timeouts=0  published=612
+capture seq gaps (legA2c_base.jsonl): lost 0/616 = 0.0%  (received 616, 0 gaps, longest 0; 1 codec run; period 0.50 s)
+radio deltas: {'radio_dio0': 831, 'radio_rx_ok': 617, 'radio_crc_err': 2, 'radio_tx_ok': 211}
+FIRMWARE DROP (drx_ok - host URCs): 617 - 611 = 6
+n_frag=612 span=305s max_gap=0.6s gaps>3s=0 total_silent=0.0s
+episodes (start s from first frag, +length): NONE
+base sends on air=210 | tractor decoded cmds=209
+tractor cmd offsets (s from its first): 0.0, 1.4, 2.9, 4.4, 5.9, 7.5, 8.9, 10.4, 11.9, 13.4, 14.9, 16.4, 17.9, 19.4, 20.5, 21.9, 23.4, 24.4, 25.9, 27.4, 28.9, 30.4, 31.4, 32.9, 34.4, 35.9, 37.4, 38.9, 40.4, 41.9, 43.4, 44.9, 46.4, 47.9, 49.4, 50.5, 51.9, 53.4, 54.9, 56.4
+18:50:11Z -- P2 / P4 from the archive
+# leg A2c P2/P4 greps on C:/Users/dorkm/Documents/GitHub/LifeTrac-bench-main/LifeTrac-v25/DESIGN-CONTROLLER/bench-evidence/radio_monitor_20261019_134805_1d10f57f
+harness: reg_profile=2 force_frf_hz=927500000 tx_batch=0 synth_fps=2 cam_extra_env=-e LIFETRAC_ENCODE_MODE=6
+published frame_id lines (rx_daemon.log): 612
+tx done K=1 lines: 611
+tx done K>=2 lines: 0
+tx ABORTED lines: 0
+max K: 1 fragments
+camera_service vector_stats lines: 0
+tx drops before air (last tx stats line): drop_full=0 drop_stale=0 
+tractor FHSS authority (post bracket): tx_first_anchor=0 tx_stream_streak_max=0 
+seq-gap loss (per codec run): leg A2c: 616 frames received; seq gaps within same-codec runs (row, lost): [] -> 0 lost of 616 = 0.0 % after the first received frame (0 codec switch(es) not counted)
+no vector_stats lines found (VECTOR mode logs one every LIFETRAC_CAMERA_HEALTH_EVERY_S, default 2 s)
+18:50:12Z -- park both radios (last)
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+base:    attempt 1: PARK_OK {"opmode_readback": "0x80", "opmode_after_settle": "0x80", "settle_s": 1.5}
+tractor: attempt 1: PARK_OK {"opmode_readback": "0x80", "opmode_after_settle": "0x80", "settle_s": 1.5}
+18:50:20Z == leg A2c post done (evidence: C:/Users/dorkm/Documents/GitHub/LifeTrac-bench-main/LifeTrac-v25/DESIGN-CONTROLLER/bench-evidence/RS_13_range_edge_2026-10-19/legs)

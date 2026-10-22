@@ -1,0 +1,72 @@
+16:26:50Z == leg W2 post (archive C:/Users/dorkm/Documents/GitHub/LifeTrac-bench-main/LifeTrac-v25/DESIGN-CONTROLLER/bench-evidence/radio_monitor_20261018_112639_d484a92d)
+16:26:51Z -- waiting for the base capture (rs13_cap_base) to finish its 480 s
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+sed: can't read /tmp/lifetrac_strict/legs/legW2_base.txt: No such file or directory
+(rs13_cap_base is gone: using the capture files already on the board)
+scp: /tmp/lifetrac_strict/legs/legW2_base.txt: No such file or directory
+PULL FAILED legW2_base.txt
+scp: /tmp/lifetrac_strict/legs/legW2_base.jsonl: No such file or directory
+PULL FAILED legW2_base.jsonl
+scp: /tmp/lifetrac_strict/legs/legW2_base.json: No such file or directory
+PULL FAILED legW2_base.json
+16:26:52Z -- radio quiet check before the brackets and the park
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+base: leg daemons [] ttymxc3 holders []
+tractor: leg daemons [] ttymxc3 holders []
+16:26:55Z -- post-brackets (rs115) both boards
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+radio_rx_ok=3228 radio_crc_err=2 radio_tx_ok=122  (base)
+radio_rx_ok=72 radio_crc_err=0 radio_tx_ok=1239  (tractor)
+16:26:59Z -- rs12_leg_report (--capture) + frag_gap_report
+train_gap_ms=40  tx_pipeline_depth=2  synth_budget_b=3000  force_frf_hz=0  git_sha=d484a92d  
+  (tx frags_ok counter 1198 is stale; using 1230 fragments from per-frame TX events)
+  (rx rx_frames counter 1151 is stale; using 1185 fragments from frag_arrival events)
+loss 45/1230 = 3.7%   crc_dumps=0  timeouts=1  published=78
+radio deltas: {'radio_dio0': 1262, 'radio_rx_ok': 1190, 'radio_crc_err': 0, 'radio_tx_ok': 72}
+FIRMWARE DROP (drx_ok - host URCs): 1190 - 1185 = 5
+identity residue: 0
+crc closure: dcrc_err=0 vs crc_dumps=0
+n_frag=1185 span=284s max_gap=0.5s gaps>3s=0 total_silent=0.0s
+episodes (start s from first frag, +length): NONE
+base sends on air=72 | tractor decoded cmds=72
+tractor cmd offsets (s from its first): 0.0, 3.6, 7.2, 10.8, 14.4, 18.0, 21.1, 24.7, 28.3, 31.9, 35.9, 39.5, 43.1, 46.2, 50.3, 53.4, 57.0, 61.1, 64.7, 68.3, 71.4, 75.5, 79.1, 82.2, 85.8, 89.4, 93.0, 97.0, 100.6, 103.7, 107.8, 111.0, 114.5, 118.6, 122.2, 125.8, 129.4, 133.0, 136.1, 139.7
+16:27:00Z -- P2 / P4 from the archive
+# leg W2 P2/P4 greps on C:/Users/dorkm/Documents/GitHub/LifeTrac-bench-main/LifeTrac-v25/DESIGN-CONTROLLER/bench-evidence/radio_monitor_20261018_112639_d484a92d
+harness: reg_profile=1 force_frf_hz=0 tx_batch=1 synth_fps=2 cam_extra_env=
+published frame_id lines (rx_daemon.log): 78
+tx done K=1 lines: 0
+tx done K>=2 lines: 82
+tx ABORTED lines: 0
+max K: 15 fragments
+camera_service vector_stats lines: no camera_service.log
+tx drops before air (last tx stats line): drop_full=488 drop_stale=0 
+tractor FHSS authority (post bracket): tx_first_anchor=1 tx_stream_streak_max=1239 
+seq-gap loss (per codec run): no base capture
+16:27:00Z -- park both radios (last)
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+base:    attempt 1: PARK_FAIL {"opmode_readback": "0x85", "opmode_after_settle": "0x85", "settle_s": 1.5}
+tractor: attempt 1: PARK_TRANSIENT {"opmode_readback": "0x80", "opmode_after_settle": "0x85", "settle_s": 1.5}
+16:27:08Z not parked: base tractor -- the scan SM may still be walking; waiting 60 s
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+base:    attempt 2: PARK_TRANSIENT {"opmode_readback": "0x80", "opmode_after_settle": "0x85", "settle_s": 1.5}
+tractor: attempt 2: PARK_TRANSIENT {"opmode_readback": "0x80", "opmode_after_settle": "0x85", "settle_s": 1.5}
+16:28:15Z not parked: base tractor -- the scan SM may still be walking; waiting 60 s
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+base:    attempt 3: PARK_OK {"opmode_readback": "0x80", "opmode_after_settle": "0x80", "settle_s": 1.5}
+tractor: attempt 3: PARK_OK {"opmode_readback": "0x80", "opmode_after_settle": "0x80", "settle_s": 1.5}
+16:29:22Z == leg W2 post done (evidence: C:/Users/dorkm/Documents/GitHub/LifeTrac-bench-main/LifeTrac-v25/DESIGN-CONTROLLER/bench-evidence/RS_12_15_reverse_delivery_2026-10-18/legs)

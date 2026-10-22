@@ -1,0 +1,65 @@
+## date
+2026-10-14T23:57:38Z
+## systemctl --version
+systemd 250 (250.5+)
+## DEPLOYED_FROM
+f6e4b4632296a5c508fb236c58268e4a815315a8
+subject=Merge pull request #151 from OpenSourceEcology/claude/project-thread-e2dnl1
+deployed_utc=2026-10-14T23:55:45Z
+paths=Dockerfile base_station docker-compose.yml firmware
+tarball=dc_deploy_f6e4b463.tar.gz md5=89134759b20468c0afaf14929601b43a
+tool=bench_tools/deploy_base.sh
+image=lifetrac-v25:latest sha256:0413f3c4dac3d94058971adebe3b028ad6934f52982bd322408a0b4f69a55b28
+build_locked=1 build_log=/home/fio/docker_build_f6e4b463.log pip_freeze=/home/fio/pip_freeze_lifetrac-v25_f6e4b463.txt
+## tree top (compose / deploy)
+-rw-r--r--    1 fio fio    537 Oct 14 23:57 DEPLOYED_FROM.txt
+-rw-rw-r--    1 fio fio   2324 Oct 14 23:55 Dockerfile
+-rw-rw-r--    1 fio fio   3919 Sep 15 22:28 docker-compose.video-test.yml.RETIRED-2026-10-14
+-rw-r--r--    1 fio fio   3919 May 27 20:22 docker-compose.video-test.yml.bak_20260527_152255
+-rw-rw-r--    1 fio fio   3518 Oct 14 23:55 docker-compose.yml
+deploy/: absent
+## ls firmware/tractor_x8/
+total 280
+drwxrwxr-x  4 fio fio  4096 Oct 14 23:55 .
+drwxrwxr-x 15 fio fio  4096 Oct 14 23:55 ..
+-rw-rw-r--  1 fio fio  1303 Oct 14 23:55 Dockerfile
+-rw-rw-r--  1 fio fio  3093 Oct 14 23:55 README-DEPLOY.md
+-rw-rw-r--  1 fio fio 93225 Oct 14 23:55 camera_service.py
+-rw-rw-r--  1 fio fio  8598 Oct 14 23:55 dry_run_w2_05.py
+-rw-rw-r--  1 fio fio 14836 Oct 14 23:55 gps_service.py
+-rw-rw-r--  1 fio fio 80591 Oct 14 23:55 image_tx_daemon.py
+-rw-rw-r--  1 fio fio 12980 Oct 14 23:55 imu_service.py
+-rw-rw-r--  1 fio fio  7029 Oct 14 23:55 logger_service.py
+-rw-rw-r--  1 fio fio  6288 Oct 14 23:55 method_compare.py
+-rw-rw-r--  1 fio fio  7397 Oct 14 23:55 params_service.py
+-rw-rw-r--  1 fio fio  3298 Oct 14 23:55 requirements.lock.txt
+-rw-rw-r--  1 fio fio  1184 Oct 14 23:55 requirements.txt
+drwxrwxr-x  2 fio fio  4096 Oct 14 23:55 systemd
+-rw-rw-r--  1 fio fio  4778 Oct 14 23:55 time_service.py
+drwxrwxr-x  2 fio fio  4096 Oct 14 23:55 x8_image_pipeline
+## compose files anywhere under firmware/tractor_x8
+(end)
+## images
+lifetrac-v25:f6e4b463 0413f3c4dac3 35 seconds ago
+lifetrac-v25:latest 0413f3c4dac3 35 seconds ago
+lifetrac-tractor-x8:latest 2727dfd36f9f 2 weeks ago
+lifetrac-tractor-x8:rs13-65869517 2727dfd36f9f 2 weeks ago
+python:3.11-slim-bookworm aad78d4fecb5 3 weeks ago
+lifetrac-v25:previous 4623980c2dac 4 weeks ago
+<none>:<none> ed7c058774f4 4 weeks ago
+<none>:<none> 12fe97dece57 4 weeks ago
+<none>:<none> c6ded786130c 2 months ago
+python:3.11-slim 2fe5ff938d2b 3 months ago
+eclipse-mosquitto:2 0db28dca6f11 3 months ago
+## containers
+design-controller-mosquitto-1	eclipse-mosquitto:2	Up 24 seconds
+rx_smoke	4623980c2dac	Exited (137) 10 days ago
+bench_mqtt	eclipse-mosquitto:2	Exited (1) 2 months ago
+f11_webui	c6ded786130c	Exited (0) 2 months ago
+## broker
+/design-controller-mosquitto-1 image=sha256:0db28dca6f113dc87797b9249d12841dc7877d1b31e8557d227785d9b832ff14 created=2026-10-14T23:57:12.837158021Z restart=unless-stopped
+## uart_chk
+
+__UART_CHK_DONE__
+## lifetrac units
+● psplash-start.service loaded failed failed Start psplash boot splash screen

@@ -1,0 +1,38 @@
+2026-10-14T23:55:41Z
+[deploy_base 23:55:42Z] archive f6e4b463 (Merge pull request #151 from OpenSourceEcology/claude/project-thread-e2dnl1): Dockerfile base_station docker-compose.yml firmware
+[deploy_base 23:55:45Z] commit   f6e4b4632296a5c508fb236c58268e4a815315a8
+[deploy_base 23:55:45Z] target   fio@192.168.1.117 (ssh) -> /var/rootdirs/opt/lifetrac/DESIGN-CONTROLLER
+[deploy_base 23:55:45Z] tarball  /c/Users/dorkm/Documents/LifeTrac-bench-archive/deploy/dc_deploy_f6e4b463.tar.gz (1917409 B, md5 89134759b20468c0afaf14929601b43a)
+[deploy_base 23:55:45Z] build    yes, locked=1 (commit has lock file: 1)
+[deploy_base 23:55:45Z] broker   docker compose -p design-controller up -d --no-deps mosquitto
+[deploy_base 23:55:45Z] disarm   an old docker-compose.video-test.yml in the tree is renamed docker-compose.video-test.yml.RETIRED-2026-10-14 (refused while a container made from it is not exited)
+[deploy_base 23:55:45Z] disarm   firmware/tractor_x8/docker-compose*.yml and mosquitto.video-test.conf are not shipped; an old copy in the tree is removed (the backup keeps it)
+[deploy_base 23:55:48Z] copied to /home/fio/lifetrac_deploy (md5 OK); running the board-side script as root
+[base 23:55:48Z] renamed /var/rootdirs/opt/lifetrac/DESIGN-CONTROLLER/docker-compose.video-test.yml to docker-compose.video-test.yml.RETIRED-2026-10-14, so no docker compose up here finds it
+[base 23:55:50Z] old tree (deployed) saved to /home/fio/lifetrac_deploy/prev_tree_deployed_20261014T235548Z.tgz
+[base 23:55:51Z] tree at /var/rootdirs/opt/lifetrac/DESIGN-CONTROLLER is now f6e4b463 (clean=1)
+[base 23:55:51Z] docker build -t lifetrac-v25:latest -t lifetrac-v25:f6e4b463 --build-arg LOCKED=1 . (log /home/fio/docker_build_f6e4b463.log)
+[base 23:57:04Z] the image it replaced is kept as lifetrac-v25:previous (4623980c2dac)
+image deps import OK
+[base 23:57:11Z] built 0413f3c4dac3 (locked=1); wheels: /home/fio/pip_freeze_lifetrac-v25_f6e4b463.txt
+time="2026-10-14T23:57:12Z" level=warning msg="The \"LIFETRAC_MQTT_HOST\" variable is not set. Defaulting to a blank string."
+time="2026-10-14T23:57:12Z" level=warning msg="The \"LIFETRAC_MQTT_HOST\" variable is not set. Defaulting to a blank string."
+ Container design-controller-mosquitto-1  Recreate
+ Container design-controller-mosquitto-1  Recreated
+ Container design-controller-mosquitto-1  Starting
+ Container design-controller-mosquitto-1  Started
+mqtt probe: CONNACK accepted on 127.0.0.1:1883
+[base 23:57:14Z] broker design-controller-mosquitto-1 answers on 127.0.0.1:1883
+time="2026-10-14T23:57:15Z" level=warning msg="The \"LIFETRAC_MQTT_HOST\" variable is not set. Defaulting to a blank string."
+[base 23:57:15Z] DEPLOYED_FROM.txt:
+    f6e4b4632296a5c508fb236c58268e4a815315a8
+    subject=Merge pull request #151 from OpenSourceEcology/claude/project-thread-e2dnl1
+    deployed_utc=2026-10-14T23:55:45Z
+    paths=Dockerfile base_station docker-compose.yml firmware
+    tarball=dc_deploy_f6e4b463.tar.gz md5=89134759b20468c0afaf14929601b43a
+    tool=bench_tools/deploy_base.sh
+    image=lifetrac-v25:latest sha256:0413f3c4dac3d94058971adebe3b028ad6934f52982bd322408a0b4f69a55b28
+    build_locked=1 build_log=/home/fio/docker_build_f6e4b463.log pip_freeze=/home/fio/pip_freeze_lifetrac-v25_f6e4b463.txt
+[base 23:57:15Z] done
+[deploy_base 23:57:16Z] base deployed from f6e4b463. The radios were not touched.
+deploy exit=0
