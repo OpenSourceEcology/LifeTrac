@@ -1256,9 +1256,11 @@ static void process_air_frame(uint8_t* onair, size_t len, int16_t rssi_dbm, int1
 //   rt_rx_rearm()     put the radio back in receive after a PHY change
 //   apply_phy_rung()  (further down) retune for the SF ladder
 //
-// The on-air bytes are the same either way: one KISS-framed, AES-GCM
-// encrypted frame per LoRa packet, so a Method G tractor still talks to a
-// RadioLib handheld.
+// The application payload is the same either way: one KISS-framed, AES-GCM
+// encrypted frame per LoRa packet. The on-air packet is NOT: the stock L072
+// build (LIFETRAC_FHSS_TX_ROUTED) adds an 8-byte hop header on TX, drops RX
+// packets without one, and hops. The RadioLib MKR handheld sends bare KISS
+// packets on one channel, so it cannot reach a Method G tractor yet (H7-4c).
 
 // One LoRa packet: feed the KISS decoder and process each complete frame.
 static void on_radio_packet(const uint8_t* buf, size_t len,

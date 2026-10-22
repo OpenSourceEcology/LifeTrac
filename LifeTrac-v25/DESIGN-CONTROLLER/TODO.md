@@ -4588,7 +4588,8 @@ marked *(both)* also improve the X8's onboard H747.
 profile stays an option, so work runs in three stages:
 
 1. *Software only, useful to both profiles; no hardware needed.* H7-4 (done),
-   then H7-4a, the H7-7 SIL model (four classes plus a model of the L072
+   then H7-4c (handheld framing vs the L072; needs a design call), H7-4a,
+   the H7-7 SIL model (four classes plus a model of the L072
    FIFO ring) before its C, H7-13, H7-16 and H7-10. Each lands with a host
    test, like `tractor_h7/bench/methodg_sil/`.
 2. *Bench checks; no RF transmit and no board flashing without Dorkmo's OK.*
@@ -4619,8 +4620,8 @@ profile stays an option, so work runs in three stages:
   2026-10-22 in software. `tractor_h7.ino` now runs arbitration, the Modbus
   master, AES-GCM and the IP-107 queue in the Method G build too; only a
   small "radio transport" section differs from RadioLib, which stays a bench
-  option. `RX_FRAME_URC` packets feed the KISS decoder (same on-air bytes as
-  RadioLib, so the MKR handheld still works). TX sends one `TX_FRAME_REQ` at
+  option. `RX_FRAME_URC` packets feed the KISS decoder (same application
+  payload as RadioLib; the on-air packet differs, see H7-4c). TX sends one `TX_FRAME_REQ` at
   a time (K = 1), released by `TX_DONE_URC`, a matching `ERR_PROTO_URC`,
   `BOOT_URC` or a timeout, never by `FAULT_URC` (`murata_host/mh_link.c`).
   Host tests: `bench/h7_host_proto/mh_link_vectors.c` and
@@ -4633,6 +4634,17 @@ profile stays an option, so work runs in three stages:
   the CMD_LINK_TUNE handshake) or the ladder moves into the L072, then
   re-enable it with a SIL test. Also decide whether the H7 should CFG_SET TX
   power and the regional profile at boot instead of trusting L072 defaults.
+- [ ] **H7-4c Handheld link-layer compatibility with the L072** *(both)* —
+  the stock L072 build (`LIFETRAC_FHSS_TX_ROUTED` in `murata_l072/Makefile`)
+  prefixes every TX packet with the 8-byte hop header (`lora_pkt_hdr`) and
+  `sx1276_rx.c` drops any RX packet without one, while `handheld_mkr.ino`
+  sends bare KISS packets on a fixed channel. So the MKR handheld cannot
+  reach a Method G tractor (X8 or H7) today; the base path through another
+  L072 is unaffected. Decide between teaching the handheld the hop header
+  and hop schedule, or an explicit L072 compatibility mode (unrouted RX on a
+  fixed channel), then add a test that runs handheld packets through the
+  L072 receive parser. Must land before H7-5 uses the handheld. Found by
+  Copilot on PR #162.
 - [ ] **H7-4b Max Carrier pin map for the control app** — `setup()` still
   uses the legacy `RS485.setPins(PA_9, PA_10, PB_3)`; PA_9 is USART1 TX
   (`Serial1`), and the Max Carrier pinout puts RS-485 on SERIAL0. Confirm
