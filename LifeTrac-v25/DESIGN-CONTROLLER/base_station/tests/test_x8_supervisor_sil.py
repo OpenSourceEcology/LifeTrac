@@ -10,7 +10,7 @@ Everything the script would touch on a board is redirected into a temp dir:
 * ``docker``, ``systemctl``, ``fw_printenv``, ``systemd-notify`` and ``sync``
   are fake scripts on a PATH that holds nothing else but a handful of real
   coreutils (``timeout``, ``stat``, ``mv``, ``rm``, ``mkdir``, ``sleep``,
-  ``cat``). Each fake appends its argv to one log, so the tests can check
+  ``cat``, ``dd``). Each fake appends its argv to one log, so the tests can check
   what was called and in which order. The fake ``systemctl`` also records
   which ``last_action`` and ``consecutive_reboots`` were on disk at the
   moment it was called, and the fake ``sync`` records which ``*.tmp`` files
@@ -24,9 +24,17 @@ Everything the script would touch on a board is redirected into a temp dir:
 * uptime and boot id come from files the test writes
   (``LIFETRAC_PROC_UPTIME``, ``LIFETRAC_BOOT_ID_FILE``), so "time passing"
   and "the board rebooted" are just file writes. Real sleeps only in the
-  ``run`` loop tests and one SYSRQ_SETTLE_S=1 test (a few seconds each).
+  ``run`` loop tests and the SYSRQ_SETTLE_S=1 tests (a few seconds each).
 * the sysrq trigger is a regular file (``LIFETRAC_SYSRQ``); the script
   appends one character per write, so the file content is the write order.
+* the tractor's H747 link service (D-PWR1) is ``_FakeLink``, a thread that
+  rewrites the idle file every few ms with a fresh <seq> and answers a
+  reboot request according to its mode; the supervisor polls it every
+  20 ms (``LIFETRAC_IDLE_POLL``) instead of every second, and the fake
+  ``sleep`` holds each of those polls until the thread has written, so a
+  slow runner cannot make a running link look dead. The fake
+  ``systemctl`` and ``sync`` can change the link's mode or remove the
+  request at the moment they run (the H747 dropping its hold mid-rung).
 
 No root, no /dev, /proc or /etc access, no network. Skipped where there is
 no POSIX sh (the Windows bench laptop). The whole suite runs under /bin/sh
@@ -48,8 +56,10 @@ import os
 import re
 import shutil
 import signal
+import stat
 import subprocess
 import tempfile
+import threading
 import time
 import unittest
 from pathlib import Path
@@ -66,7 +76,7 @@ _HAVE_POSIX = (
     and shutil.which("sh") is not None
     and shutil.which("timeout") is not None
 )
-_REAL_TOOLS = ("timeout", "stat", "mv", "rm", "mkdir", "sleep", "cat")
+_REAL_TOOLS = ("timeout", "stat", "mv", "rm", "mkdir", "sleep", "cat", "dd")
 
 BOOT_A = "aaaaaaaa-1111-4111-8111-000000000001"
 BOOT_B = "bbbbbbbb-2222-4222-8222-000000000002"
@@ -119,6 +129,30 @@ if [ -f "$FAKE_STATE/last_action" ]; then
     "reboot -ff") cat "$FAKE_STATE/last_action" > "$FAKE_DIR/last_action.at_reboot_ff" ;;
   esac
 fi
+# The tractor's motion-hold request on disk at that moment (D-PWR1).
+if [ -f "$FAKE_REQ" ]; then
+  case $* in
+    reboot) cat "$FAKE_REQ" > "$FAKE_DIR/request.at_reboot" ;;
+    "reboot -ff") cat "$FAKE_REQ" > "$FAKE_DIR/request.at_reboot_ff" ;;
+  esac
+fi
+# The tractor's reset record at that moment.
+if [ -f "${FAKE_REQ%/*}/reset_issued" ] && [ "$*" = "reboot -ff" ]; then
+  cat "${FAKE_REQ%/*}/reset_issued" > "$FAKE_DIR/reset_issued.at_reboot_ff"
+fi
+# The H747 drops its hold as systemd is asked (D-PWR1 tests).
+if [ "$*" = reboot ] && [ -f "$FAKE_DIR/on_reboot_link_mode" ]; then
+  cat "$FAKE_DIR/on_reboot_link_mode" > "$FAKE_DIR/link_mode"
+fi
+# The forced path's reset record cannot be written (Copilot review on #156).
+if [ "$*" = reboot ] && [ -f "$FAKE_DIR/on_reboot_block_reset_record" ]; then
+  mkdir -p "${FAKE_REQ%/*}/reset_issued.tmp"
+fi
+# The supervisor is stopped while systemd is being asked.
+if [ "$*" = reboot ] && [ -f "$FAKE_DIR/on_reboot_hang" ]; then
+  : > "$FAKE_DIR/reboot_hanging"
+  sleep 3
+fi
 # A slow rung: uptime has moved on by the time systemd takes the reboot.
 if [ "$*" = reboot ] && [ -f "$FAKE_DIR/uptime_at_accept" ]; then
   cat "$FAKE_DIR/uptime_at_accept" > "$FAKE_UPTIME"
@@ -126,6 +160,9 @@ fi
 rc=0
 if [ "$*" = reboot ] && [ -f "$FAKE_DIR/systemctl_reboot_rc" ]; then
   read -r rc < "$FAKE_DIR/systemctl_reboot_rc"
+fi
+if [ "$*" = "reboot -ff" ] && [ -f "$FAKE_DIR/systemctl_reboot_ff_rc" ]; then
+  read -r rc < "$FAKE_DIR/systemctl_reboot_ff_rc"
 fi
 exit "$rc"
 """
@@ -154,7 +191,83 @@ for f in "$FAKE_STATE"/*.tmp "$FAKE_STATE"/per_boot/*.tmp; do
   fi
 done
 printf 'sync [tmp=%s]\n' "${tmps# }" >> "$FAKE_LOG"
+# D-PWR1 tests: while a motion-hold request is on disk (the records written
+# between the hold and `systemctl reboot`), remove it or make the H747 drop
+# the hold, and wait until the idle file shows it. With on_sync_only_for,
+# only while a last_action record naming that action is being written; with
+# on_sync_after_log, only when the supervisor log's last line contains it.
+only=
+if [ -f "$FAKE_DIR/on_sync_only_for" ]; then
+  read -r only < "$FAKE_DIR/on_sync_only_for"
+  hit=
+  if [ -f "$FAKE_STATE/last_action.tmp" ]; then
+    while IFS= read -r l; do
+      [ "$l" = "action=$only" ] && hit=1
+    done < "$FAKE_STATE/last_action.tmp"
+  fi
+  [ -n "$hit" ] || only=skip
+fi
+if [ -f "$FAKE_DIR/on_sync_after_log" ]; then
+  IFS= read -r needle < "$FAKE_DIR/on_sync_after_log"
+  last=
+  if [ -f "$FAKE_STATE/supervisor.log" ]; then
+    while IFS= read -r l; do
+      last=$l
+    done < "$FAKE_STATE/supervisor.log"
+  fi
+  case $last in *"$needle"*) ;; *) only=skip ;; esac
+fi
+if [ -f "$FAKE_REQ" ] && [ "$only" != skip ]; then
+  # The supervisor is stopped during these record writes.
+  if [ -f "$FAKE_DIR/on_sync_hang" ]; then
+    : > "$FAKE_DIR/sync_hanging"
+    sleep 3
+  fi
+  if [ -f "$FAKE_DIR/on_sync_rm_request" ]; then
+    rm -f "$FAKE_REQ"
+  fi
+  for m in busy stale_lock badseq_lock; do
+    [ -f "$FAKE_DIR/on_sync_link_$m" ] || continue
+    printf '%s\n' "$m" > "$FAKE_DIR/link_mode"
+    n=0
+    while [ "$n" -lt 500 ]; do
+      l=
+      read -r l < "$FAKE_IDLE" 2>/dev/null
+      case $m:$l in busy:busy*|stale_lock:*" 00000000-1"|badseq_lock:"locked BAD"*) break ;; esac
+      n=$((n + 1))
+      sleep 0.01
+    done
+  done
+fi
 exit 0
+"""
+
+# The real sleep ($FAKE_SLEEP), except for an idle poll (one argument equal
+# to LIFETRAC_IDLE_POLL) while a _FakeLink runs: that first waits, up to 5 s,
+# until the link has rewritten the idle file since this poll began (every
+# line it writes carries its counter, so each write changes it). A live
+# H747 link service writes at least once per poll; the fake one is a Python
+# thread, and a busy CI runner left it unscheduled for longer than the
+# supervisor's whole liveness window (10 polls of 20 ms), so a live link
+# read as dead (2026-10-22, one of two CI runs of the same commit). Each
+# such poll also adds a line to idle_polls, which the link's
+# grant_late_badseq mode counts. With log_sleep, every call is logged.
+_FAKE_SLEEP = r"""#!/bin/sh
+[ -f "$FAKE_DIR/log_sleep" ] && printf 'sleep %s\n' "$*" >> "$FAKE_LOG"
+if [ "$#" = 1 ] && [ "$1" = "${LIFETRAC_IDLE_POLL:-}" ] && [ -f "$FAKE_DIR/link_running" ]; then
+  echo poll >> "$FAKE_DIR/idle_polls"
+  was=
+  { IFS= read -r was < "$FAKE_IDLE"; } 2>/dev/null
+  n=0
+  while [ "$n" -lt 1000 ] && [ -f "$FAKE_DIR/link_running" ]; do
+    now=
+    { IFS= read -r now < "$FAKE_IDLE"; } 2>/dev/null
+    [ "$now" = "$was" ] || break
+    n=$((n + 1))
+    "$FAKE_SLEEP" 0.005
+  done
+fi
+exec "$FAKE_SLEEP" "$@"
 """
 
 _DEFAULT_CONF = {
@@ -172,6 +285,112 @@ _DEFAULT_CONF = {
     "SYSRQ_SETTLE_S": "0",
     "TRACTOR_REBOOT_ENABLED": "0",
 }
+
+
+class _FakeLink:
+    """The tractor's H747 link service (D-PWR1), faked. Every few ms it
+    rewrites the idle file (tmp + rename) with a new <seq>; ``mode`` says what
+    the H747 reports: ``grant`` (idle, and ``locked <seq> <id>`` while a
+    request file exists), ``idle`` (never takes a lock), ``busy``,
+    ``stale_lock`` (locked for some other request), ``badseq_lock`` (a hold
+    for the request with a malformed <seq>, ``BAD<n>!``), ``grant_late_badseq`` (idle
+    until two idle polls after it sees the request, then ``badseq_lock``)
+    or ``raw:<state>`` (any first word). ``mode_file``, when it exists, overrides ``mode`` (the fake
+    ``systemctl`` and ``sync`` write it). ``seq_fmt`` formats the counter
+    (an invalid <seq> that still changes). ``running_file`` exists while the
+    thread runs, so the fake ``sleep`` can make each idle poll wait for a
+    write. ``stop`` leaves the last file behind, like a link service stopped
+    by the shutdown."""
+
+    STALE_ID = "00000000-1"
+
+    def __init__(self, idle_file: Path, req_file: Path, mode: str,
+                 mode_file: Path | None = None, seq_fmt: str = "{}",
+                 running_file: Path | None = None) -> None:
+        self.idle_file = idle_file
+        self.req_file = req_file
+        self.mode = mode
+        self.mode_file = mode_file
+        self.seq_fmt = seq_fmt
+        self.running_file = running_file
+        self.seq = 0
+        self.requests: list[str] = []
+        self._polls_at_request = 0
+        self._stop = threading.Event()
+        self._thread = threading.Thread(target=self._loop, daemon=True)
+
+    def _line(self) -> str:
+        if self.mode_file is not None:
+            try:
+                self.mode = self.mode_file.read_text(encoding="utf-8").strip() or self.mode
+            except OSError:
+                pass
+        try:
+            req = self.req_file.read_text(encoding="utf-8").split()[0]
+        except (OSError, IndexError):
+            req = ""
+        if req and req not in self.requests:
+            self.requests.append(req)
+            self._polls_at_request = self._idle_polls()
+        seq = self.seq_fmt.format(self.seq)
+        if self.mode == "grant":
+            return f"locked {seq} {req}" if req else f"idle {seq}"
+        if self.mode == "badseq_lock" or (
+                self.mode == "grant_late_badseq" and req
+                and self._idle_polls() - self._polls_at_request >= 2):
+            return f"locked BAD{seq}! {req}" if req else f"idle {seq}"
+        if self.mode == "grant_late_badseq":
+            return f"idle {seq}"
+        if self.mode == "stale_lock":
+            return f"locked {seq} {self.STALE_ID}"
+        if self.mode.startswith("raw:"):
+            return f"{self.mode[4:]} {seq}"
+        return f"{self.mode} {seq}"
+
+    def _idle_polls(self) -> int:
+        """Idle polls the fake ``sleep`` has counted (see _FAKE_SLEEP)."""
+        if self.running_file is None:
+            return 0
+        try:
+            return len((self.running_file.parent / "idle_polls").read_text(encoding="utf-8").splitlines())
+        except OSError:
+            return 0
+
+    def shows(self, needle: str, timeout: float = 5.0) -> None:
+        """Wait until the idle file's line contains ``needle``."""
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            try:
+                if needle in self.idle_file.read_text(encoding="utf-8"):
+                    return
+            except OSError:
+                pass
+            time.sleep(0.005)
+        raise AssertionError(f"idle file never showed {needle!r}")
+
+    def write_once(self) -> None:
+        self.seq += 1
+        tmp = self.idle_file.with_name(self.idle_file.name + ".tmp")
+        tmp.write_text(self._line() + "\n", encoding="utf-8")
+        os.replace(tmp, self.idle_file)
+
+    def _loop(self) -> None:
+        while not self._stop.wait(0.003):
+            self.write_once()
+
+    def start(self) -> "_FakeLink":
+        self.idle_file.parent.mkdir(parents=True, exist_ok=True)
+        self.write_once()
+        if self.running_file is not None:
+            self.running_file.touch()
+        self._thread.start()
+        return self
+
+    def stop(self) -> None:
+        self._stop.set()
+        self._thread.join(timeout=10)
+        if self.running_file is not None:
+            self.running_file.unlink(missing_ok=True)
 
 
 def _code_lines(text: str) -> list[str]:
@@ -236,7 +455,7 @@ class X8SUP_A_Static(unittest.TestCase):
             with self.subTest(pattern=pat):
                 self.assertIsNone(re.search(pat, code, re.IGNORECASE), pat)
         # sysrq: only s, u and b, each as its own write; never c.
-        writes = re.findall(r"^\s*sysrq_write\s+(\S+)", code, re.MULTILINE)
+        writes = re.findall(r"^\s*(?:if\s+)?sysrq_write\s+([^\s;]+)", code, re.MULTILINE)
         self.assertEqual(writes, ["s", "u", "b"])
         self.assertIsNone(re.search(r"""(echo|printf)[^\n]*\bc\b[^\n]*sysrq""", code, re.IGNORECASE))
         # restart only ever names the loop variable fed from CONTAINERS.
@@ -324,6 +543,29 @@ class X8SUP_A_Static(unittest.TestCase):
         self.assertRegex(text, r"(?is)mosquitto.*on_connect")
         self.assertRegex(text, r"(?is)web_ui.*retained")
         self.assertIn("RESET_REQ", text)
+        # D-PWR1: the example names the idle-only rule next to the switch.
+        self.assertIn("TRACTOR_IDLE_WAIT_S=10", [ln.strip() for ln in active])
+        self.assertRegex(text, r"(?s)D-PWR1.*TRACTOR_REBOOT_ENABLED=0")
+
+    def test_supervisor_only_reads_the_h747_idle_file(self) -> None:
+        # D-PWR1: the idle report comes from the H747's link service; the
+        # supervisor writing or deleting it could fake an idle tractor.
+        code = "\n".join(_code_lines(self.text))
+        self.assertIsNone(re.search(r'>>?\s*"?\$IDLE_FILE', code))
+        for verb in ("kv_put", "write_record", "rm -f", "mv -f"):
+            self.assertNotIn(f'{verb} "$IDLE_FILE"', code)
+        self.assertIn('kv_put "$REQ_FILE"', code)
+        # Two directories (2026-10-18 review): the idle file in the link
+        # service's own, the request in a root-only one the supervisor makes,
+        # so the link's user cannot plant or swap names root writes.
+        self.assertIn("IDLE_FILE=${LIFETRAC_TRACTOR_IDLE_FILE:-/run/lifetrac/tractor_idle}", self.text)
+        self.assertIn("REQ_FILE=${LIFETRAC_TRACTOR_REBOOT_REQUEST:-/run/lifetrac-supervisor/tractor_reboot_request}",
+                      self.text)
+        self.assertIn('mkdir -m 0755 "${REQ_FILE%/*}"', code)
+        # The idle file is read bounded, and the open itself refuses a link
+        # and does not block (a link swapped in after the checks, a FIFO).
+        self.assertIn('timeout 2 dd if="$IDLE_FILE" bs=256 count=1 iflag=nofollow,nonblock status=none', code)
+        self.assertIn('[ -L "$IDLE_FILE" ]', code)
 
 
 # ------------------------------------------------------------------ behaviour
@@ -361,6 +603,7 @@ class X8SUP_B_Supervisor(unittest.TestCase):
             ("fw_printenv", _FAKE_FW_PRINTENV),
             ("systemd-notify", _FAKE_NOTIFY),
             ("sync", _FAKE_SYNC),
+            ("sleep", _FAKE_SLEEP),
         ):
             p = self.bin / name
             p.write_text(body, encoding="utf-8")
@@ -372,6 +615,10 @@ class X8SUP_B_Supervisor(unittest.TestCase):
         self.sysrq = root / "sysrq-trigger"
         self.armed = self.etc / "supervisor.armed"
         self.conf = self.etc / "supervisor.conf"
+        self.idle_file = root / "run" / "lifetrac" / "tractor_idle"
+        self.req_file = root / "run" / "lifetrac-supervisor" / "tractor_reboot_request"
+        self.reset_file = self.req_file.parent / "reset_issued"
+        (root / "run").mkdir()
         self.set_uptime(1000)
         self.set_boot(BOOT_A)
         self.write_conf()
@@ -400,9 +647,22 @@ class X8SUP_B_Supervisor(unittest.TestCase):
             (self.fake / "containers" / f"{name}.resolves").write_text(resolves + "\n", encoding="utf-8")
 
     def fresh(self) -> None:
-        """Forget all supervisor state and fake calls (between sub-cases)."""
+        """Forget all supervisor state and fake calls (between sub-cases).
+        Stop any link first: the tmpfs files go too."""
         shutil.rmtree(self.state, ignore_errors=True)
         self.fake_log.write_text("", encoding="utf-8")
+        for f in self.fake.glob("*.at_reboot*"):
+            f.unlink()
+        for name in ("link_mode", "on_reboot_link_mode", "on_sync_rm_request",
+                     "on_sync_link_busy", "on_sync_link_stale_lock",
+                     "on_sync_link_badseq_lock", "idle_polls", "on_sync_only_for",
+                     "on_sync_after_log", "on_sync_hang", "sync_hanging",
+                     "on_reboot_hang", "reboot_hanging", "on_reboot_block_reset_record",
+                     "on_dd_hang", "dd_hanging",
+                     "systemctl_reboot_rc", "systemctl_reboot_ff_rc"):
+            (self.fake / name).unlink(missing_ok=True)
+        shutil.rmtree(self.req_file.parent, ignore_errors=True)
+        self.idle_file.unlink(missing_ok=True)
 
     def pending_marker(self) -> Path:
         return self.state / "per_boot" / "reboot_pending"
@@ -459,6 +719,12 @@ class X8SUP_B_Supervisor(unittest.TestCase):
             "FAKE_DIR": str(self.fake),
             "FAKE_STATE": str(self.state),
             "FAKE_UPTIME": str(self.uptime_file),
+            "FAKE_REQ": str(self.req_file),
+            "FAKE_IDLE": str(self.idle_file),
+            "LIFETRAC_TRACTOR_IDLE_FILE": str(self.idle_file),
+            "LIFETRAC_TRACTOR_REBOOT_REQUEST": str(self.req_file),
+            "LIFETRAC_IDLE_POLL": "0.02",
+            "FAKE_SLEEP": str(self.tools / "sleep"),
         }
         if extra:
             env.update(extra)
@@ -483,6 +749,22 @@ class X8SUP_B_Supervisor(unittest.TestCase):
                 self.set_uptime(start + i * step)
             self.run_sv("once")
 
+    def start_link(self, mode: str = "grant", seq_fmt: str = "{}",
+                   idle_file: Path | None = None) -> _FakeLink:
+        link = _FakeLink(idle_file or self.idle_file, self.req_file, mode,
+                         mode_file=self.fake / "link_mode", seq_fmt=seq_fmt,
+                         running_file=self.fake / "link_running").start()
+        self.addCleanup(link.stop)
+        return link
+
+    def write_idle(self, line: str) -> None:
+        """An idle file nobody updates (a dead or missing link service)."""
+        self.idle_file.parent.mkdir(parents=True, exist_ok=True)
+        self.idle_file.write_text(line + "\n", encoding="utf-8")
+
+    def request(self) -> str | None:
+        return self.req_file.read_text(encoding="utf-8").strip() if self.req_file.exists() else None
+
     def fake_kv(self, name: str) -> dict[str, str]:
         p = self.fake / name
         text = p.read_text(encoding="utf-8") if p.exists() else ""
@@ -495,24 +777,41 @@ class X8SUP_B_Supervisor(unittest.TestCase):
         self.run_err = self.root / "run.stderr"
         with open(self.root / "run.stdout", "w", encoding="utf-8") as out, \
                 open(self.run_err, "w", encoding="utf-8") as err:
+            # cwd: a SIGABRT test's core dump lands in the temp dir.
             self.run_proc = subprocess.Popen(
                 [self.shell, str(_SCRIPT), "run"], env=self.env(),
-                stdout=out, stderr=err, start_new_session=True)
-        self.addCleanup(self._kill_run)
+                stdout=out, stderr=err, start_new_session=True, cwd=self.root)
+        # This process, not self.run_proc: a later sub-case replaces that,
+        # and a loop left running after its temp dir goes finds no `sleep`
+        # and spins.
+        self.addCleanup(self._kill_run, self.run_proc)
 
-    def _kill_run(self) -> None:
-        if self.run_proc.poll() is None:
+    @staticmethod
+    def _kill_run(proc: "subprocess.Popen[bytes]") -> None:
+        if proc.poll() is None:
             try:
-                os.killpg(self.run_proc.pid, signal.SIGKILL)
+                os.killpg(proc.pid, signal.SIGKILL)
             except ProcessLookupError:
                 pass
-            self.run_proc.wait(timeout=10)
+            proc.wait(timeout=10)
 
-    def stop_run(self) -> None:
+    def stop_run(self, sig: signal.Signals = signal.SIGTERM) -> None:
         self.assertIsNone(self.run_proc.poll(), "the run loop exited by itself")
-        os.killpg(self.run_proc.pid, signal.SIGTERM)
-        self.run_proc.wait(timeout=10)
-        self.assertEqual(self.run_err.read_text(encoding="utf-8"), "")
+        os.killpg(self.run_proc.pid, sig)
+        try:
+            self.run_proc.wait(timeout=30)
+        except subprocess.TimeoutExpired:
+            self.fail(f"the run loop outlived {sig.name}; stderr:\n"
+                      f"{self.run_err.read_text(encoding='utf-8')}\n"
+                      f"supervisor.log:\n{self.sv_log()[-3000:]}")
+        # The stop trap lets the shell outlive the child the stop killed, so
+        # the shell may report it ("Terminated", "Interrupt", "Hangup");
+        # nothing else may be printed.
+        report = {signal.SIGTERM: "Terminated", signal.SIGINT: "Interrupt",
+                  signal.SIGHUP: "Hangup"}[sig]
+        err = [ln for ln in self.run_err.read_text(encoding="utf-8").splitlines()
+               if ln.strip() and not ln.rstrip().endswith(report)]
+        self.assertEqual(err, [])
 
     def wait_for(self, cond, what: str, timeout: float = 20.0) -> None:
         deadline = time.monotonic() + timeout
@@ -681,6 +980,7 @@ class X8SUP_B_Supervisor(unittest.TestCase):
         self.assertIsNone(self.state_text("last_action"))
         self.assertIsNone(self.state_text("consecutive_reboots"))
         self.write_conf(ROLE="tractor", TRACTOR_REBOOT_ENABLED="1")
+        self.start_link("grant")
         self.run_sv("once")
         self.assertEqual(len(self.calls("systemctl reboot")), 1)
 
@@ -934,8 +1234,11 @@ class X8SUP_B_Supervisor(unittest.TestCase):
         self.assertEqual(la["action"], "reboot_abandoned")
         self.assertEqual(la["detail"], "forced_path_returned:systemctl_reboot_rc_1")
         log = self.sv_log()
-        self.assertLess(log.index("SYSRQ wrote 's'"), log.index("SYSRQ wrote 'u'"))
-        self.assertLess(log.index("SYSRQ wrote 'u'"), log.index("SYSRQ wrote 'b'"))
+        # The write order is the sysrq file's text ("sub"); u is logged
+        # after b, so nothing but the settle sits between the last look and b.
+        self.assertLess(log.index("SYSRQ wrote 's'"), log.index("SYSRQ wrote 'b'"))
+        self.assertLess(log.index("SYSRQ wrote 'b'"), log.index("SYSRQ wrote 'u' (logged after b)"))
+        self.assertNotIn("SYSRQ wrote 'u'", log[:log.index("SYSRQ wrote 'b'")])
         self.assertIn("ABANDONED reboot reason=docker_down", log)
         # A forced reboot that did happen: the next boot finds the record as
         # it was at the `reboot -ff` call.
@@ -954,10 +1257,28 @@ class X8SUP_B_Supervisor(unittest.TestCase):
         self.set_docker_info_rc(1)
         self.set_fake("systemctl_reboot_rc", "1")
         self.sysrq.write_text("", encoding="utf-8")
-        t0 = time.monotonic()
-        self.run_sv("once")
-        self.assertGreaterEqual(time.monotonic() - t0, 1.9)
+        seen: dict[str, float] = {}
+        done = threading.Event()
+
+        def watch() -> None:
+            while not done.is_set() and len(seen) < 3:
+                text = self.sysrq.read_text(encoding="utf-8")
+                if text in ("s", "su", "sub") and text not in seen:
+                    seen[text] = time.monotonic()
+                time.sleep(0.002)
+
+        watcher = threading.Thread(target=watch, daemon=True)
+        watcher.start()
+        try:
+            self.run_sv("once")
+        finally:
+            done.set()
+            watcher.join(timeout=10)
         self.assertEqual(self.sysrq_text(), "sub")
+        self.assertEqual(sorted(seen), ["s", "su", "sub"])
+        # Each pair is one settle apart (u needs its settle before b).
+        self.assertGreaterEqual(seen["su"] - seen["s"], 0.9)
+        self.assertGreaterEqual(seen["sub"] - seen["su"], 0.9)
 
     def test_forced_path_without_sysrq_file_uses_reboot_ff(self) -> None:
         self.arm()
@@ -1004,6 +1325,8 @@ class X8SUP_B_Supervisor(unittest.TestCase):
         settings = {"FAIL_THRESHOLD": "1", "REBOOT_GRACE_S": "0"}
         settings.update(conf)
         self.write_conf(**settings)
+        if settings.get("ROLE") == "tractor" and not hasattr(self, "link"):
+            self.link = self.start_link("grant")
         self.set_docker_info_rc(1)
         self.sysrq.write_text("", encoding="utf-8")
         self.set_uptime(1000)
@@ -1023,6 +1346,10 @@ class X8SUP_B_Supervisor(unittest.TestCase):
         self.assertIn("BLOCKED forced reboot gate=tractor_reboot_disabled", self.sv_log())
         self.assertFalse(self.pending_marker().exists())
         self.assertEqual(self.state_kv("status")["reboot_blocked"], "tractor_reboot_disabled")
+        # systemd may still carry out the reboot it accepted, so the H747
+        # keeps holding motion off until the reset (2026-10-18 review).
+        self.assertEqual(self.request(), "aaaaaaaa-1000")
+        self.assertIn("LOCK kept (reboot abandoned)", self.sv_log())
 
     def test_forced_path_respects_a_hold_written_after_the_accept(self) -> None:
         self._accepted_reboot()
@@ -1493,6 +1820,1098 @@ class X8SUP_B_Supervisor(unittest.TestCase):
         self.assertIn("ERROR state dir", cp.stdout)
         self.assertIn("WOULD restart container=mosq", cp.stdout)  # unusable state = disarmed
         self.assertEqual(self.calls("docker restart"), [])
+
+    # ---------------------------------------- tractor idle gate (D-PWR1)
+    # Dorkmo, 2026-10-18: a tractor reboots itself only when idle. The H747
+    # reports idle through its link service and holds motion off for the
+    # reboot; the supervisor never resets a tractor without both.
+    def _tractor(self, **conf: str) -> None:
+        self.arm()
+        settings = {"ROLE": "tractor", "TRACTOR_REBOOT_ENABLED": "1",
+                    "FAIL_THRESHOLD": "1", "REBOOT_GRACE_S": "0"}
+        settings.update(conf)
+        self.write_conf(**settings)
+        self.set_docker_info_rc(1)
+        self.sysrq.write_text("", encoding="utf-8")
+        self.set_uptime(1000)
+
+    def assert_nothing_rebooted(self) -> None:
+        self.assertEqual(self.calls("systemctl"), [])
+        self.assertEqual(self.sysrq_text(), "")
+        self.assertIsNone(self.state_text("last_action"))
+        self.assertIsNone(self.state_text("consecutive_reboots"))
+        self.assertIsNone(self.request())
+
+    def test_tractor_reboot_needs_a_live_idle_report(self) -> None:
+        # (static line, or link mode / seq format / linked path, why)
+        esc = "\x1b]0;owned\x1b\\\x1b[2Jfake"
+        cases = {
+            "missing": (None, None, "missing:"),
+            "frozen_idle": ("idle 7", None, "not_live:seq_unchanged_for_10_polls:last=idle"),
+            "frozen_lock": ("locked 7 x", None, "not_live:"),
+            "bad_seq": ("idle 7!", None, "not_live:"),
+            # A link writing a changing but invalid <seq> is not live either.
+            "bad_seq_live": (None, ("grant", "{}!", None), "not_live:"),
+            "long_seq_live": (None, ("grant", "{:033d}", None), "not_live:"),
+            "busy": (None, ("busy", "{}", None), "state=busy"),
+            "unknown": (None, ("raw:parked", "{}", None), "state=invalid"),
+            # Control bytes or a huge first word never reach the log/status.
+            "escapes": (None, ("raw:" + esc, "{}", None), "state=invalid"),
+            "huge": (None, ("raw:" + "A" * 4000, "{}", None), "not_live:"),
+            # Never read through a link: the link service's directory is not
+            # root's (2026-10-18 review).
+            "symlink": (None, ("grant", "{}", "elsewhere"), "missing:"),
+        }
+        for case, (line, live, why) in cases.items():
+            with self.subTest(case=case):
+                self.fresh()
+                self._tractor()
+                link = None
+                if live is not None:
+                    mode, fmt, other = live
+                    target = None
+                    if other is not None:
+                        target = self.idle_file.with_name(other)
+                        self.idle_file.parent.mkdir(parents=True, exist_ok=True)
+                        self.idle_file.symlink_to(target)
+                    link = self.start_link(mode, seq_fmt=fmt, idle_file=target)
+                elif line is not None:
+                    self.write_idle(line)
+                self.run_sv("once")
+                if link is not None:
+                    link.stop()
+                self.assert_nothing_rebooted()
+                status_text = self.state_text("status") or ""
+                self.assertNotIn("\x1b", status_text + self.sv_log())
+                self.assertLess(len(status_text), 2048)
+                self.assertLess(max(len(ln) for ln in self.sv_log().splitlines()), 1024)
+                self.assertIn("BLOCKED reboot gate=tractor_not_idle", self.sv_log())
+                status = self.state_kv("status")
+                self.assertEqual(status["reboot_blocked"], "tractor_not_idle")
+                self.assertIn("reboot_blocked:tractor_not_idle", status["decision"])
+                self.assertIn(why, status["tractor_idle"])
+                # The node streak is kept: the next pass asks again.
+                self.assertEqual(status["node_fault_streak"], "1")
+
+    def test_tractor_reboots_once_the_h747_holds_motion_off(self) -> None:
+        self._tractor()
+        link = self.start_link("busy")
+        self.run_sv("once")
+        self.assert_nothing_rebooted()
+        link.mode = "grant"
+        self.set_uptime(1030)
+        self.run_sv("once")
+        self.assertEqual(self.calls("systemctl reboot"),
+                         ["systemctl reboot [last_action=reboot consecutive=1]"])
+        # The request was on disk, and the H747 held motion off for it, when
+        # systemd took the reboot; it stays on disk while the reboot is
+        # pending (tmpfs: gone with the reboot).
+        want = "aaaaaaaa-1030"
+        self.assertEqual(link.requests, [want])
+        self.assertEqual((self.fake / "request.at_reboot").read_text(encoding="utf-8").strip(), want)
+        self.assertEqual(self.request(), want)
+        log = self.sv_log()
+        self.assertLess(log.index("LOCK requested id=" + want), log.index("LOCK held id=" + want))
+        self.assertLess(log.index("LOCK held id=" + want), log.index("ACTION reboot reason=docker_down"))
+        self.assertEqual(self.state_kv("status")["tractor_idle"], "locked=" + want)
+        # The request's directory is root-only and the reset is recorded for
+        # this boot before systemd is asked.
+        self.assertEqual(stat.S_IMODE(self.req_file.parent.stat().st_mode), 0o755)
+        self.assertEqual(self.reset_file.read_text(encoding="utf-8").split(), [BOOT_A, "1030", want])
+
+    def test_tractor_reboot_is_blocked_when_the_hold_is_not_confirmed(self) -> None:
+        for mode in ("idle", "stale_lock"):
+            with self.subTest(mode=mode):
+                self.fresh()
+                self._tractor()
+                link = self.start_link(mode)
+                self.run_sv("once")
+                link.stop()
+                # Asked once, then withdrawn: the H747 must not be left
+                # holding motion off for a reboot that is not coming.
+                self.assertEqual(link.requests, ["aaaaaaaa-1000"])
+                self.assert_nothing_rebooted()
+                log = self.sv_log()
+                self.assertIn("BLOCKED reboot gate=tractor_lock", log)
+                self.assertIn("LOCK withdrawn (not granted: no_lock:state=", log)
+                status = self.state_kv("status")
+                self.assertEqual(status["reboot_blocked"], "tractor_lock")
+                self.assertIn("reboot_blocked:tractor_lock", status["decision"])
+                if mode == "stale_lock":
+                    # A hold for some other request reads as idle, never as
+                    # ours; the other id is not logged.
+                    self.assertIn("state=locked:other_id", status["tractor_idle"])
+                    self.assertNotIn(_FakeLink.STALE_ID, self.sv_log())
+                self.assertFalse(self.reset_file.exists())
+
+    def test_tractor_malformed_hold_from_a_live_link_is_not_a_hold(self) -> None:
+        # Copilot review on #156: once the link was seen live, a later
+        # "locked BAD<n>! <id>" (malformed <seq>, our id) passed the hold
+        # probe.
+        self._tractor()
+        link = self.start_link("grant_late_badseq")
+        self.run_sv("once")
+        link.stop()
+        self.assertEqual(link.requests, ["aaaaaaaa-1000"])
+        self.assert_nothing_rebooted()
+        log = self.sv_log()
+        self.assertIn("BLOCKED reboot gate=tractor_lock (state=invalid)", log)
+        self.assertIn("LOCK withdrawn (not granted: state=invalid)", log)
+        self.assertFalse(self.reset_file.exists())
+
+    def test_tractor_disarmed_probes_idle_but_never_asks_for_the_hold(self) -> None:
+        self._tractor()
+        self.armed.unlink()
+        link = self.start_link("grant")
+        self.run_sv("once")
+        self.assertEqual(link.requests, [])
+        self.assertIsNone(self.request())
+        self.assertIn("WOULD reboot reason=docker_down", self.sv_log())
+        self.assertIn("the H747 reports idle", self.sv_log())
+        link.mode = "busy"
+        self.set_uptime(1030)
+        self.run_sv("once")
+        self.assertIn("BLOCKED reboot gate=tractor_not_idle", self.sv_log())
+        self.assertEqual(self.calls("systemctl"), [])
+
+    def test_tractor_probation_never_overrides_the_idle_gate(self) -> None:
+        self._tractor()
+        self.put_state("held", "reason=old\nconsecutive=3\ncap=3")
+        self.set_fake("fw_upgrade_available", "1")
+        self.set_fake("fw_bootlimit", "5")
+        self.set_fake("fw_bootcount", "1")
+        self.start_link("busy")
+        self.run_sv("once")
+        self.assertIn("PROBATION overrides HELD", self.sv_log())
+        self.assertIn("BLOCKED reboot gate=tractor_not_idle", self.sv_log())
+        self.assertEqual(self.calls("systemctl"), [])
+
+    def test_tractor_forced_path_needs_the_hold(self) -> None:
+        # systemd took the reboot at up=1000; at 1180 the supervisor is still
+        # alive with the fault present, so the forced path is due.
+        live_no_hold = "link is live but not holding"
+        frozen_no_hold = "does not show a hold for request"
+        cases = {
+            # link still up and holding: force.
+            "held": ("grant", None),
+            # link stopped by the shutdown with our hold as its last line:
+            # the H747 keeps the hold until it resets, so force.
+            "link_stopped": ("stop", None),
+            # link live but the H747 no longer reports our hold: never force.
+            "hold_lost": ("busy", live_no_hold),
+            "idle_no_hold": ("idle", live_no_hold),
+            # link stopped after reporting something other than our hold
+            # (2026-10-18 review: a frozen busy used to force).
+            "stopped_busy": ("stop:busy", frozen_no_hold),
+            "stopped_idle": ("stop:idle", frozen_no_hold),
+            "stopped_other": ("stop:stale_lock", frozen_no_hold),
+            # Copilot review on #156: a hold with a malformed <seq>, frozen
+            # or live (never live then: its <seq> reads as empty).
+            "stopped_badseq": ("stop:badseq_lock", frozen_no_hold),
+            "badseq": ("badseq_lock", frozen_no_hold),
+            "idle_missing": ("rm_idle", "missing:"),
+            # request file gone, link stopped with our hold as its last line:
+            # only the request check can block.
+            "request_gone": ("rm_request", "no motion-hold request at"),
+        }
+        shown = {"busy": "busy ", "idle": "idle ", "stale_lock": _FakeLink.STALE_ID,
+                 "badseq_lock": "locked BAD"}
+        for case, (what, blocked_by) in cases.items():
+            with self.subTest(case=case):
+                if hasattr(self, "link"):
+                    self.link.stop()
+                    del self.link
+                self.fresh()
+                self.sysrq.write_text("", encoding="utf-8")
+                self._accepted_reboot(ROLE="tractor", TRACTOR_REBOOT_ENABLED="1")
+                req = self.request()
+                self.assertEqual(req, "aaaaaaaa-1000")
+                if what == "stop":
+                    self.link.stop()
+                elif what.startswith("stop:"):
+                    mode = what[5:]
+                    self.link.mode = mode
+                    self.link.shows(shown[mode])
+                    self.link.stop()
+                elif what == "rm_idle":
+                    self.link.stop()
+                    self.idle_file.unlink()
+                elif what == "rm_request":
+                    self.link.stop()
+                    self.req_file.unlink()
+                else:
+                    self.link.mode = what
+                self.set_uptime(1180)
+                self.run_sv("once")
+                log = self.sv_log()
+                if blocked_by is None:
+                    self.assertEqual(self.sysrq_text(), "sub")
+                    self.assertEqual(self.calls("systemctl reboot -ff"),
+                                     ["systemctl reboot -ff [last_action=force_reboot consecutive=1]"])
+                    self.assertEqual((self.fake / "request.at_reboot_ff").read_text(encoding="utf-8").strip(), req)
+                    if what == "stop":
+                        self.assertIn("the H747 link is not live", log)
+                        self.assertIn("its last report shows the hold", log)
+                else:
+                    self.assertEqual(self.sysrq_text(), "")
+                    self.assertEqual(self.calls("systemctl reboot -ff"), [])
+                    self.assertIn("BLOCKED forced reboot gate=tractor_lock", log)
+                    self.assertIn(blocked_by, log)
+                    la = self.state_kv("last_action")
+                    self.assertEqual(la["action"], "reboot_abandoned")
+                    self.assertTrue(la["detail"].startswith("force_blocked:tractor_lock:alive_180s"), la["detail"])
+                    status = self.state_kv("status")
+                    self.assertEqual(status["reboot_blocked"], "tractor_lock")
+                    self.assertIn("force_blocked:tractor_lock", status["decision"])
+                # Forced or not, systemd accepted a reboot in this boot that
+                # can still land, so the hold stays until the reset.
+                if what == "rm_request":
+                    self.assertIsNone(self.request())
+                else:
+                    self.assertEqual(self.request(), req)
+                    self.assertIn("LOCK kept (reboot abandoned)", log)
+                self.assertNotIn("LOCK withdrawn", log)
+                self.assertFalse(self.pending_marker().exists())
+
+    def test_tractor_systemctl_failure_forces_while_the_hold_is_live(self) -> None:
+        self._tractor()
+        self.set_fake("systemctl_reboot_rc", "1")
+        self.start_link("grant")
+        self.run_sv("once")
+        self.assertEqual(self.sysrq_text(), "sub")
+        self.assertEqual((self.fake / "request.at_reboot_ff").read_text(encoding="utf-8").strip(),
+                         "aaaaaaaa-1000")
+        self.assertIn("LOCK still held id=aaaaaaaa-1000", self.sv_log())
+        # The forced path ran (sysrq s, u, b): the hold stays even though the
+        # fakes let it return.
+        self.assertEqual(self.request(), "aaaaaaaa-1000")
+        self.assertIn("LOCK kept (reboot abandoned)", self.sv_log())
+        self.assertTrue(self.reset_file.exists())
+
+    def test_tractor_systemctl_failure_with_the_hold_gone(self) -> None:
+        # The H747 drops the hold as systemd is asked, and `systemctl reboot`
+        # fails. rc 1, or 125-127 (timeout or exec failed): systemd queued
+        # nothing, so the request is withdrawn. rc 124 (timeout) or 128 and
+        # above (only the systemctl child killed by a signal, e.g. the OOM
+        # killer's SIGKILL, 137; a unit stop or watchdog kill takes this sh
+        # down too): the reboot may still be queued, so it stays.
+        for rc, kept in (("1", False), ("124", True), ("125", False), ("127", False),
+                         ("128", True), ("137", True), ("143", True)):
+            with self.subTest(rc=rc):
+                self.fresh()
+                self._tractor()
+                self.set_fake("systemctl_reboot_rc", rc)
+                self.set_fake("on_reboot_link_mode", "busy")
+                link = self.start_link("grant")
+                self.run_sv("once")
+                link.stop()
+                log = self.sv_log()
+                self.assertEqual(self.sysrq_text(), "")
+                self.assertEqual(self.calls("systemctl reboot -ff"), [])
+                self.assertIn("link is live but not holding", log)
+                self.assertEqual(self.state_kv("last_action")["action"], "reboot_abandoned")
+                if kept:
+                    self.assertEqual(self.request(), "aaaaaaaa-1000")
+                    self.assertIn("LOCK kept (reboot abandoned)", log)
+                    self.assertTrue(self.reset_file.exists())
+                else:
+                    self.assertIsNone(self.request())
+                    self.assertIn("LOCK withdrawn (reboot abandoned)", log)
+                    self.assertFalse(self.reset_file.exists())
+
+    def test_tractor_forced_path_rechecks_the_hold_after_its_record(self) -> None:
+        # Copilot review on #156: the forced path checked the hold, then
+        # wrote its record (syncs, up to 20 s) and reset without looking
+        # again. A reboot cancelled by hand, or a hold dropped, meanwhile
+        # must stop it.
+        for hook, why in (("on_sync_rm_request", "request_gone_or_changed"),
+                          ("on_sync_link_busy", "no_lock:state=busy")):
+            with self.subTest(hook=hook):
+                if hasattr(self, "link"):
+                    self.link.stop()
+                    del self.link
+                self.fresh()
+                self.sysrq.write_text("", encoding="utf-8")
+                self._accepted_reboot(ROLE="tractor", TRACTOR_REBOOT_ENABLED="1")
+                self.set_fake("on_sync_only_for", "force_reboot")
+                self.set_fake(hook, "1")
+                self.set_uptime(1180)
+                self.run_sv("once")
+                log = self.sv_log()
+                self.assertIn("LOCK still held id=aaaaaaaa-1000", log)
+                self.assertIn(f"BLOCKED forced reboot gate=tractor_lock ({why}) before the forced reset", log)
+                self.assertNotIn("ACTION force_reboot reason=", log)
+                self.assertEqual(self.sysrq_text(), "")
+                self.assertEqual(self.calls("systemctl reboot -ff"), [])
+                la = self.state_kv("last_action")
+                self.assertEqual(la["action"], "reboot_abandoned")
+                self.assertTrue(la["detail"].startswith("force_blocked:tractor_lock_lost:alive_180s"), la["detail"])
+                status = self.state_kv("status")
+                self.assertEqual(status["reboot_blocked"], "tractor_lock")
+                self.assertIn("force_blocked:tractor_lock_lost", status["decision"])
+                self.assertFalse(self.pending_marker().exists())
+                if hook == "on_sync_rm_request":
+                    self.assertIsNone(self.request())
+                else:
+                    # The reboot systemd accepted can still land: keep the hold.
+                    self.assertEqual(self.request(), "aaaaaaaa-1000")
+                    self.assertIn("LOCK kept (reboot abandoned)", log)
+
+    def test_tractor_forced_path_rechecks_the_hold_before_sysrq_u(self) -> None:
+        # Copilot review on #156: the sysrq settles (SYSRQ_SETTLE_S each, up
+        # to 10 s) come between the checks and the reset. The last look is
+        # after the s settle and before u: u remounts the disks read-only and
+        # cannot be undone, so after it the path goes on to b (follow-up
+        # review). Real 1 s settles here.
+        cases = {
+            # lost late in the s settle (after any look made right after s)
+            "request_removed": ("s", "request_gone_or_changed"),
+            "hold_dropped": ("s", "no_lock:state=busy"),
+            # lost after u: too late to stop, the reset goes ahead
+            "removed_after_u": ("su", None),
+        }
+        for case, (trigger, why) in cases.items():
+            with self.subTest(case=case):
+                if hasattr(self, "link"):
+                    self.link.stop()
+                    del self.link
+                self.fresh()
+                self.sysrq.write_text("", encoding="utf-8")
+                self._accepted_reboot(ROLE="tractor", TRACTOR_REBOOT_ENABLED="1",
+                                      SYSRQ_SETTLE_S="1")
+                done = threading.Event()
+
+                def cancel(trigger: str = trigger, case: str = case) -> None:
+                    while not done.is_set():
+                        if self.sysrq.read_text(encoding="utf-8") == trigger:
+                            time.sleep(0.3)
+                            if case == "hold_dropped":
+                                self.link.mode = "busy"
+                            else:
+                                self.req_file.unlink(missing_ok=True)
+                            return
+                        time.sleep(0.005)
+
+                watcher = threading.Thread(target=cancel, daemon=True)
+                watcher.start()
+                self.set_uptime(1180)
+                try:
+                    self.run_sv("once")
+                finally:
+                    done.set()
+                    watcher.join(timeout=10)
+                log = self.sv_log()
+                self.assertIn("ACTION force_reboot reason=", log)
+                if why is None:
+                    self.assertEqual(self.sysrq_text(), "sub")
+                    self.assertEqual(len(self.calls("systemctl reboot -ff")), 1)
+                    self.assertNotIn("BLOCKED forced reboot", log)
+                    # The removal after u really landed, before the reset.
+                    self.assertIsNone(self.request())
+                    self.assertFalse((self.fake / "request.at_reboot_ff").exists())
+                    continue
+                self.assertEqual(self.sysrq_text(), "s")
+                self.assertIn(f"gate=tractor_lock ({why}) before sysrq u: the motion hold for request "
+                              "aaaaaaaa-1000 is no longer shown", log)
+                self.assertEqual(self.calls("systemctl reboot -ff"), [])
+                la = self.state_kv("last_action")
+                self.assertEqual(la["action"], "reboot_abandoned")
+                self.assertTrue(la["detail"].startswith("force_blocked:tractor_lock_lost:"), la["detail"])
+                self.assertIn("last_action rewritten", log)
+                if case == "request_removed":
+                    self.assertIsNone(self.request())
+                else:
+                    # systemd accepted a reboot at up=1000 that can still land.
+                    self.assertEqual(self.request(), "aaaaaaaa-1000")
+                    self.assertIn("LOCK kept (reboot abandoned)", log)
+
+    def test_tractor_forced_path_without_sysrq_looks_before_reboot_ff(self) -> None:
+        # Follow-up review: `systemctl reboot -ff` syncs before it resets, so
+        # without a sysrq file the path syncs first and looks once more.
+        # Also when the sysrq file exists but cannot be written (u did not
+        # happen, so the disks are still writable and it may still give up).
+        for hook, why, unwritable in (("on_sync_rm_request", "request_gone_or_changed", False),
+                                      ("on_sync_link_busy", "no_lock:state=busy", False),
+                                      (None, None, False),
+                                      ("on_sync_link_busy", "no_lock:state=busy", True)):
+            with self.subTest(hook=hook, unwritable=unwritable):
+                if hasattr(self, "link"):
+                    self.link.stop()
+                    del self.link
+                self.fresh()
+                self._accepted_reboot(ROLE="tractor", TRACTOR_REBOOT_ENABLED="1")
+                self.sysrq.unlink()
+                needle = "skipping sysrq"
+                if unwritable:
+                    self.sysrq.mkdir()
+                    self.addCleanup(lambda: self.sysrq.is_dir() and self.sysrq.rmdir())
+                    needle = "still alive after sysrq b"
+                if hook is not None:
+                    self.set_fake("on_sync_after_log", needle)
+                    self.set_fake(hook, "1")
+                self.set_uptime(1180)
+                self.run_sv("once")
+                log = self.sv_log()
+                if unwritable:
+                    self.sysrq.rmdir()
+                    # sysrq_write logs the s and b failures itself; u's (quiet)
+                    # failure is logged once, by force_reboot, after b.
+                    self.assertIn("SYSRQ write 's' to", log)
+                    self.assertIn("SYSRQ write 'b' to", log)
+                    self.assertEqual(log.count("SYSRQ write 'u' to"), 1)
+                    self.assertLess(log.index("SYSRQ write 'b' to"), log.index("SYSRQ write 'u' to"))
+                else:
+                    self.assertIn("missing, skipping sysrq", log)
+                self.assertFalse(self.sysrq.exists())
+                if why is None:
+                    self.assertEqual(len(self.calls("systemctl reboot -ff")), 1)
+                    self.assertEqual((self.fake / "request.at_reboot_ff").read_text(encoding="utf-8").strip(),
+                                     "aaaaaaaa-1000")
+                    continue
+                self.assertIn(f"gate=tractor_lock ({why}) before systemctl reboot -ff", log)
+                self.assertEqual(self.calls("systemctl reboot -ff"), [])
+                self.assertEqual(self.state_kv("last_action")["action"], "reboot_abandoned")
+                if hook == "on_sync_rm_request":
+                    self.assertIsNone(self.request())
+                else:
+                    self.assertEqual(self.request(), "aaaaaaaa-1000")
+
+    def test_abandon_says_when_last_action_cannot_be_rewritten(self) -> None:
+        # Follow-up review: the log claimed "last_action rewritten" even when
+        # the write failed.
+        self._accepted_reboot()
+        (self.state / "last_action.tmp").mkdir()
+        self.set_docker_info_rc(0)
+        self.set_uptime(1180)
+        self.run_sv("once")
+        log = self.sv_log()
+        self.assertIn("ERROR last_action could not be rewritten", log)
+        self.assertNotIn("last_action rewritten", log)
+        self.assertEqual(self.state_kv("last_action")["action"], "reboot")
+
+    def test_tractor_forced_path_refuses_without_its_reset_record(self) -> None:
+        # Copilot review on #156: after a `systemctl reboot` that failed
+        # outright, the forced path's own record is the only one; if it
+        # cannot be written, a restart could withdraw the request during the
+        # reset, so the forced path is refused, as the rung is.
+        self._tractor()
+        self.set_fake("systemctl_reboot_rc", "1")
+        self.set_fake("on_reboot_block_reset_record", "1")
+        link = self.start_link("grant")
+        self.run_sv("once")
+        log = self.sv_log()
+        self.assertIn("REFUSED forced reboot: cannot write", log)
+        # The record is written after s (a sync), right before the last look.
+        self.assertEqual(self.sysrq_text(), "s")
+        self.assertEqual(self.calls("systemctl reboot -ff"), [])
+        la = self.state_kv("last_action")
+        self.assertEqual((la["action"], la["detail"]),
+                         ("reboot_abandoned", "force_refused:reset_marker:systemctl_reboot_rc_1"))
+        self.assertIn("force_refused:reset_marker", self.state_kv("status")["decision"])
+        self.assertIsNone(self.request())
+        self.assertFalse(self.reset_file.exists())
+        # A restarted supervisor, the fault gone: nothing left to reset.
+        self.set_docker_info_rc(0)
+        self.set_uptime(1030)
+        self.run_sv("once")
+        link.stop()
+        self.assertIsNone(self.request())
+        self.assertEqual(self.sysrq_text(), "s")
+        self.assertEqual(self.calls("systemctl reboot -ff"), [])
+
+    def test_tractor_forced_path_records_its_reset_before_sending_it(self) -> None:
+        # After a `systemctl reboot` that failed outright, the forced path
+        # writes its own record right before its last look, so it stands
+        # when u, b and `reboot -ff` are sent: with sysrq, without, and when
+        # the sysrq writes fail (the record is dropped after b and written
+        # again before `reboot -ff`), and when only b fails (u was written,
+        # so the record stays).
+        def fail_b_after_u() -> None:
+            deadline = time.monotonic() + 20
+            while time.monotonic() < deadline:
+                if self.sysrq.is_file() and self.sysrq_text() == "su":
+                    self.sysrq.unlink()
+                    self.sysrq.mkdir()
+                    return
+                time.sleep(0.005)
+
+        self.set_fake("log_sleep", "1")
+        for sysrq in ("ok", "missing", "unwritable", "b_fails"):
+            with self.subTest(sysrq=sysrq):
+                self.fresh()
+                settle = sysrq in ("unwritable", "b_fails")
+                self._tractor(SYSRQ_SETTLE_S="1" if settle else "0")
+                if sysrq in ("missing", "unwritable"):
+                    self.sysrq.unlink()
+                if sysrq == "unwritable":
+                    self.sysrq.mkdir()
+                self.set_fake("systemctl_reboot_rc", "1")
+                link = self.start_link("grant")
+                swapper = threading.Thread(target=fail_b_after_u)
+                if sysrq == "b_fails":
+                    swapper.start()
+                try:
+                    self.run_sv("once")
+                finally:
+                    link.stop()
+                    if swapper.is_alive() or sysrq == "b_fails":
+                        swapper.join()
+                    if self.sysrq.is_dir():
+                        self.sysrq.rmdir()
+                if settle:
+                    self.assertIn("SYSRQ write 'b' to", self.sv_log())
+                    # The s settle, and the u settle only once u was written
+                    # (a failed u has no remount to wait for: b at once).
+                    settles = [ln for ln in self.fake_lines() if ln == "sleep 1"]
+                    self.assertEqual(len(settles), 2 if sysrq == "b_fails" else 1)
+                self.assertEqual(self.sysrq_text(), "sub" if sysrq == "ok" else "")
+                self.assertEqual(len(self.calls("systemctl reboot -ff")), 1)
+                self.assertEqual(
+                    (self.fake / "reset_issued.at_reboot_ff").read_text(encoding="utf-8").strip(),
+                    f"{BOOT_A} 1000 aaaaaaaa-1000")
+                self.assertEqual(self.request(), "aaaaaaaa-1000")
+
+    def test_tractor_forced_path_killed_before_its_reset_leaves_no_record(self) -> None:
+        # 2026-10-18 review: the forced path wrote its reset record before
+        # its last_action syncs and settles, so a supervisor killed outright
+        # there (the unit watchdog's SIGABRT on a hung sync, a SIGKILL) left
+        # a record for this boot with no reset sent, and the restarted one
+        # kept the request: motion held for the rest of the boot. Also in the
+        # sync before `reboot -ff` after the sysrq writes failed (nothing
+        # sent, so the record is dropped after b), unless a timed-out
+        # `systemctl reboot` (rc 124) may still land: then it stays.
+        cases = (("record_syncs", "1", False), ("after_failed_sysrq", "1", False),
+                 ("after_failed_sysrq", "124", True))
+        runs = [(case, sig) for case in cases for sig in (signal.SIGKILL, signal.SIGABRT)]
+        for (where, rc, kept), sig in runs:
+            with self.subTest(where=where, rc=rc, sig=sig.name):
+                self.fresh()
+                if where == "record_syncs":
+                    self._tractor()
+                    self.set_fake("on_sync_only_for", "force_reboot")
+                else:
+                    self._tractor(SYSRQ_SETTLE_S="1")
+                    self.sysrq.unlink()
+                    self.sysrq.mkdir()
+                    self.set_fake("on_sync_after_log", "still alive after sysrq b")
+                self.set_fake("systemctl_reboot_rc", rc)
+                self.set_fake("on_sync_hang", "1")
+                link = self.start_link("grant")
+                try:
+                    self.start_run()
+                    self.wait_for(lambda: (self.fake / "sync_hanging").exists(), "the hung sync")
+                    os.kill(self.run_proc.pid, sig)
+                    self.run_proc.wait(timeout=30)
+                    self.assertEqual(self.run_proc.returncode, -sig)
+                    self.assertEqual(self.request(), "aaaaaaaa-1000")
+                    self.assertEqual(self.reset_file.exists(), kept)
+                    # Restarted (Restart=on-failure), the fault gone.
+                    self.set_docker_info_rc(0)
+                    self.set_uptime(1300)
+                    self.run_sv("once")
+                finally:
+                    link.stop()
+                    if self.sysrq.is_dir():
+                        self.sysrq.rmdir()
+                if kept:
+                    self.assertEqual(self.request(), "aaaaaaaa-1000")
+                    self.assertIn("LOCK kept (left from an earlier run with no pending reboot)",
+                                  self.sv_log())
+                else:
+                    self.assertIsNone(self.request())
+                    self.assertIn("LOCK withdrawn (left from an earlier run with no pending reboot)",
+                                  self.sv_log())
+                self.assertEqual(self.sysrq_text(), "")
+                self.assertEqual(self.calls("systemctl reboot -ff"), [])
+
+    def test_tractor_forced_path_after_an_accepted_reboot_keeps_its_old_record(self) -> None:
+        # The other side: systemd took a reboot earlier in this boot and its
+        # record stands, so a failed rewrite does not stop the forced path.
+        self._accepted_reboot(ROLE="tractor", TRACTOR_REBOOT_ENABLED="1")
+        (self.req_file.parent / "reset_issued.tmp").mkdir()
+        self.set_uptime(1180)
+        self.run_sv("once")
+        log = self.sv_log()
+        self.assertIn("ERROR cannot rewrite", log)
+        self.assertNotIn("REFUSED forced reboot", log)
+        self.assertEqual(self.sysrq_text(), "sub")
+        self.assertEqual(self.request(), "aaaaaaaa-1000")
+        self.assertTrue(self.reset_file.exists())
+
+    def _dd_hangs_once_after_the_reset_record(self) -> None:
+        """A dd that stalls once, after the reset record is written: the
+        rung's last look, between the record and `systemctl reboot`."""
+        self._dd_hangs_once_when('[ -f "${FAKE_REQ%/*}/reset_issued" ]')
+
+    def _dd_hangs_once_when(self, cond: str) -> None:
+        """A dd (the idle file read in each look) that stalls once, the
+        first time the shell test COND holds."""
+        wrapper = self.bin / "dd"
+        wrapper.write_text(
+            "#!/bin/sh\n"
+            f'if [ -f "$FAKE_DIR/on_dd_hang" ] && {{ {cond}; }}; then\n'
+            '  rm -f "$FAKE_DIR/on_dd_hang"\n'
+            '  : > "$FAKE_DIR/dd_hanging"\n'
+            "  sleep 1\n"
+            "fi\n"
+            f'exec "{self.tools / "dd"}" "$@"\n', encoding="utf-8")
+        wrapper.chmod(0o755)
+        self.addCleanup(wrapper.unlink, missing_ok=True)
+        self.set_fake("on_dd_hang", "1")
+
+    def test_tractor_stop_withdraws_a_request_with_no_reset_behind_it(self) -> None:
+        # Copilot review on #156: a service stopped between writing the
+        # request and sending the reset left the request behind, and an
+        # explicit stop does not restart the service, so the H747 kept
+        # motion off with no reboot coming. Stopped once a reset is sent
+        # (the shutdown of the reboot it asked for), it keeps the request.
+        # (mode, fake files, conf, ready, kept, sysrq written, systemctl calls)
+        rc1 = {"systemctl_reboot_rc": "1"}
+        cases = {
+            # waiting for the H747 to take the hold
+            "handshake": ("idle", {}, {}, lambda: self.req_file.exists(), False, "", 0),
+            # writing the records after the hold
+            "records": ("grant", {"on_sync_only_for": "reboot", "on_sync_hang": "1"}, {},
+                        lambda: (self.fake / "sync_hanging").exists(), False, "", 0),
+            # reset record written, last look running, systemctl not called
+            "last_look": ("grant", {}, {}, lambda: (self.fake / "dd_hanging").exists(),
+                          False, "", 0),
+            # forced path after a failed `systemctl reboot` (nothing queued):
+            # still writing last_action (its reset record comes later)
+            "forced_record": ("grant", {**rc1, "on_sync_only_for": "force_reboot", "on_sync_hang": "1"},
+                              {}, lambda: (self.fake / "sync_hanging").exists(), False, "", 1),
+            # ... or at its last look before u, its reset record written
+            "forced_look": ("grant", rc1, {}, lambda: (self.fake / "dd_hanging").exists(),
+                            False, "s", 1),
+            # 2026-10-18 review: with an earlier reset standing (a timed-out
+            # `systemctl reboot` may still land), the same stop keeps it ...
+            "forced_look_after_timeout": ("grant", {"systemctl_reboot_rc": "124"}, {},
+                                          lambda: (self.fake / "dd_hanging").exists(), True, "s", 1),
+            # ... as does a stop at the rung's last look after a reset
+            # recorded earlier in this boot (abandoned since)
+            "last_look_after_earlier": ("grant", {}, {}, lambda: (self.fake / "dd_hanging").exists(),
+                                        True, "", 0),
+            # ... or in the sysrq s settle, before u
+            "forced_settle": ("grant", rc1, {"SYSRQ_SETTLE_S": "5"},
+                              lambda: self.sysrq_text() == "s", False, "s", 1),
+            # ... or in the sync before `reboot -ff` after failed sysrq
+            # writes (the disks still writable)
+            "forced_failed_u": ("grant", {**rc1, "on_sync_after_log": "still alive after sysrq b",
+                                          "on_sync_hang": "1"}, {},
+                                lambda: (self.fake / "sync_hanging").exists(), False, "", 1),
+            # in the settle after u (Copilot review on #156): u cannot be
+            # undone, so the stop waits for b and `reboot -ff`, and keeps it
+            "forced_after_u": ("grant", rc1, {"SYSRQ_SETTLE_S": "3"},
+                               lambda: self.sysrq_text() == "su", True, "sub", 2),
+            # while systemd is being asked
+            "asking_systemd": ("grant", {"on_reboot_hang": "1"}, {},
+                               lambda: (self.fake / "reboot_hanging").exists(), True, "", 1),
+            # after systemd took the reboot
+            "accepted": ("grant", {}, {}, lambda: self.pending_marker().exists(), True, "", 1),
+            # after the forced path sent its resets and (the fakes) returned
+            "forced_returned": ("grant", rc1, {},
+                                lambda: "LOCK kept (reboot abandoned)" in self.sv_log(), True, "sub", 2),
+        }
+        runs = [(case, signal.SIGTERM) for case in cases]
+        runs += [(case, sig) for case in ("handshake", "accepted")
+                 for sig in (signal.SIGINT, signal.SIGHUP)]
+        for case, sig in runs:
+            mode, fakes, conf, ready, kept, sysrq, n_systemctl = cases[case]
+            with self.subTest(case=case, sig=sig.name):
+                self.fresh()
+                # A stop that lands while the shell forks a child is spent
+                # in the child before it execs, so the shell waits that
+                # child out: keep the loop's sleep (30 s by default) short.
+                self._tractor(TRACTOR_IDLE_WAIT_S="15", CHECK_INTERVAL_S="5", **conf)
+                for name, value in fakes.items():
+                    self.set_fake(name, value)
+                if case == "last_look":
+                    self._dd_hangs_once_after_the_reset_record()
+                if case in ("forced_look", "forced_look_after_timeout"):
+                    # after s: the forced path's look before u
+                    self._dd_hangs_once_when('[ -s "$LIFETRAC_SYSRQ" ]')
+                if case == "last_look_after_earlier":
+                    self.req_file.parent.mkdir(parents=True, exist_ok=True)
+                    self.req_file.write_text("aaaaaaaa-900\n", encoding="utf-8")
+                    self.reset_file.write_text(f"{BOOT_A} 900 aaaaaaaa-900\n", encoding="utf-8")
+                    # once the rung has recorded its own reset
+                    self._dd_hangs_once_when(
+                        'r=; read -r r < "${FAKE_REQ%/*}/reset_issued"; [ "${r##*-}" = 1000 ]')
+                if case == "forced_failed_u":
+                    self.sysrq.unlink()
+                    self.sysrq.mkdir()
+                link = self.start_link(mode)
+                try:
+                    self.start_run()
+                    self.wait_for(ready, case)
+                    self.stop_run(sig)
+                finally:
+                    link.stop()
+                    (self.bin / "dd").unlink(missing_ok=True)
+                    if self.sysrq.is_dir():
+                        self.sysrq.rmdir()
+                self.assertEqual(self.run_proc.returncode, -sig)
+                log = self.sv_log()
+                if case == "forced_after_u":
+                    self.assertIn(f"STOP {sig.name} was held from sysrq u until now", log)
+                    self.assertLess(log.index("still alive after systemctl reboot -ff"),
+                                    log.index(f"STOP {sig.name} was held"))
+                else:
+                    self.assertNotIn("was held from sysrq u", log)
+                self.assertEqual(self.sysrq_text(), sysrq)
+                self.assertEqual(len(self.calls("systemctl reboot -ff")), 1 if sysrq == "sub" else 0)
+                self.assertEqual(len(self.calls("systemctl")), n_systemctl)
+                if kept:
+                    self.assertEqual(self.request(), "aaaaaaaa-1000")
+                    self.assertIn(f"LOCK kept (supervisor stopped by {sig.name})", log)
+                else:
+                    self.assertIsNone(self.request())
+                    self.assertIn(f"LOCK withdrawn (supervisor stopped by {sig.name})", log)
+                    self.assertFalse(self.reset_file.exists())
+
+    def test_tractor_forced_path_giving_up_withdraws_when_nothing_was_issued(self) -> None:
+        # Follow-up review: after a `systemctl reboot` that failed outright
+        # (rc 1, nothing queued) the forced path marks its own reset; if it
+        # then gives up before that reset, the mark must not keep the request
+        # for the rest of the boot. A timed-out one (rc 124) may still land,
+        # so then it stays.
+        for rc, sysrq, kept in (("1", True, False), ("1", False, False), ("124", True, True)):
+            with self.subTest(rc=rc, sysrq=sysrq):
+                self.fresh()
+                self._tractor()
+                if not sysrq:
+                    self.sysrq.unlink()
+                    self.set_fake("on_sync_after_log", "skipping sysrq")
+                else:
+                    self.set_fake("on_sync_only_for", "force_reboot")
+                self.set_fake("systemctl_reboot_rc", rc)
+                self.set_fake("on_sync_link_busy", "1")
+                link = self.start_link("grant")
+                self.run_sv("once")
+                link.stop()
+                log = self.sv_log()
+                self.assertIn("LOCK still held id=aaaaaaaa-1000", log)
+                self.assertIn("BLOCKED forced reboot gate=tractor_lock (no_lock:state=busy)", log)
+                self.assertEqual(self.sysrq_text(), "")
+                self.assertEqual(self.calls("systemctl reboot -ff"), [])
+                if kept:
+                    self.assertEqual(self.request(), "aaaaaaaa-1000")
+                    self.assertTrue(self.reset_file.exists())
+                    self.assertIn("LOCK kept (reboot abandoned)", log)
+                else:
+                    self.assertIsNone(self.request())
+                    self.assertFalse(self.reset_file.exists())
+                    self.assertIn("LOCK withdrawn (reboot abandoned)", log)
+
+    def test_tractor_forced_path_whose_reboot_ff_fails_withdraws_when_nothing_was_sent(self) -> None:
+        # Copilot review on #156: after a `systemctl reboot` that failed
+        # outright (rc 1), with no sysrq file or with its writes failing,
+        # `systemctl reboot -ff` that fails too (its own error, or it never
+        # ran: 126, 127) sent nothing, so the forced path's record must not
+        # keep the request. Kept when `reboot -ff` may still reset (0, a
+        # timeout, a signal), when `u` was written (the disks are read-only)
+        # or when an earlier reset in this boot may still land (rc 124).
+        cases = (
+            # (first rc, sysrq, -ff rc, kept)
+            ("1", "missing", "1", False),
+            ("1", "missing", "127", False),
+            ("1", "unwritable", "1", False),
+            ("1", "missing", "0", True),
+            ("1", "missing", "124", True),
+            ("1", "missing", "143", True),
+            ("1", "ok", "1", True),
+            ("124", "missing", "1", True),
+        )
+        for rc, sysrq, ff_rc, kept in cases:
+            with self.subTest(rc=rc, sysrq=sysrq, ff_rc=ff_rc):
+                self.fresh()
+                self._tractor()
+                if sysrq != "ok":
+                    self.sysrq.unlink()
+                if sysrq == "unwritable":
+                    self.sysrq.mkdir()
+                self.set_fake("systemctl_reboot_rc", rc)
+                self.set_fake("systemctl_reboot_ff_rc", ff_rc)
+                link = self.start_link("grant")
+                try:
+                    self.run_sv("once")
+                finally:
+                    link.stop()
+                    if self.sysrq.is_dir():
+                        self.sysrq.rmdir()
+                log = self.sv_log()
+                self.assertEqual(len(self.calls("systemctl reboot -ff")), 1)
+                self.assertEqual((self.fake / "request.at_reboot_ff").read_text(encoding="utf-8").strip(),
+                                 "aaaaaaaa-1000")
+                self.assertIn(f"still alive after systemctl reboot -ff rc={ff_rc}", log)
+                self.assertEqual(self.sysrq_text(), "sub" if sysrq == "ok" else "")
+                self.assertEqual(self.state_kv("last_action")["action"], "reboot_abandoned")
+                if kept:
+                    self.assertEqual(self.request(), "aaaaaaaa-1000")
+                    self.assertTrue(self.reset_file.exists())
+                    self.assertIn("LOCK kept (reboot abandoned)", log)
+                else:
+                    self.assertIsNone(self.request())
+                    self.assertFalse(self.reset_file.exists())
+                    self.assertIn("LOCK withdrawn (reboot abandoned)", log)
+                    # A restarted supervisor does not bring the hold back.
+                    self.run_sv("once", extra={"LIFETRAC_TRACTOR_IDLE_FILE": str(self.root / "no_link")})
+                    self.assertIsNone(self.request())
+
+    def test_tractor_rechecks_the_hold_right_before_systemctl(self) -> None:
+        # The records written after the hold can take a minute; if the
+        # request goes or the H747 drops the hold meanwhile, no reboot
+        # (2026-10-18 review: a second instance's start could withdraw it).
+        for hook, why in (("on_sync_rm_request", "request_gone_or_changed"),
+                          ("on_sync_link_busy", "no_lock:state=busy"),
+                          ("on_sync_link_stale_lock", "no_lock:state=locked:other_id"),
+                          # Copilot review on #156: a hold with a malformed
+                          # <seq> is not a hold.
+                          ("on_sync_link_badseq_lock", "no_lock:state=invalid")):
+            with self.subTest(hook=hook):
+                self.fresh()
+                self._tractor()
+                self.set_fake(hook, "1")
+                link = self.start_link("grant")
+                self.run_sv("once")
+                link.stop()
+                log = self.sv_log()
+                self.assertEqual(self.calls("systemctl"), [])
+                self.assertEqual(self.sysrq_text(), "")
+                self.assertIn(f"BLOCKED reboot gate=tractor_lock ({why})", log)
+                self.assertIn("reboot_blocked:tractor_lock_lost", self.state_kv("status")["decision"])
+                self.assertEqual(self.state_kv("last_action")["action"], "reboot_abandoned")
+                self.assertFalse(self.reset_file.exists())
+                self.assertIsNone(self.request())
+                # Not a reboot, so it does not move the boot-loop cap.
+                self.assertEqual(self.counter(), "0")
+
+    def test_tractor_lost_last_looks_never_reach_held(self) -> None:
+        # 2026-10-18 second review: each lost last look used to count as a
+        # reboot, so three of them entered HELD with no reboot at all.
+        self._tractor()
+        self.set_fake("on_sync_link_busy", "1")
+        link = self.start_link("grant")
+        for up in (1000, 1030, 1060, 1090, 1120):
+            # Through the mode file, not link.mode: the link thread may have
+            # read the file's old "busy" just before, and would set it back.
+            self.set_fake("link_mode", "grant")
+            link.shows("idle ")
+            self.set_uptime(up)
+            self.run_sv("once")
+        self.assertIsNone(self.state_text("held"))
+        self.assertEqual(self.counter(), "0")
+        self.assertEqual(self.calls("systemctl"), [])
+        self.assertEqual(self.sv_log().count("is no longer shown right before the reboot"), 5)
+
+    def test_tractor_reset_record_unwritable_refuses_the_reboot(self) -> None:
+        self._tractor()
+        self.req_file.parent.mkdir(parents=True)
+        (self.req_file.parent / "reset_issued.tmp").mkdir()
+        self.start_link("grant")
+        self.run_sv("once")
+        log = self.sv_log()
+        self.assertIn("REFUSED reboot: cannot write", log)
+        self.assertIn("LOCK withdrawn (reboot abandoned)", log)
+        self.assertIsNone(self.request())
+        self.assertEqual(self.calls("systemctl"), [])
+        self.assertEqual(self.state_kv("last_action")["detail"], "reboot_refused:reset_marker")
+        self.assertEqual(self.counter(), "0")
+
+    def test_tractor_abandoned_reboot_keeps_the_hold(self) -> None:
+        # 2026-10-18 review: an abandoned reboot used to withdraw the
+        # request, but systemd may still carry out the reboot it accepted
+        # (a stop job hangs, then the 30 min reboot-force), so the tractor
+        # could be driven again and then reset mid-work.
+        for case in ("healthy", "disarmed", "stale", "unreadable_marker"):
+            with self.subTest(case=case):
+                if hasattr(self, "link"):
+                    self.link.stop()
+                    del self.link
+                self.fresh()
+                self.set_boot(BOOT_A)
+                self._accepted_reboot(ROLE="tractor", TRACTOR_REBOOT_ENABLED="1")
+                self.assertEqual(self.request(), "aaaaaaaa-1000")
+                self.set_uptime(1100)
+                self.run_sv("once")  # inside the window: still pending, still held
+                self.assertEqual(self.request(), "aaaaaaaa-1000")
+                self.set_docker_info_rc(0)
+                up = 1180
+                if case == "disarmed":
+                    self.armed.unlink()
+                    want = "BLOCKED forced reboot gate=disarmed"
+                elif case == "stale":
+                    up, want = 1241, "PENDING marker stale"
+                elif case == "unreadable_marker":
+                    self.pending_marker().write_text("garbage x y\n", encoding="utf-8")
+                    want = "PENDING marker unreadable"
+                else:
+                    want = "no node fault now: not forcing"
+                self.set_uptime(up)
+                self.run_sv("once")
+                log = self.sv_log()
+                self.assertIn(want, log)
+                self.assertEqual(self.state_kv("last_action")["action"], "reboot_abandoned")
+                self.assertIn("LOCK kept (reboot abandoned)", log)
+                self.assertEqual(self.request(), "aaaaaaaa-1000")
+                self.assertEqual(self.sysrq_text(), "")
+                # A restarted supervisor keeps it too, for the rest of the boot.
+                self.set_uptime(5000)
+                self.run_sv("once")
+                self.assertEqual(self.request(), "aaaaaaaa-1000")
+                self.assertIn("LOCK kept (left from an earlier run", self.sv_log())
+                self.assertNotIn("LOCK withdrawn", self.sv_log())
+                if case == "unreadable_marker":
+                    self.assertEqual(self.state_kv("last_action")["detail"],
+                                     "force_skipped:pending_marker_unreadable")
+
+    def test_tractor_second_attempt_keeps_an_earlier_reset_record(self) -> None:
+        # The first reboot was accepted and then abandoned (node healthy), so
+        # it can still land. A second attempt later in the boot that fails
+        # before or at `systemctl reboot` must not clear that record or
+        # withdraw the request: one case per place the rung would otherwise
+        # clear it.
+        for case in ("last_look_lost", "systemctl_rc_1", "record_unwritable"):
+            with self.subTest(case=case):
+                if hasattr(self, "link"):
+                    self.link.stop()
+                    del self.link
+                self.fresh()
+                self.sysrq.write_text("", encoding="utf-8")
+                self._accepted_reboot(ROLE="tractor", TRACTOR_REBOOT_ENABLED="1")
+                self.set_docker_info_rc(0)
+                self.set_uptime(1180)
+                self.run_sv("once")
+                self.assertIn("LOCK kept (reboot abandoned)", self.sv_log())
+                self.set_docker_info_rc(1)
+                if case == "last_look_lost":
+                    self.set_fake("on_sync_link_busy", "1")
+                    want = "BLOCKED reboot gate=tractor_lock (no_lock:state=busy)"
+                elif case == "systemctl_rc_1":
+                    self.set_fake("systemctl_reboot_rc", "1")
+                    self.set_fake("on_reboot_link_mode", "busy")
+                    want = "link is live but not holding"
+                else:
+                    (self.req_file.parent / "reset_issued.tmp").mkdir()
+                    want = "REFUSED reboot: cannot write"
+                self.set_uptime(1210)
+                self.run_sv("once")
+                log = self.sv_log()
+                self.assertIn("LOCK requested id=aaaaaaaa-1210", log)
+                self.assertIn(want, log)
+                self.assertTrue(self.reset_file.exists())
+                self.assertEqual(self.request(), "aaaaaaaa-1210")
+                self.assertNotIn("LOCK withdrawn", log)
+                self.assertNotIn("LOCK released by hand", log)
+                self.assertEqual(self.calls("systemctl reboot -ff"), [])
+
+    def test_tractor_hold_released_by_hand_is_not_kept_again(self) -> None:
+        # The documented release (cancel the queued reboot, remove the
+        # request) makes that earlier reset no longer count, so a later
+        # attempt that is not granted withdraws its request as usual.
+        self._accepted_reboot(ROLE="tractor", TRACTOR_REBOOT_ENABLED="1")
+        self.set_docker_info_rc(0)
+        self.set_uptime(1180)
+        self.run_sv("once")
+        self.assertEqual(self.request(), "aaaaaaaa-1000")
+        self.req_file.unlink()            # by hand, after `systemctl cancel`
+        self.link.mode = "idle"           # the H747 is idle but does not grant
+        self.set_docker_info_rc(1)
+        self.set_uptime(1210)
+        self.run_sv("once")
+        log = self.sv_log()
+        self.assertIn("LOCK released by hand", log)
+        self.assertIn("LOCK withdrawn (not granted:", log)
+        self.assertIsNone(self.request())
+        self.assertFalse(self.reset_file.exists())
+        self.set_docker_info_rc(0)
+        self.set_uptime(9000)
+        self.run_sv("once")
+        self.assertIsNone(self.request())
+        self.assertEqual(len(self.calls("systemctl reboot")), 1)
+
+    def test_unreadable_pending_marker_is_abandoned(self) -> None:
+        self._accepted_reboot()
+        self.pending_marker().write_text("garbage x y\n", encoding="utf-8")
+        self.set_docker_info_rc(0)
+        self.set_uptime(1030)
+        self.run_sv("once")
+        self.assertIn("PENDING marker unreadable", self.sv_log())
+        la = self.state_kv("last_action")
+        self.assertEqual((la["action"], la["detail"]),
+                         ("reboot_abandoned", "force_skipped:pending_marker_unreadable"))
+        self.assertFalse(self.pending_marker().exists())
+
+    def test_tractor_refused_reboot_withdraws_the_request(self) -> None:
+        # A record cannot be written: no reboot, and the H747 must not be
+        # left holding motion off.
+        for tmp, why in (("consecutive_reboots.tmp", "cannot persist consecutive_reboots"),
+                         ("last_action.tmp", "cannot write last_action")):
+            with self.subTest(record=tmp):
+                self.fresh()
+                self._tractor()
+                self.state.mkdir(parents=True)
+                (self.state / tmp).mkdir()
+                link = self.start_link("grant")
+                self.run_sv("once")
+                link.stop()
+                self.assertIn(why, self.sv_log())
+                self.assertIn("LOCK withdrawn (reboot refused)", self.sv_log())
+                self.assertIsNone(self.request())
+                self.assertFalse(self.reset_file.exists())
+                self.assertEqual(self.calls("systemctl"), [])
+
+    def test_request_left_without_a_pending_reboot_is_withdrawn_at_start(self) -> None:
+        # A reset record naming another boot does not count (on the board it
+        # is on tmpfs and gone with that boot anyway).
+        for role, reset in (("tractor", None), ("base", None), ("tractor", BOOT_B)):
+            with self.subTest(role=role, reset=reset):
+                self.fresh()
+                self.write_conf(ROLE=role)
+                self.req_file.parent.mkdir(parents=True, exist_ok=True)
+                self.req_file.write_text("aaaaaaaa-900\n", encoding="utf-8")
+                if reset is not None:
+                    self.reset_file.write_text(f"{reset} 900 aaaaaaaa-900\n", encoding="utf-8")
+                self.run_sv("once")
+                self.assertIsNone(self.request())
+                self.assertIn("LOCK withdrawn (left from an earlier run with no pending reboot)",
+                              self.sv_log())
+
+    def test_request_is_kept_at_start_after_a_reset_was_issued_in_this_boot(self) -> None:
+        for content in (f"{BOOT_A} 900 aaaaaaaa-900", ""):
+            with self.subTest(content=content or "unreadable"):
+                self.fresh()
+                self.write_conf(ROLE="tractor")
+                self.req_file.parent.mkdir(parents=True, exist_ok=True)
+                self.req_file.write_text("aaaaaaaa-900\n", encoding="utf-8")
+                self.reset_file.write_text(content, encoding="utf-8")
+                self.run_sv("once")
+                self.assertEqual(self.request(), "aaaaaaaa-900")
+                self.assertIn("LOCK kept (left from an earlier run", self.sv_log())
+
+    def test_base_never_reads_the_idle_file_or_asks_for_a_hold(self) -> None:
+        self.arm()
+        self.write_conf(FAIL_THRESHOLD="1", REBOOT_GRACE_S="0")
+        self.set_docker_info_rc(1)
+        self.write_idle("busy 1")
+        self.run_sv("once")
+        self.assertEqual(len(self.calls("systemctl reboot")), 1)
+        self.assertIsNone(self.request())
+        self.assertFalse(self.req_file.parent.exists())
+        self.assertEqual(self.state_kv("status")["tractor_idle"], "not_checked")
+        self.assertNotIn("LOCK", self.sv_log())
+
+    def test_idle_wait_bounds(self) -> None:
+        for value, want in (("1", "10"), ("16", "10"), ("x", "10"), ("2", "2"), ("15", "15")):
+            with self.subTest(value=value):
+                self.fresh()
+                self._tractor(TRACTOR_IDLE_WAIT_S=value)
+                self.write_idle("idle 1")
+                self.run_sv("once")
+                self.assertIn(f"not_live:seq_unchanged_for_{want}_polls",
+                              self.state_kv("status")["tractor_idle"])
+                if want != value:
+                    self.assertIn(f"CONFIG TRACTOR_IDLE_WAIT_S='{value}' invalid", self.sv_log())
 
     def test_watchdog_notify_only_with_notify_socket(self) -> None:
         self.run_sv("once")

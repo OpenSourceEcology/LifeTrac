@@ -596,9 +596,15 @@ class WDO_D_Installer(_ScriptHarness):
         self.assertIn("stm32h7-program", r.stderr)
         for item in ("PWR-8", "PWR-9", "PWR-11"):
             self.assertIn(item, r.stderr)
+        # D-PWR1 (2026-10-18): the flag is for a revisited decision, not for
+        # "the prerequisites have landed" (review finding).
+        self.assertIn("D-PWR1", r.stderr)
+        self.assertIn("revisited", r.stderr)
+        self.assertNotIn("When they have, re-run", r.stderr)
         self._assert_nothing_written()
         r = self.installer("install", "--role", "tractor", "--i-accept-tractor-prereqs")
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("against DECISIONS.md D-PWR1", r.stdout + r.stderr)
         self.assertTrue(self._wd().exists() and self._rt().exists())
 
     def test_bench_role_needs_the_bench_marker(self) -> None:

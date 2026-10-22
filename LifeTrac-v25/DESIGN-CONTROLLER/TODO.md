@@ -4058,7 +4058,10 @@ Design, hardware facts and the five-layer plan:
 The built pieces live in [firmware/x8_recovery/](firmware/x8_recovery/README.md),
 installed nowhere and disarmed. Valve safety stays with the M4/Opta 200 ms
 watchdogs; none of this may gate it. **On the tractor every module reset is
-an engine stop**, so tractor arming waits on PWR-8, PWR-9 and PWR-11.
+an engine stop**, so tractor arming waits on PWR-8, PWR-9 and PWR-11, and
+the tractor reboots itself only when idle (Dorkmo, 2026-10-18,
+[DECISIONS.md D-PWR1](DECISIONS.md#d-pwr1--tractor-automatic-reboots-idle-only)),
+which also needs PWR-12 and PWR-13.
 
 - [ ] **PWR-1 Bench reset-reach checks** — the plan's §6 list, each with
   Dorkmo's OK and the bench power-up procedure (`power_up_guard.sh`): does
@@ -4069,7 +4072,9 @@ an engine stop**, so tractor arming waits on PWR-8, PWR-9 and PWR-11.
   do one reboot with a staged OTA deployment (gates production arming of L2
   on the base, PWR-2); PB1/PB2/J1-73 from the DT first; 18650 behaviour
   (BQ24195 REG01 first); `poweroff`/`halt` vs the 128 s re-arm; whether a
-  module-only reset clears the camera USB wedge. No RF transmit.
+  module-only reset clears the camera USB wedge; that LmP's `dd` takes
+  `iflag=nofollow,nonblock status=none` (the supervisor's idle-file read
+  fails closed without it). No RF transmit.
   Start with the new read-only `capture_board_state.sh` captures.
 - [ ] **PWR-2 systemd owns the hardware watchdog (L2)** — built:
   `x8_recovery/systemd/` drop-ins (`RuntimeWatchdogSec=30s`,
@@ -4078,8 +4083,8 @@ an engine stop**, so tractor arming waits on PWR-8, PWR-9 and PWR-11.
   reporting a false start failure. Remaining: install on the base under the
   bench opt-in and verify per PWR-1; production arming of the base only after
   PWR-1's shutdown-timing and staged-OTA reboot checks; then
-  `watchdog.open_timeout=` (X8OS-4) and a `HandlePowerKey` decision. Tractor
-  waits on PWR-8, PWR-9 and PWR-11.
+  `watchdog.open_timeout=` (X8OS-4) and a `HandlePowerKey` decision. Not on
+  the tractor (D-PWR1: a watchdog reset cannot wait for idle).
 - [ ] **PWR-3 Container health status (L1)** — built: compose healthchecks on
   mosquitto (base, tractor) and web_ui (base), and a tractor
   `mosquitto.conf` with a non-loopback listener. Remaining: radio daemons
@@ -4092,9 +4097,11 @@ an engine stop**, so tractor arming waits on PWR-8, PWR-9 and PWR-11.
   container restart → `systemctl reboot` → sysrq `s`,`u`,`b`; uptime-based
   boot-loop cap with HELD state, OTA probation, reset-reason record, tractor
   reboots off. Remaining: install path in provisioning, merge with
-  OTA_STRATEGY's `lifetrac-health`, publish the reset reason, the tractor
-  reboot decision, and PWR-7 before arming any production node (arming arms
-  the forced-reboot rung, which has no switch of its own).
+  OTA_STRATEGY's `lifetrac-health`, publish the reset reason, and PWR-7
+  before arming any production node (arming arms the forced-reboot rung,
+  which has no switch of its own). Tractor reboot decision made (D-PWR1):
+  the supervisor's idle gate and H747 motion-hold handshake are built and
+  SIL-tested; they block every tractor reboot until PWR-13 exists.
 - [ ] **PWR-5 Independent hard power cycle (L4)** — decide where it lives
   (recommended: standalone node-watchdog board; alternative: Opta R4 or
   D1608S channel 7) against the plan's seven requirements: trigger from a
@@ -4134,6 +4141,50 @@ an engine stop**, so tractor arming waits on PWR-8, PWR-9 and PWR-11.
   assume the node comes back; the self-holding relay drops whenever the H747
   resets and must survive it; the 18650 reaches +5V only in BQ24195 boost
   mode.
+- [ ] **PWR-13 Tractor idle signal and motion hold (D-PWR1)** — the other end
+  of the supervisor's idle gate (contract in the header of
+  `firmware/x8_recovery/lifetrac-supervisor.sh` and the plan's L3 guards):
+  a link service on the tractor X8, part of the Linux↔H747 link X8OS-3
+  picks, writes `/run/lifetrac/tractor_idle` (`busy|idle <seq>`, or
+  `locked <seq> <id>`, all from one H747 frame) at least once a second
+  from the H747's own status frames, and mirrors
+  `/run/lifetrac-supervisor/tractor_reboot_request` to the H747. The link is
+  a host systemd unit with no dependency on `docker.service`; its directory
+  comes from a tmpfiles.d entry it owns; it only reads the request and
+  never creates, deletes or owns the request's directory (no
+  `RuntimeDirectory=` there); on stop it leaves its last line in place.
+  M7 firmware: "engine stopped" needs an engine-running signal (RPM, oil
+  pressure or alternator), not the Opta's ignition sense I1 alone, and
+  until PWR-12 makes the key-off hold survive an H747 reset the H747
+  reports busy while I1 is low or a `SHUTDOWN_REQ` is in progress; report
+  idle only with every valve output off for a settling time; on a request
+  while idle, latch a motion hold that refuses every motion command, keep
+  it while busy, re-latch it for a new request id, and release it only
+  when the H747 resets or the link reports no request (no timeout: a
+  stopped tractor that waits for a person is the safe side); show the
+  operator that the X8 is rebooting. Also turn off LmP's `docker.service`
+  `FailureAction=reboot` on the tractor (drop-in, after checking the unit on
+  the bench), since it reboots without waiting for idle; the supervisor
+  covers that fault with an idle-gated reboot (`CHECK_DOCKER=1`), and LmP
+  ties it to OTA rollback, so a Docker-breaking update then rolls back only
+  through the armed supervisor. Gates tractor arming.
+- [ ] **PWR-14 Finish a forced reset cut off after sysrq `u`** — a
+  supervisor killed outright (SIGKILL, the unit watchdog) in the seconds
+  between the forced path's `u` and `b` leaves the disks read-only with no
+  reset queued. The restarted supervisor keeps the motion hold (the reset
+  record is on tmpfs) but cannot write its state and runs disarmed, so the
+  X8 waits, motion held, for a person to cycle power. Record the `u` phase
+  on tmpfs and finish the reset at startup after one more look at the hold
+  (Copilot review on #156). The same record can close a narrower gap: each
+  path writes its reset record right before its last look (so a withdraw
+  by a restart or a second instance cannot fall between the look and the
+  reset), and a supervisor killed outright during that look (one read, at
+  most 2 s) leaves a record with nothing sent, so the restart keeps the
+  hold even on a healthy node, until a person removes the request or the
+  next fault's reboot. Record the phase (checking, sent, `u` written) and
+  the writer's PID, and at startup withdraw a record still checking whose
+  writer is gone (Copilot review on #156, 2026-10-22). Bench check with
+  PWR-1.
 
 ---
 
