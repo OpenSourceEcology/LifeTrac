@@ -179,7 +179,10 @@ the board then stays up in that boot.
   supervisor killed outright during the record syncs, settles or that
   sync (the unit watchdog, SIGKILL) leaves none, and the restart
   withdraws the request. It is refused when its reset record cannot be
-  written and no earlier reset in this boot recorded one. Stopping the service (`systemctl stop`, a kill
+  written and no earlier reset in this boot recorded one. When `u` was not
+  written and `systemctl reboot -ff` fails too (its own error, or it never
+  ran), nothing was sent, so the record goes and the request is withdrawn;
+  a timeout or a signal keeps them, as for `systemctl reboot`. Stopping the service (`systemctl stop`, a kill
   by hand) withdraws a request that has no reset behind it, because an
   explicit stop does not restart the service and the startup cleanup
   would not run. That includes a stop after the reset record is written

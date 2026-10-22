@@ -4175,7 +4175,16 @@ which also needs PWR-12 and PWR-13.
   record is on tmpfs) but cannot write its state and runs disarmed, so the
   X8 waits, motion held, for a person to cycle power. Record the `u` phase
   on tmpfs and finish the reset at startup after one more look at the hold
-  (Copilot review on #156). Bench check with PWR-1.
+  (Copilot review on #156). The same record can close a narrower gap: each
+  path writes its reset record right before its last look (so a withdraw
+  by a restart or a second instance cannot fall between the look and the
+  reset), and a supervisor killed outright during that look (one read, at
+  most 2 s) leaves a record with nothing sent, so the restart keeps the
+  hold even on a healthy node, until a person removes the request or the
+  next fault's reboot. Record the phase (checking, sent, `u` written) and
+  the writer's PID, and at startup withdraw a record still checking whose
+  writer is gone (Copilot review on #156, 2026-10-22). Bench check with
+  PWR-1.
 
 ---
 

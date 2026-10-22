@@ -1499,7 +1499,8 @@ force_reboot() {  # REASON WHY
     # Was a reset already issued in this boot (an accepted, timed-out or
     # killed `systemctl reboot`)? If not, this path records its own right
     # before its last look (force_mark), and clears it again if it gives up
-    # before the reset (force_hold_ok).
+    # before the reset (force_hold_ok) or sends nothing (`u` and `b` failed,
+    # or no sysrq file, and `reboot -ff` failed outright).
     _fr_was=0
     if reset_issued; then
       _fr_was=1
@@ -1567,6 +1568,15 @@ force_reboot() {  # REASON WHY
   RESET_PROV=0
   timeout 30 systemctl reboot -ff >/dev/null 2>&1
   _fr_rc=$?
+  # rc 0, 124 (timed out) or 128 and above (killed by a signal): the reset
+  # may still come, so the record stays. Any other rc: `reboot -ff` failed
+  # or never ran, so unless `u` was written or a reset was issued earlier
+  # in this boot nothing was sent: drop the record before the log write,
+  # and abandon_reboot withdraws the request (Copilot review on #156).
+  if [ "$ROLE" = tractor ] && [ "$_fr_u" != 1 ] && [ "$_fr_was" != 1 ] \
+      && [ "$_fr_rc" -ne 0 ] && [ "$_fr_rc" -ne 124 ] && [ "$_fr_rc" -lt 128 ]; then
+    clear_reset_issued
+  fi
   rc_note "$_fr_rc"
   log "ACTION force_reboot: still alive after systemctl reboot -ff rc=$_fr_rc$RCNOTE"
   abandon_reboot "$1" "forced_path_returned:$2"

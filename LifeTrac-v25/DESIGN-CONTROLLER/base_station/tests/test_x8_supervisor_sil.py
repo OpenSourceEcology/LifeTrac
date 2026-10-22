@@ -161,6 +161,9 @@ rc=0
 if [ "$*" = reboot ] && [ -f "$FAKE_DIR/systemctl_reboot_rc" ]; then
   read -r rc < "$FAKE_DIR/systemctl_reboot_rc"
 fi
+if [ "$*" = "reboot -ff" ] && [ -f "$FAKE_DIR/systemctl_reboot_ff_rc" ]; then
+  read -r rc < "$FAKE_DIR/systemctl_reboot_ff_rc"
+fi
 exit "$rc"
 """
 
@@ -633,7 +636,7 @@ class X8SUP_B_Supervisor(unittest.TestCase):
                      "on_sync_after_log", "on_sync_hang", "sync_hanging",
                      "on_reboot_hang", "reboot_hanging", "on_reboot_block_reset_record",
                      "on_dd_hang", "dd_hanging",
-                     "systemctl_reboot_rc"):
+                     "systemctl_reboot_rc", "systemctl_reboot_ff_rc"):
             (self.fake / name).unlink(missing_ok=True)
         shutil.rmtree(self.req_file.parent, ignore_errors=True)
         self.idle_file.unlink(missing_ok=True)
@@ -2556,6 +2559,61 @@ class X8SUP_B_Supervisor(unittest.TestCase):
                     self.assertIsNone(self.request())
                     self.assertFalse(self.reset_file.exists())
                     self.assertIn("LOCK withdrawn (reboot abandoned)", log)
+
+    def test_tractor_forced_path_whose_reboot_ff_fails_withdraws_when_nothing_was_sent(self) -> None:
+        # Copilot review on #156: after a `systemctl reboot` that failed
+        # outright (rc 1), with no sysrq file or with its writes failing,
+        # `systemctl reboot -ff` that fails too (its own error, or it never
+        # ran: 126, 127) sent nothing, so the forced path's record must not
+        # keep the request. Kept when `reboot -ff` may still reset (0, a
+        # timeout, a signal), when `u` was written (the disks are read-only)
+        # or when an earlier reset in this boot may still land (rc 124).
+        cases = (
+            # (first rc, sysrq, -ff rc, kept)
+            ("1", "missing", "1", False),
+            ("1", "missing", "127", False),
+            ("1", "unwritable", "1", False),
+            ("1", "missing", "0", True),
+            ("1", "missing", "124", True),
+            ("1", "missing", "143", True),
+            ("1", "ok", "1", True),
+            ("124", "missing", "1", True),
+        )
+        for rc, sysrq, ff_rc, kept in cases:
+            with self.subTest(rc=rc, sysrq=sysrq, ff_rc=ff_rc):
+                self.fresh()
+                self._tractor()
+                if sysrq != "ok":
+                    self.sysrq.unlink()
+                if sysrq == "unwritable":
+                    self.sysrq.mkdir()
+                self.set_fake("systemctl_reboot_rc", rc)
+                self.set_fake("systemctl_reboot_ff_rc", ff_rc)
+                link = self.start_link("grant")
+                try:
+                    self.run_sv("once")
+                finally:
+                    link.stop()
+                    if self.sysrq.is_dir():
+                        self.sysrq.rmdir()
+                log = self.sv_log()
+                self.assertEqual(len(self.calls("systemctl reboot -ff")), 1)
+                self.assertEqual((self.fake / "request.at_reboot_ff").read_text(encoding="utf-8").strip(),
+                                 "aaaaaaaa-1000")
+                self.assertIn(f"still alive after systemctl reboot -ff rc={ff_rc}", log)
+                self.assertEqual(self.sysrq_text(), "sub" if sysrq == "ok" else "")
+                self.assertEqual(self.state_kv("last_action")["action"], "reboot_abandoned")
+                if kept:
+                    self.assertEqual(self.request(), "aaaaaaaa-1000")
+                    self.assertTrue(self.reset_file.exists())
+                    self.assertIn("LOCK kept (reboot abandoned)", log)
+                else:
+                    self.assertIsNone(self.request())
+                    self.assertFalse(self.reset_file.exists())
+                    self.assertIn("LOCK withdrawn (reboot abandoned)", log)
+                    # A restarted supervisor does not bring the hold back.
+                    self.run_sv("once", extra={"LIFETRAC_TRACTOR_IDLE_FILE": str(self.root / "no_link")})
+                    self.assertIsNone(self.request())
 
     def test_tractor_rechecks_the_hold_right_before_systemctl(self) -> None:
         # The records written after the hold can take a minute; if the
