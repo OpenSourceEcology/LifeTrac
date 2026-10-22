@@ -4584,6 +4584,22 @@ directly, and video comes from a second H7 with a camera. Options, wiring
 facts and the scheduling design: [PLATFORM_H7.md](PLATFORM_H7.md). Items
 marked *(both)* also improve the X8's onboard H747.
 
+**Order of work** (agreed 2026-10-22). The X8 stays the main path and the H7
+profile stays an option, so work runs in three stages:
+
+1. *Software only, useful to both profiles; no hardware needed.* H7-4 (done),
+   then H7-4a, the H7-7 SIL model (four classes plus a model of the L072
+   FIFO ring) before its C, H7-13, H7-16 and H7-10. Each lands with a host
+   test, like `tractor_h7/bench/methodg_sil/`.
+2. *Bench checks; no RF transmit and no board flashing without Dorkmo's OK.*
+   H7-1 (is `Serial3` the Murata UART, and fix BRINGUP_MAX_CARRIER.md §1.1,
+   which calls it the modem) and H7-4b (RS-485 and X8-link pins on the Max
+   Carrier). H7-5 is the first on-air step and waits for an explicit GO.
+3. *No full H7-only migration until stages 1 and 2 land.* That covers moving
+   folders (H7-17), new device sketches (H7-2, H7-6, H7-9), the base stack on
+   a PC (H7-3) and the MASTER_PLAN/BOM changes (H7-18). H7-19 (export
+   classification) runs in parallel and must finish before buying H7 parts.
+
 **Platform bring-up**
 
 - [ ] **H7-1 Confirm the Murata UART on Max Carrier + H7** — the ABX00043
@@ -4599,12 +4615,29 @@ marked *(both)* also improve the X8's onboard H747.
 - [ ] **H7-3 Base stack on a PC** — run `base_station/` against the gateway
   on `/dev/ttyACM0`; add a PC compose file and native-run notes (Docker
   Desktop on Windows cannot pass a USB serial port through).
-- [ ] **H7-4 Join the control application to Method G** *(both)* — today the
-  Method G build runs only `mh_runtime`, while arbitration, Modbus master,
-  AES-GCM and the IP-107 queue exist only in the legacy RadioLib build, which
-  needs SX1276 SPI access the Max Carrier does not route. Drive them from
-  `TX_FRAME_REQ` / `RX_FRAME_URC` instead, behind a small radio-transport
-  interface so RadioLib remains a bench option.
+- [x] **H7-4 Join the control application to Method G** *(both)* — done
+  2026-10-22 in software. `tractor_h7.ino` now runs arbitration, the Modbus
+  master, AES-GCM and the IP-107 queue in the Method G build too; only a
+  small "radio transport" section differs from RadioLib, which stays a bench
+  option. `RX_FRAME_URC` packets feed the KISS decoder (same on-air bytes as
+  RadioLib, so the MKR handheld still works). TX sends one `TX_FRAME_REQ` at
+  a time (K = 1), released by `TX_DONE_URC`, a matching `ERR_PROTO_URC`,
+  `BOOT_URC` or a timeout, never by `FAULT_URC` (`murata_host/mh_link.c`).
+  Host tests: `bench/h7_host_proto/mh_link_vectors.c` and
+  `bench/methodg_sil/run.sh` (the real sketch against a fake L072 and Opta),
+  both in CI. `LIFETRAC_MH_PROBE_ONLY=1` keeps the old link-probe build.
+  Not yet run on hardware (H7-5).
+- [ ] **H7-4a SF ladder over Method G** *(both)* — the ladder is idle in the
+  Method G build because the L072 owns SF/BW and has no per-SF CFG key (only
+  `REG_PROFILE`). Decide whether the H7 drives profile changes (CFG_SET with
+  the CMD_LINK_TUNE handshake) or the ladder moves into the L072, then
+  re-enable it with a SIL test. Also decide whether the H7 should CFG_SET TX
+  power and the regional profile at boot instead of trusting L072 defaults.
+- [ ] **H7-4b Max Carrier pin map for the control app** — `setup()` still
+  uses the legacy `RS485.setPins(PA_9, PA_10, PB_3)`; PA_9 is USART1 TX
+  (`Serial1`), and the Max Carrier pinout puts RS-485 on SERIAL0. Confirm
+  the RS-485 and X8-link UARTs alongside H7-1 and move them behind build
+  config. Bench check only, no RF transmit.
 - [ ] **H7-5 Standalone tractor H7 milestone** — control and telemetry only
   (no video): Method G link to the base gateway, Modbus to the bench Opta,
   M4 100 Hz loop, failsafe timings re-measured on the H7.

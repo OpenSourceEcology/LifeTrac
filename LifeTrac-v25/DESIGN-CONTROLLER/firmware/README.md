@@ -90,6 +90,31 @@ Every file is **commented heavily** so it reads as documentation. The firmware s
 
 ---
 
+### Platform profiles (X8 and H7-only)
+
+The folders are split by **device**, not by platform profile, and most of
+them serve both profiles unchanged. The recommendation (2026-10-22, see
+[PLATFORM_H7.md](../PLATFORM_H7.md) and TODO H7-17) is to keep it that way:
+shared code stays shared, and code that only one profile needs lives in its
+own folder or subfolder, rather than splitting into `x8_only/` and
+`h7_only/` trees. No folder moves without Dorkmo's OK.
+
+| Folder | X8 profile | H7-only profile |
+|---|---|---|
+| `common/` | yes | yes |
+| `murata_l072/` | yes | yes |
+| `tractor_h7/`, `tractor_h7_m4/` | the X8's onboard H747 | the standalone H7 |
+| `tractor_opta/`, `handheld_mkr/` | yes | yes |
+| `../base_station/` | on the base X8 | on a PC |
+| `tractor_x8/`, `x8_recovery/`, `x8_*` | yes | no (Linux side) |
+| `base_h7_gateway/`, `camera_h7/` (planned) | no | yes |
+
+Within `tractor_h7/`, the X8-only units (`sysclock_x8.c`, the tick
+overrides, `linker_script_x8_m7.ld`, `x8_no_usb_main.cpp`) move into
+`tractor_h7/platform_x8/` together with the profile switch (H7-17), not
+before: arduino-cli only compiles the sketch root and `src/`, so that move
+needs the build staging changed in the same PR.
+
 ## What each file is for, and what to look at when reviewing
 
 ### 1. [`common/lora_proto/`](common/lora_proto/) — the wire format, in code

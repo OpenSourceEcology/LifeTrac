@@ -13,9 +13,18 @@
 //   5. Tick the Opta watchdog "alive" register at >=10 Hz.
 //   6. Read Opta telemetry and emit TelemetryFrames over LoRa @ 1 Hz.
 //
+// Radio transport (H7-4): the same control application runs over either
+//   - Method G (LIFETRAC_USE_METHOD_G_HOST=1): the Murata L072 over a UART,
+//     TX_FRAME_REQ out and RX_FRAME_URC in (murata_host/). This is the only
+//     path on a Max Carrier, which does not route the SX1276 SPI pins.
+//   - RadioLib on the SX1276 SPI pins (the legacy default, a bench option).
+// Only the "radio transport" section below differs between the two.
+//
 // What is NOT here yet (deferred):
 //   - Cellular failover, MQTT-SN topic dispatch, video thumbnails.
 //   - Per-coil current monitoring, CAN-bus engine telemetry.
+//   - Adaptive SF ladder over Method G: the L072 owns its PHY (REG_PROFILE),
+//     so the ladder is idle there until it gets a host-driven equivalent.
 
 #include <Arduino.h>
 
@@ -33,8 +42,26 @@
 #define LIFETRAC_MH_SOFT_BRIDGE_HEARTBEAT_MS 0
 #endif
 
+// LIFETRAC_MH_PROBE_ONLY=1 keeps the pre-H7-4 Method G build: the host
+// runtime alone (ping, version, stats), no control application and no
+// TX_FRAME_REQ, for link bring-up such as the T6 gate-1 preflight.
+#ifndef LIFETRAC_MH_PROBE_ONLY
+#define LIFETRAC_MH_PROBE_ONLY 0
+#endif
+
+// H7-4: the control application (arbitration, Modbus master, AES-GCM, TX
+// queue) runs in every build except the two Method G bench modes: the soft
+// bridge (a bare UART passthrough) and the link probe.
+#if LIFETRAC_METHOD_G_HOST_BUILD && ((LIFETRAC_MH_SOFT_BRIDGE) || (LIFETRAC_MH_PROBE_ONLY))
+#define LIFETRAC_CONTROL_APP 0
+#else
+#define LIFETRAC_CONTROL_APP 1
+#endif
+
 #if !LIFETRAC_METHOD_G_HOST_BUILD
 #include <RadioLib.h>
+#endif
+#if LIFETRAC_CONTROL_APP
 #include <ArduinoRS485.h>
 #include <ArduinoModbus.h>
 // lora_proto and shared_mem are vendored into ./src/ at build time. CI:
@@ -133,7 +160,7 @@ static void mh_bench_log_sink(const char *line, void *ctx) {
 }
 #endif
 
-#if !LIFETRAC_METHOD_G_HOST_BUILD
+#if LIFETRAC_CONTROL_APP
 
 // Forward declarations for types used in helper-function signatures, so the
 // Arduino preprocessor's auto-generated prototypes (inserted near the top of
@@ -308,6 +335,7 @@ static inline void boot_trace_mark(uint32_t stage) {
 #endif
 }
 
+#if !LIFETRAC_METHOD_G_HOST_BUILD
 #if defined(ARDUINO_PORTENTA_X8) || defined(LIFETRAC_X8_NO_USB_SERIAL)
 static inline void lifetrac_x8_spi_kernel_clock_init() {
     volatile uint32_t* const rcc_cr = reinterpret_cast<volatile uint32_t*>(0x58024400UL);
@@ -457,6 +485,7 @@ static Module radio_module(/*nss*/ PD_4, /*dio0*/ PD_5,
                            /*reset*/ PE_4, /*dio1*/ PE_5);
 #endif
 SX1276 radio(&radio_module);
+#endif /* !LIFETRAC_METHOD_G_HOST_BUILD */
 
 __attribute__((constructor(101)))
 static void boot_trace_constructor_mark() {
@@ -1217,28 +1246,72 @@ static void process_air_frame(uint8_t* onair, size_t len, int16_t rssi_dbm, int1
     }
 }
 
-// Pull bytes off the LoRa modem and feed the KISS decoder.
+// ---------- radio transport (H7-4) ----------
+//
+// Everything above and below this section is shared by both transports.
+// What each transport provides:
+//   poll_radio()      hand each received LoRa packet to on_radio_packet()
+//   tx_pump()         (further down) start the next queued packet when the
+//                     radio can take it
+//   rt_rx_rearm()     put the radio back in receive after a PHY change
+//   apply_phy_rung()  (further down) retune for the SF ladder
+//
+// The on-air bytes are the same either way: one KISS-framed, AES-GCM
+// encrypted frame per LoRa packet, so a Method G tractor still talks to a
+// RadioLib handheld.
+
+// One LoRa packet: feed the KISS decoder and process each complete frame.
+static void on_radio_packet(const uint8_t* buf, size_t len,
+                            int16_t rssi_dbm, int16_t snr_db_x10) {
+    bench_radio_add(LIFETRAC_SHARED_RADIO_RX_PACKET_IDX);
+    bench_radio_add(LIFETRAC_SHARED_RADIO_RX_BYTE_IDX, (uint32_t)len);
+    for (size_t i = 0; i < len; i++) {
+        uint8_t* frame; size_t flen;
+        if (lp_kiss_feed(&g_dec, buf[i], &frame, &flen)) {
+            bench_radio_add(LIFETRAC_SHARED_RADIO_RX_KISS_IDX);
+            process_air_frame(frame, flen, rssi_dbm, snr_db_x10);
+        }
+    }
+}
+
+#if LIFETRAC_METHOD_G_HOST_BUILD
+// RX_FRAME_URC arrives from inside mh_runtime_loop(); the L072 reports SNR
+// in whole dB.
+static void mh_on_rx(const mh_link_rx_t* rx, void* /*ctx*/) {
+    on_radio_packet(rx->data, rx->len, rx->rssi_dbm, (int16_t)rx->snr_db * 10);
+}
+
+// The TX gate released: count it the way the RadioLib path does.
+static void mh_on_tx(mh_link_event_t event, void* /*ctx*/) {
+    if (event == MH_LINK_EV_SENT) {
+        bench_radio_add(LIFETRAC_SHARED_RADIO_TX_DONE_IDX);
+    } else {
+        bench_radio_add(LIFETRAC_SHARED_RADIO_TX_FAIL_IDX);
+    }
+}
+
+// Received packets are pushed by mh_runtime_loop(), see mh_on_rx().
+static void poll_radio() {}
+
+// The L072 re-arms RX itself after every TX (sx1276_tx.c s_rearm_rx).
+static inline void rt_rx_rearm() {}
+#else
+// Pull one packet off the SX1276.
 static void poll_radio() {
     int packet_len = radio.getPacketLength();
     if (packet_len <= 0) return;
     uint8_t buf[256];
     int st = radio.readData(buf, packet_len);
     if (st != RADIOLIB_ERR_NONE) return;
-    bench_radio_add(LIFETRAC_SHARED_RADIO_RX_PACKET_IDX);
-    bench_radio_add(LIFETRAC_SHARED_RADIO_RX_BYTE_IDX, (uint32_t)packet_len);
     int16_t rssi = radio.getRSSI();
     // SX1276::getSNR() returns float dB; capture *10 for fixed-point telemetry.
     int16_t snr_x10 = (int16_t)(radio.getSNR() * 10.0f);
-
-    for (int i = 0; i < packet_len; i++) {
-        uint8_t* frame; size_t flen;
-        if (lp_kiss_feed(&g_dec, buf[i], &frame, &flen)) {
-            bench_radio_add(LIFETRAC_SHARED_RADIO_RX_KISS_IDX);
-            process_air_frame(frame, flen, rssi, snr_x10);
-        }
-    }
+    on_radio_packet(buf, (size_t)packet_len, rssi, snr_x10);
     radio.startReceive();
 }
+
+static inline void rt_rx_rearm() { radio.startReceive(); }
+#endif
 
 #if defined(ARDUINO_PORTENTA_X8) || defined(LIFETRAC_X8_NO_USB_SERIAL)
 static uint32_t g_nonce_prng_state = 0;
@@ -1310,7 +1383,11 @@ static uint16_t g_telem_seq = 0;
 #define TX_QUEUE_CAP        4
 #define TX_PRIO_SAFETY      0    // CMD_LINK_TUNE
 #define TX_PRIO_NORMAL      1    // telemetry / source / x8 forwards
+#if LIFETRAC_METHOD_G_HOST_BUILD
+#define TX_PAYLOAD_MAX      255  // TX_FRAME_REQ carries a one-byte length
+#else
 #define TX_PAYLOAD_MAX      256  // ~118 B encrypted + KISS expansion + slack
+#endif
 
 struct TxRequest {
     uint8_t  prio;
@@ -1395,6 +1472,35 @@ static bool tx_enqueue(const uint8_t* kiss, uint16_t kiss_len, uint8_t prio) {
     return true;
 }
 
+#if LIFETRAC_METHOD_G_HOST_BUILD
+// Method G: completion comes from the L072 (TX_DONE_URC / ERR_PROTO_URC /
+// BOOT_URC) instead of a ToA estimate, and at most one of our frames waits
+// at the L072 at a time (murata_host/mh_link.h). The L072 does its own LBT
+// and hopping, so there is no CSMA step here.
+//
+// Gate timeout = ToA ceiling at the slowest rung (the L072 picks its own
+// PHY, so the committed rung says nothing about it) + one FHSS slot.
+#ifndef LIFETRAC_MH_TX_SLOT_MS
+#define LIFETRAC_MH_TX_SLOT_MS 200u
+#endif
+static void tx_pump(uint32_t /*now_ms*/) {
+    if (mh_runtime_tx_busy()) return;
+    if (g_tx_queue_depth == 0) return;
+    TxRequest req = g_tx_queue[0];
+    for (int i = 0; i < (int)g_tx_queue_depth - 1; ++i) {
+        g_tx_queue[i] = g_tx_queue[i + 1];
+    }
+    g_tx_queue_depth--;
+    const uint32_t timeout_ms = estimate_toa_ms(req.kiss_len, 2) + LIFETRAC_MH_TX_SLOT_MS;
+    if (!mh_runtime_submit_tx(req.kiss, (uint8_t)req.kiss_len, timeout_ms)) {
+        // UART write failed or the gate was busy; the frame is dropped like
+        // a refused startTransmit() on the RadioLib path.
+        bench_radio_add(LIFETRAC_SHARED_RADIO_TX_FAIL_IDX);
+        return;
+    }
+    bench_radio_add(LIFETRAC_SHARED_RADIO_TX_START_IDX);
+}
+#else
 // Drive the radio forward. Called from loop() every iteration. Never
 // blocks: each invocation either advances the SX1276 state machine or
 // returns immediately.
@@ -1477,6 +1583,7 @@ static void tx_pump(uint32_t now_ms) {
     g_tx_in_flight    = true;
     g_tx_done_after_ms = now_ms + estimate_toa_ms(req.kiss_len, req.rung_at_submit);
 }
+#endif /* LIFETRAC_METHOD_G_HOST_BUILD */
 
 // emit_topic — encrypt + frame an arbitrary (topic_id, payload) tuple and
 // transmit it as a TelemetryFrame on the radio. Shared by emit_telemetry()
@@ -1576,7 +1683,7 @@ static void emit_source_active() {
 // when LIFETRAC_FHSS_ENABLED is defined; otherwise it's a no-op so the
 // single-channel default doesn't pay for `scanChannel()`.
 static inline void csma_pick_hop_before_tx() {
-#ifdef LIFETRAC_FHSS_ENABLED
+#if defined(LIFETRAC_FHSS_ENABLED) && !LIFETRAC_METHOD_G_HOST_BUILD
     auto sampler = [](uint32_t hz, void* /*ctx*/) -> int16_t {
         radio.setFrequency(hz / 1.0e6f);
         int state = radio.scanChannel();
@@ -1627,6 +1734,19 @@ static inline void refresh_m4_alive_before_tx() { /* no-op since IP-107 round-7 
 // driving Serial1 from the Linux side, so this loop sees no bytes — the rest
 // of the firmware behaves identically. (In that build, IMU + GPS would have
 // to be wired natively — see HARDWARE_BOM.md § Notes on substitutions.)
+//
+// H7-4: the link is on by default in the RadioLib build and off in the
+// Method G build, where Serial1 may be the Murata UART itself (CI builds
+// with LIFETRAC_MH_SERIAL=Serial1) and a standalone H7 has no X8 behind it.
+// -DLIFETRAC_X8_LINK=1 turns it back on when Serial1 is free.
+#ifndef LIFETRAC_X8_LINK
+#if LIFETRAC_METHOD_G_HOST_BUILD
+#define LIFETRAC_X8_LINK 0
+#else
+#define LIFETRAC_X8_LINK 1
+#endif
+#endif
+
 static KissDecoder g_x8_dec;
 
 #define X8_CMD_TOPIC 0xC0
@@ -1635,6 +1755,10 @@ static KissDecoder g_x8_dec;
 // out Serial1. Cheap (one-shot, no queueing) — commands fired from CMD_*
 // handlers are P0/P1 single-frame events at human-scale rates.
 static void send_cmd_to_x8(uint8_t opcode, const uint8_t* args, uint8_t args_len) {
+#if !LIFETRAC_X8_LINK
+    (void)opcode; (void)args; (void)args_len;
+    return;
+#endif
     if (args_len > 32) return;   // defensive: arg payload from LoRa is ≤8 bytes
     uint8_t body[2 + 32];
     body[0] = X8_CMD_TOPIC;
@@ -1646,6 +1770,9 @@ static void send_cmd_to_x8(uint8_t opcode, const uint8_t* args, uint8_t args_len
 }
 
 static void poll_x8_uart() {
+#if !LIFETRAC_X8_LINK
+    return;
+#endif
     while (Serial1.available()) {
         uint8_t b = (uint8_t)Serial1.read();
         uint8_t* frame; size_t flen;
@@ -1668,10 +1795,14 @@ static void poll_x8_uart() {
 // changing SF / BW kicks the modem out of receive on the SX1276.
 static void apply_phy_rung(uint8_t rung) {
     if (rung > 2) return;
+#if LIFETRAC_METHOD_G_HOST_BUILD
+    // Unreachable today: poll_link_ladder() is idle over Method G.
+#else
     radio.setSpreadingFactor(LADDER[rung].sf);
     radio.setBandwidth((float)LADDER[rung].bw_khz);
     radio.setCodingRate(LADDER[rung].cr_den);
     radio.startReceive();
+#endif
 }
 
 // send_link_tune() builds, encrypts, and transmits one CMD_LINK_TUNE frame.
@@ -1727,7 +1858,7 @@ static void try_step_ladder(uint8_t target_rung, uint8_t reason) {
     send_link_tune(target_rung, reason);
     // 4. Re-arm RX after the second TX — radio.transmit() leaves the SX1276
     //    in standby, so without this the verification HB would never arrive.
-    radio.startReceive();
+    rt_rx_rearm();
 
     g_ladder_pending_rung  = target_rung;
     g_ladder_tune_deadline = millis() + LADDER_TUNE_REVERT_MS;
@@ -1748,6 +1879,11 @@ static void try_step_ladder(uint8_t target_rung, uint8_t reason) {
 //   2. When the 5 s window closes, classify it bad/good and step the ladder
 //      after R-8 hysteresis is satisfied (3 bad → step-down, 6 good → step-up).
 static void poll_link_ladder() {
+#if LIFETRAC_METHOD_G_HOST_BUILD
+    // The L072 owns SF/BW (REG_PROFILE has no per-SF key), so the ladder
+    // stays on rung 0 and never announces CMD_LINK_TUNE over Method G.
+    return;
+#endif
     uint32_t now = millis();
     if (g_ladder_window_start == 0) g_ladder_window_start = now;
 
@@ -1799,17 +1935,16 @@ static void poll_link_ladder() {
     g_ladder_window_start = now;
 }
 
-#endif /* !LIFETRAC_METHOD_G_HOST_BUILD */
+#endif /* LIFETRAC_CONTROL_APP */
 
 
 // ---------- Arduino entry points ----------
 void setup() {
-#if LIFETRAC_METHOD_G_HOST_BUILD
+#if !LIFETRAC_CONTROL_APP
 #if (LIFETRAC_MH_SOFT_BRIDGE)
     LIFETRAC_MH_BRIDGE_DEBUG_SERIAL.begin(115200);
     LIFETRAC_MH_SERIAL.begin(921600U);
     LIFETRAC_MH_BRIDGE_DEBUG_SERIAL.println("MH_SOFT_BRIDGE ready; forwarding Serial<->LIFETRAC_MH_SERIAL");
-    return;
 #else
 #if defined(LIFETRAC_MH_BENCH_LOG) && (LIFETRAC_MH_BENCH_LOG)
     Serial.begin(115200);
@@ -1822,7 +1957,6 @@ void setup() {
 #if defined(LIFETRAC_MH_BENCH_LOG) && (LIFETRAC_MH_BENCH_LOG)
     mh_runtime_set_log_sink(mh_bench_log_sink, nullptr);
 #endif
-    return;
 #endif
 #else
     boot_trace_mark(1);
@@ -1835,6 +1969,22 @@ void setup() {
     init_stick_curve_lut();
     boot_trace_mark(3);
 
+#if LIFETRAC_METHOD_G_HOST_BUILD
+    // Method G: the L072 boots in RX and owns its PHY and TX power (host
+    // CFG keys), so there is nothing to configure here beyond the link.
+#if defined(LIFETRAC_MH_BENCH_LOG) && (LIFETRAC_MH_BENCH_LOG)
+    mh_runtime_set_log_sink(mh_bench_log_sink, nullptr);
+#endif
+    mh_runtime_set_rx_handler(mh_on_rx, nullptr);
+    mh_runtime_set_tx_handler(mh_on_tx, nullptr);
+    if (!mh_runtime_begin((void *)&LIFETRAC_MH_SERIAL, 921600U)) {
+        // No radio link: hold the M4 E-stop so the valves stay closed.
+        Serial.println("FATAL: Murata host link failed to open");
+        SHARED->estop_request = LIFETRAC_ESTOP_MAGIC;
+        while (1) { delay(1000); }
+    }
+    boot_trace_mark(4);
+#else
     // LoRa control profile per LADDER[0] (DECISIONS.md D-A2: SF7/BW250/CR4-5).
     // IP-006: must match LADDER[0] exactly so the first TX after boot decodes
     // on a peer that has not yet received CMD_LINK_TUNE.
@@ -1859,6 +2009,7 @@ void setup() {
         bench_radio_set(LIFETRAC_SHARED_RADIO_RX_META_IDX,
                         bench_radio_status_meta(2u, radio_state));
     }
+#endif
     g_ladder_rung = 0;
     boot_trace_mark(5);
 
@@ -1884,14 +2035,18 @@ void setup() {
 
     // X8 ↔ H747 UART (Linux side runs gps_service.py + imu_service.py).
     // Harmless on a standalone H7 — Serial1 just sees no bytes.
+#if LIFETRAC_X8_LINK
     Serial1.begin(921600);
+#endif
     boot_trace_mark(9);
 #endif
 }
 
 void loop() {
-#if LIFETRAC_METHOD_G_HOST_BUILD
-#if (LIFETRAC_MH_SOFT_BRIDGE)
+#if !LIFETRAC_CONTROL_APP
+#if !(LIFETRAC_MH_SOFT_BRIDGE)
+    mh_runtime_loop(millis());
+#else
 #if (LIFETRAC_MH_SOFT_BRIDGE_HEARTBEAT_MS > 0)
     static uint32_t next_hb_ms = 0;
     const uint32_t now_ms = millis();
@@ -1901,10 +2056,7 @@ void loop() {
     }
 #endif
     mh_soft_bridge_pump();
-#else
-    mh_runtime_loop(millis());
 #endif
-    return;
 #else
     static uint32_t next_arb = 0;
     static uint32_t next_tx  = 0;
@@ -1934,6 +2086,9 @@ void loop() {
     __DMB();
     SHARED->seq           = (s | 1u) + 1u;   // back to even = "stable"
 
+#if LIFETRAC_METHOD_G_HOST_BUILD
+    mh_runtime_loop(now);   // L072 link: RX_FRAME_URC -> mh_on_rx(), TX gate
+#endif
     poll_radio();
     poll_x8_uart();    // pump KISS frames from gps_service.py / imu_service.py
     poll_link_ladder();  // R-8 hysteresis SF7→SF8→SF9 ladder
