@@ -226,14 +226,14 @@ if [ -f "$FAKE_REQ" ] && [ "$only" != skip ]; then
   if [ -f "$FAKE_DIR/on_sync_rm_request" ]; then
     rm -f "$FAKE_REQ"
   fi
-  for m in busy stale_lock; do
+  for m in busy stale_lock badseq_lock; do
     [ -f "$FAKE_DIR/on_sync_link_$m" ] || continue
     printf '%s\n' "$m" > "$FAKE_DIR/link_mode"
     n=0
     while [ "$n" -lt 500 ]; do
       l=
       read -r l < "$FAKE_IDLE" 2>/dev/null
-      case $m:$l in busy:busy*|stale_lock:*" 00000000-1") break ;; esac
+      case $m:$l in busy:busy*|stale_lock:*" 00000000-1"|badseq_lock:"locked BAD"*) break ;; esac
       n=$((n + 1))
       sleep 0.01
     done
@@ -244,15 +244,18 @@ exit 0
 
 # The real sleep ($FAKE_SLEEP), except for an idle poll (one argument equal
 # to LIFETRAC_IDLE_POLL) while a _FakeLink runs: that first waits, up to 5 s,
-# until the link has rewritten the idle file since this poll began. A live
+# until the link has rewritten the idle file since this poll began (every
+# line it writes carries its counter, so each write changes it). A live
 # H747 link service writes at least once per poll; the fake one is a Python
 # thread, and a busy CI runner left it unscheduled for longer than the
 # supervisor's whole liveness window (10 polls of 20 ms), so a live link
-# read as dead (2026-10-22, one of two CI runs of the same commit). With
-# log_sleep, every call is logged.
+# read as dead (2026-10-22, one of two CI runs of the same commit). Each
+# such poll also adds a line to idle_polls, which the link's
+# grant_late_badseq mode counts. With log_sleep, every call is logged.
 _FAKE_SLEEP = r"""#!/bin/sh
 [ -f "$FAKE_DIR/log_sleep" ] && printf 'sleep %s\n' "$*" >> "$FAKE_LOG"
 if [ "$#" = 1 ] && [ "$1" = "${LIFETRAC_IDLE_POLL:-}" ] && [ -f "$FAKE_DIR/link_running" ]; then
+  echo poll >> "$FAKE_DIR/idle_polls"
   was=
   { IFS= read -r was < "$FAKE_IDLE"; } 2>/dev/null
   n=0
@@ -289,8 +292,10 @@ class _FakeLink:
     rewrites the idle file (tmp + rename) with a new <seq>; ``mode`` says what
     the H747 reports: ``grant`` (idle, and ``locked <seq> <id>`` while a
     request file exists), ``idle`` (never takes a lock), ``busy``,
-    ``stale_lock`` (locked for some other request) or ``raw:<state>`` (any
-    first word). ``mode_file``, when it exists, overrides ``mode`` (the fake
+    ``stale_lock`` (locked for some other request), ``badseq_lock`` (a hold
+    for the request with a malformed <seq>, ``BAD<n>!``), ``grant_late_badseq`` (idle
+    until two idle polls after it sees the request, then ``badseq_lock``)
+    or ``raw:<state>`` (any first word). ``mode_file``, when it exists, overrides ``mode`` (the fake
     ``systemctl`` and ``sync`` write it). ``seq_fmt`` formats the counter
     (an invalid <seq> that still changes). ``running_file`` exists while the
     thread runs, so the fake ``sleep`` can make each idle poll wait for a
@@ -310,6 +315,7 @@ class _FakeLink:
         self.running_file = running_file
         self.seq = 0
         self.requests: list[str] = []
+        self._polls_at_request = 0
         self._stop = threading.Event()
         self._thread = threading.Thread(target=self._loop, daemon=True)
 
@@ -325,14 +331,30 @@ class _FakeLink:
             req = ""
         if req and req not in self.requests:
             self.requests.append(req)
+            self._polls_at_request = self._idle_polls()
         seq = self.seq_fmt.format(self.seq)
         if self.mode == "grant":
             return f"locked {seq} {req}" if req else f"idle {seq}"
+        if self.mode == "badseq_lock" or (
+                self.mode == "grant_late_badseq" and req
+                and self._idle_polls() - self._polls_at_request >= 2):
+            return f"locked BAD{seq}! {req}" if req else f"idle {seq}"
+        if self.mode == "grant_late_badseq":
+            return f"idle {seq}"
         if self.mode == "stale_lock":
             return f"locked {seq} {self.STALE_ID}"
         if self.mode.startswith("raw:"):
             return f"{self.mode[4:]} {seq}"
         return f"{self.mode} {seq}"
+
+    def _idle_polls(self) -> int:
+        """Idle polls the fake ``sleep`` has counted (see _FAKE_SLEEP)."""
+        if self.running_file is None:
+            return 0
+        try:
+            return len((self.running_file.parent / "idle_polls").read_text(encoding="utf-8").splitlines())
+        except OSError:
+            return 0
 
     def shows(self, needle: str, timeout: float = 5.0) -> None:
         """Wait until the idle file's line contains ``needle``."""
@@ -632,7 +654,8 @@ class X8SUP_B_Supervisor(unittest.TestCase):
         for f in self.fake.glob("*.at_reboot*"):
             f.unlink()
         for name in ("link_mode", "on_reboot_link_mode", "on_sync_rm_request",
-                     "on_sync_link_busy", "on_sync_link_stale_lock", "on_sync_only_for",
+                     "on_sync_link_busy", "on_sync_link_stale_lock",
+                     "on_sync_link_badseq_lock", "idle_polls", "on_sync_only_for",
                      "on_sync_after_log", "on_sync_hang", "sync_hanging",
                      "on_reboot_hang", "reboot_hanging", "on_reboot_block_reset_record",
                      "on_dd_hang", "dd_hanging",
@@ -1921,6 +1944,21 @@ class X8SUP_B_Supervisor(unittest.TestCase):
                     self.assertNotIn(_FakeLink.STALE_ID, self.sv_log())
                 self.assertFalse(self.reset_file.exists())
 
+    def test_tractor_malformed_hold_from_a_live_link_is_not_a_hold(self) -> None:
+        # Copilot review on #156: once the link was seen live, a later
+        # "locked BAD<n>! <id>" (malformed <seq>, our id) passed the hold
+        # probe.
+        self._tractor()
+        link = self.start_link("grant_late_badseq")
+        self.run_sv("once")
+        link.stop()
+        self.assertEqual(link.requests, ["aaaaaaaa-1000"])
+        self.assert_nothing_rebooted()
+        log = self.sv_log()
+        self.assertIn("BLOCKED reboot gate=tractor_lock (state=invalid)", log)
+        self.assertIn("LOCK withdrawn (not granted: state=invalid)", log)
+        self.assertFalse(self.reset_file.exists())
+
     def test_tractor_disarmed_probes_idle_but_never_asks_for_the_hold(self) -> None:
         self._tractor()
         self.armed.unlink()
@@ -1967,12 +2005,17 @@ class X8SUP_B_Supervisor(unittest.TestCase):
             "stopped_busy": ("stop:busy", frozen_no_hold),
             "stopped_idle": ("stop:idle", frozen_no_hold),
             "stopped_other": ("stop:stale_lock", frozen_no_hold),
+            # Copilot review on #156: a hold with a malformed <seq>, frozen
+            # or live (never live then: its <seq> reads as empty).
+            "stopped_badseq": ("stop:badseq_lock", frozen_no_hold),
+            "badseq": ("badseq_lock", frozen_no_hold),
             "idle_missing": ("rm_idle", "missing:"),
             # request file gone, link stopped with our hold as its last line:
             # only the request check can block.
             "request_gone": ("rm_request", "no motion-hold request at"),
         }
-        shown = {"busy": "busy ", "idle": "idle ", "stale_lock": _FakeLink.STALE_ID}
+        shown = {"busy": "busy ", "idle": "idle ", "stale_lock": _FakeLink.STALE_ID,
+                 "badseq_lock": "locked BAD"}
         for case, (what, blocked_by) in cases.items():
             with self.subTest(case=case):
                 if hasattr(self, "link"):
@@ -2621,7 +2664,10 @@ class X8SUP_B_Supervisor(unittest.TestCase):
         # (2026-10-18 review: a second instance's start could withdraw it).
         for hook, why in (("on_sync_rm_request", "request_gone_or_changed"),
                           ("on_sync_link_busy", "no_lock:state=busy"),
-                          ("on_sync_link_stale_lock", "no_lock:state=locked:other_id")):
+                          ("on_sync_link_stale_lock", "no_lock:state=locked:other_id"),
+                          # Copilot review on #156: a hold with a malformed
+                          # <seq> is not a hold.
+                          ("on_sync_link_badseq_lock", "no_lock:state=invalid")):
             with self.subTest(hook=hook):
                 self.fresh()
                 self._tractor()

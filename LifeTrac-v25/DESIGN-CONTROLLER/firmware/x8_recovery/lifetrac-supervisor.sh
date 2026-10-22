@@ -994,8 +994,10 @@ compute_cap() {
 # in 2 s. At most 256 bytes are read. The open itself refuses a symlink and
 # does not block (O_NOFOLLOW, O_NONBLOCK), so one swapped in after the
 # checks is not followed and a FIFO cannot hang the probe. IDLE_ST is busy, idle, locked or
-# "invalid". A <seq> that is not 1-32 letters or digits reads as empty, which
-# never counts as a change; an <id> that is not 1-40 letters, digits or "-"
+# "invalid". A <seq> that is not 1-32 letters or digits makes the whole line
+# invalid and reads as empty, which never counts as a change, so a malformed
+# line never shows idle or a hold, even from a link already seen live
+# (Copilot review on #156); an <id> that is not 1-40 letters, digits or "-"
 # reads as empty, which never matches a request. Nothing else from the file
 # reaches the log or the status file.
 idle_read() {
@@ -1024,6 +1026,9 @@ idle_read() {
   esac
   if [ ${#IDLE_SEQ} -gt 32 ]; then
     IDLE_SEQ=
+  fi
+  if [ -z "$IDLE_SEQ" ]; then
+    IDLE_ST=invalid
   fi
   IDLE_RID=${3:-}
   case $IDLE_RID in

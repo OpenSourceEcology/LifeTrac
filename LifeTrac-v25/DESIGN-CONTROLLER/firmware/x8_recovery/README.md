@@ -134,7 +134,8 @@ the board then stays up in that boot.
     frame. `<seq>` (1-32 letters or digits) comes from the H747's own
     status frames and changes at least once a second; a file whose `<seq>`
     does not change while the supervisor watches is not live and never
-    reads as idle. The supervisor reads at most 256 bytes, with an open
+    reads as idle, and a line whose `<seq>` is malformed is invalid, never
+    idle or a hold, even from a link already seen live. The supervisor reads at most 256 bytes, with an open
     that refuses a symlink and does not block (GNU `dd`
     `iflag=nofollow,nonblock`; VERIFY on LmP under PWR-1, and a `dd`
     without them reads as a missing file, so it fails closed), and logs
