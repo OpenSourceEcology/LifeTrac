@@ -30,7 +30,9 @@ Everything the script would touch on a board is redirected into a temp dir:
 * the tractor's H747 link service (D-PWR1) is ``_FakeLink``, a thread that
   rewrites the idle file every few ms with a fresh <seq> and answers a
   reboot request according to its mode; the supervisor polls it every
-  20 ms (``LIFETRAC_IDLE_POLL``) instead of every second. The fake
+  20 ms (``LIFETRAC_IDLE_POLL``) instead of every second, and the fake
+  ``sleep`` holds each of those polls until the thread has written, so a
+  slow runner cannot make a running link look dead. The fake
   ``systemctl`` and ``sync`` can change the link's mode or remove the
   request at the moment they run (the H747 dropping its hold mid-rung).
 
@@ -237,6 +239,31 @@ fi
 exit 0
 """
 
+# The real sleep ($FAKE_SLEEP), except for an idle poll (one argument equal
+# to LIFETRAC_IDLE_POLL) while a _FakeLink runs: that first waits, up to 5 s,
+# until the link has rewritten the idle file since this poll began. A live
+# H747 link service writes at least once per poll; the fake one is a Python
+# thread, and a busy CI runner left it unscheduled for longer than the
+# supervisor's whole liveness window (10 polls of 20 ms), so a live link
+# read as dead (2026-10-22, one of two CI runs of the same commit). With
+# log_sleep, every call is logged.
+_FAKE_SLEEP = r"""#!/bin/sh
+[ -f "$FAKE_DIR/log_sleep" ] && printf 'sleep %s\n' "$*" >> "$FAKE_LOG"
+if [ "$#" = 1 ] && [ "$1" = "${LIFETRAC_IDLE_POLL:-}" ] && [ -f "$FAKE_DIR/link_running" ]; then
+  was=
+  { IFS= read -r was < "$FAKE_IDLE"; } 2>/dev/null
+  n=0
+  while [ "$n" -lt 1000 ] && [ -f "$FAKE_DIR/link_running" ]; do
+    now=
+    { IFS= read -r now < "$FAKE_IDLE"; } 2>/dev/null
+    [ "$now" = "$was" ] || break
+    n=$((n + 1))
+    "$FAKE_SLEEP" 0.005
+  done
+fi
+exec "$FAKE_SLEEP" "$@"
+"""
+
 _DEFAULT_CONF = {
     "ROLE": "base",
     "CHECK_INTERVAL_S": "30",
@@ -262,18 +289,22 @@ class _FakeLink:
     ``stale_lock`` (locked for some other request) or ``raw:<state>`` (any
     first word). ``mode_file``, when it exists, overrides ``mode`` (the fake
     ``systemctl`` and ``sync`` write it). ``seq_fmt`` formats the counter
-    (an invalid <seq> that still changes). ``stop`` leaves the last file
-    behind, like a link service stopped by the shutdown."""
+    (an invalid <seq> that still changes). ``running_file`` exists while the
+    thread runs, so the fake ``sleep`` can make each idle poll wait for a
+    write. ``stop`` leaves the last file behind, like a link service stopped
+    by the shutdown."""
 
     STALE_ID = "00000000-1"
 
     def __init__(self, idle_file: Path, req_file: Path, mode: str,
-                 mode_file: Path | None = None, seq_fmt: str = "{}") -> None:
+                 mode_file: Path | None = None, seq_fmt: str = "{}",
+                 running_file: Path | None = None) -> None:
         self.idle_file = idle_file
         self.req_file = req_file
         self.mode = mode
         self.mode_file = mode_file
         self.seq_fmt = seq_fmt
+        self.running_file = running_file
         self.seq = 0
         self.requests: list[str] = []
         self._stop = threading.Event()
@@ -325,12 +356,16 @@ class _FakeLink:
     def start(self) -> "_FakeLink":
         self.idle_file.parent.mkdir(parents=True, exist_ok=True)
         self.write_once()
+        if self.running_file is not None:
+            self.running_file.touch()
         self._thread.start()
         return self
 
     def stop(self) -> None:
         self._stop.set()
         self._thread.join(timeout=10)
+        if self.running_file is not None:
+            self.running_file.unlink(missing_ok=True)
 
 
 def _code_lines(text: str) -> list[str]:
@@ -543,6 +578,7 @@ class X8SUP_B_Supervisor(unittest.TestCase):
             ("fw_printenv", _FAKE_FW_PRINTENV),
             ("systemd-notify", _FAKE_NOTIFY),
             ("sync", _FAKE_SYNC),
+            ("sleep", _FAKE_SLEEP),
         ):
             p = self.bin / name
             p.write_text(body, encoding="utf-8")
@@ -662,6 +698,7 @@ class X8SUP_B_Supervisor(unittest.TestCase):
             "LIFETRAC_TRACTOR_IDLE_FILE": str(self.idle_file),
             "LIFETRAC_TRACTOR_REBOOT_REQUEST": str(self.req_file),
             "LIFETRAC_IDLE_POLL": "0.02",
+            "FAKE_SLEEP": str(self.tools / "sleep"),
         }
         if extra:
             env.update(extra)
@@ -689,7 +726,8 @@ class X8SUP_B_Supervisor(unittest.TestCase):
     def start_link(self, mode: str = "grant", seq_fmt: str = "{}",
                    idle_file: Path | None = None) -> _FakeLink:
         link = _FakeLink(idle_file or self.idle_file, self.req_file, mode,
-                         mode_file=self.fake / "link_mode", seq_fmt=seq_fmt).start()
+                         mode_file=self.fake / "link_mode", seq_fmt=seq_fmt,
+                         running_file=self.fake / "link_running").start()
         self.addCleanup(link.stop)
         return link
 
@@ -2251,13 +2289,7 @@ class X8SUP_B_Supervisor(unittest.TestCase):
                     return
                 time.sleep(0.005)
 
-        sleeper = self.bin / "sleep"
-        sleeper.write_text(
-            "#!/bin/sh\n"
-            'printf \'sleep %s\\n\' "$*" >> "$FAKE_LOG"\n'
-            f'exec "{self.tools / "sleep"}" "$@"\n', encoding="utf-8")
-        sleeper.chmod(0o755)
-        self.addCleanup(sleeper.unlink, missing_ok=True)
+        self.set_fake("log_sleep", "1")
         for sysrq in ("ok", "missing", "unwritable", "b_fails"):
             with self.subTest(sysrq=sysrq):
                 self.fresh()
