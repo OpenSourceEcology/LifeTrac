@@ -342,10 +342,16 @@ int main() {
     g_entropy_stuck = true;
     for (int i = 0; i < 100; i++) ack_all(), run_ms(50);
     ack_all();
+    const uint32_t loops0 = SHARED->loop_counter;
+    const uint32_t writes0 = ModbusRTUClient.writes;
+    const uint32_t wd0_rng = reg(REG_WATCHDOG_CTR);
     run_ms(2500);
     expect(take_tx_reqs(tx, 16) == 0, "stuck RNG suppresses tractor TX");
     expect(g_entropy.failed && g_nonce_fail > 0, "stuck RNG is latched and counted");
-    expect(SHARED->loop_counter > 0 && ModbusRTUClient.writes > 0, "control loop keeps running");
+    expect(SHARED->loop_counter - loops0 >= 2400 && SHARED->alive_tick_ms == g_now_ms - 1,
+           "M4 mailbox keeps being stamped after the RNG fault");
+    expect(ModbusRTUClient.writes - writes0 >= 45 && (uint16_t)(reg(REG_WATCHDOG_CTR) - wd0_rng) >= 45,
+           "Modbus block and Opta watchdog keep running at 20 Hz after the RNG fault");
 
     if (g_failures) {
         fprintf(stderr, "tractor_methodg_sil: %d failure(s)\n", g_failures);
