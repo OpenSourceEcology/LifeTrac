@@ -28,10 +28,14 @@ step attenuator, no conducted shielded path, no 50 Ω terminations.
   `leg_prep.sh` labels these tags "Round A on the antennas (no attenuators
   since 2026-10-19)" and prints a NOTE unless `EVIDENCE_DIR` is under
   `bench-evidence/RS_13_range_edge_<date>/` or
-  `bench-evidence/RS_13_antenna_<date>/` (Prep item 6). In the [template](#results-template), fill
-  in Software, Firmware, the spot-check, Round A and the §8.6 rows, and mark
-  RF setup, the leakage check, Rounds B and C and The edge "not flown: no
-  attenuation equipment (2026-10-19)".
+  `bench-evidence/RS_13_antenna_<date>/` (Prep item 6). Since 2026-10-22 the
+  leg scripts refuse an `EVIDENCE_DIR` that already holds committed files,
+  such as the 2026-10-19 record, so each session gets a new dated folder.
+  In the [template](#results-template), fill in Software, Firmware, the
+  antenna rows of RF setup, the pass rule (before leg 1), the spot-check,
+  Round A and the §8.6 rows, and mark the conducted rows of RF setup, the
+  leakage check, Rounds B and C and The edge "not flown: no attenuation
+  equipment (2026-10-19)".
 - **Lost:** the range data (where SF7 / VECTOR runs out, VS frames/s per
   step). It needs a real distance test instead: a range walk with natural
   path loss ([TODO.md](../../../../TODO.md), S-HW.2).
@@ -250,7 +254,10 @@ idea, with a row per leg.
      10 s);
    - `clear_retained.py` before every leg;
    - park last;
-   - the P3 interleaving rule and the amended P8.
+   - the P3 interleaving rule and the amended P8;
+   - since 2026-10-22: a new dated `EVIDENCE_DIR`, the pass rule written in
+     RESULTS before leg 1 (margin and legs per codec), and `LOG_WINDOW
+     after_stop` after every leg.
 
    The tractor stays outside the shielding, with its camera on the screen.
 2. Health probes on both boards, keeping the whole output
@@ -291,7 +298,14 @@ idea, with a row per leg.
    `--strict` on VECTOR legs only). Before the first leg, set
    `EVIDENCE_DIR=<repo>/LifeTrac-v25/DESIGN-CONTROLLER/bench-evidence/RS_13_range_edge_<date>/legs`
    in `bench.env` (for the `A2*` antenna legs, `RS_13_antenna_<date>/legs`
-   is accepted too, since 2026-10-19). The scoring helpers are in the bench kit and take paths,
+   is accepted too, since 2026-10-19), with today's date: a new folder. Since
+   2026-10-22 `stage_boards.sh` and `leg_prep.sh` refuse (exit 7, before any
+   board action) a folder that already holds files tracked by git, and the
+   other leg scripts refuse it too, except `leg_post.sh`, which only warns
+   so that the folder never stops its park (it still stops at exit 3 while a
+   leg daemon runs). For a deliberate append, put
+   `BENCH_EVIDENCE_APPEND=1` in front of every script of the leg
+   (legs/README.md, "Evidence folder guard"). The scoring helpers are in the bench kit and take paths,
    so they need no copy: `rs13_rf_extract.py` (R0, RSSI/SNR, crc_dump,
    leakage check, tracking rule, closing check), `rs13_probe_score.py`
    (command delivery) and `rs13_digest_trace.py` (A16 confirmation and
@@ -314,13 +328,17 @@ Run from `firmware/x8_lora_bootloader_helper/`. Everything not named is at the
 harness default: `-TxPipeline v3`, depth 2, prepare-ahead 1, smooth pacing,
 `-CmdStreamMinGapS 1.0`, `-IdleDrainQuietS 1.5` and `-TxPowerDbm` empty.
 Pass `-TxBatch 0` every time, because the harness default (1) would batch
-frames that queue behind a stall into multi-fragment trains.
+frames that queue behind a stall into multi-fragment trains. `-StopDrainS`
+(2026-10-22): 2 s, the harness default, on DTS lines and 4 s on FHSS lines,
+where a saturated multi-fragment leg needs the longer drain at the stop
+(BENCH_RUNBOOK, "A leg", Stop drain). `leg_prep.sh --stop-drain S`
+(0 < S ≤ 30) changes it; fly both codecs of a round with the same value.
 
 - **DTS, VECTOR** (the 2a line with probes):
 
   ```powershell
   .\run_live_radio_monitor.ps1 -TxFeed camera -RegProfile 2 -ForceFrfHz <spot-checked carrier> `
-     -DurationS <300|180|120> -SynthFps 2 -KfRequestDisable 1 -ReactiveFire 1 -ProbeEcho 0 `
+     -DurationS <300|180|120> -StopDrainS 2 -SynthFps 2 -KfRequestDisable 1 -ReactiveFire 1 -ProbeEcho 0 `
      -LogFragArrivals 1 -TxBatch 0 -CamExtraEnv "-e LIFETRAC_ENCODE_MODE=9 -e LIFETRAC_VECTOR_DETAIL=80" -Archive
   ```
 
@@ -331,7 +349,7 @@ frames that queue behind a stall into multi-fragment trains.
 
   ```powershell
   .\run_live_radio_monitor.ps1 -TxFeed camera -RegProfile 1 `
-     -DurationS <300|180|120> -SynthFps 2 -KfRequestDisable 1 -ReactiveFire 0 -ProbeEcho 0 `
+     -DurationS <300|180|120> -StopDrainS 4 -SynthFps 2 -KfRequestDisable 1 -ReactiveFire 0 -ProbeEcho 0 `
      -LogFragArrivals 1 -TxBatch 0 -CamExtraEnv "-e LIFETRAC_ENCODE_MODE=9 -e LIFETRAC_VECTOR_DETAIL=80" -Archive
   ```
 
@@ -412,9 +430,9 @@ command delivery compare pooled legs (RS-13.1 A15).
 
 | what | rule | source |
 |---|---|---|
-| P1–P5, P7, P8 | As in RS13_VECTOR_LEG.md, amended 2026-10-10: P8 is the absolute 350 ms bound at 2 fps. **P3 interleaved:** pooled seq-gap loss of 2a + 2a′ against 2c + 2c′, two-sided Fisher exact p ≥ 0.05, or a margin stated in RESULTS before the legs. These legs carry probes, so their image loss compares only with each other, not with RS-13.1's probe-free legs | RS13_VECTOR_LEG.md Step 2 |
+| P1–P5, P7, P8 | As in RS13_VECTOR_LEG.md, amended 2026-10-10: P8 is the absolute 350 ms bound at 2 fps. **P3 interleaved:** pooled seq-gap loss of 2a + 2a′ against 2c + 2c′, against the margin written in RESULTS before leg 1 (amended 2026-10-22, RS13_VECTOR_LEG.md Amendment 2026-10-22): NOT WORSE when the one-sided 95 % Newcombe lower bound of VECTOR minus `mono_g4`, in frames received / expected, is above −margin (the template's one-liner). The 2026-10-19 legs flew under "two-sided Fisher exact p ≥ 0.05, or a margin stated in RESULTS before the legs"; the Fisher rule passes whenever the sample is too small to tell. These legs carry probes, so their image loss compares only with each other, not with RS-13.1's probe-free legs | RS13_VECTOR_LEG.md Step 2 |
 | R0 | Per leg, the median of the base's 10-s `rx_rf:` RSSI medians, and the same for SNR. R0 is the median over the four legs and must sit in −65 to −75 dBm. If it does not, change the fixed middle pad (radios parked) before Round B and re-measure with one 120 s VECTOR leg (e.g. `leg_prep.sh B0v --duration 120`). The 0 dB legs stand, with their level recorded | `py -3 rs13_rf_extract.py <A2c> <A2a> <A2c2> <A2a2>` (archives): the per-leg `row:` lines and `R0 over 4 legs ...`, with the −65 to −75 dBm verdict. On the antennas, add `--path antenna` (level only, no R0 verdict) |
-| command delivery (§8.6) | Per leg: the distinct PROBE seqs in the tractor's `LoRa cmd: PROBE seq=N … (rx#M)` lines that also appear in the base's `PROBE TX seq=N … (tx#K)` lines, over the base's PROBE TX count. Pool VECTOR (2a + 2a′) and `mono_g4` (2c + 2c′). **Not worse** = VECTOR ≥ `mono_g4`, or two-sided Fisher exact on delivered / undelivered p ≥ 0.05. Ignore the base's own `probe:` line: with `-ProbeEcho 0` it counts echoes and reads 0 %. `py -3 rs13_probe_score.py <archive> > <legs>/leg<X>_probe_score.txt` per leg; `py -3 rs13_probe_score.py <A2a> <A2a2> <A2c> <A2c2>` pools by codec (read from params.txt) and prints the Fisher p and the verdict; it pools per profile and codec and withholds the verdict (exit 1) unless every leg's params show `probe_echo=0`, a VECTOR or `mono_g4` codec and one profile (`reg_profile=2` gives the §8.6 verdict; FHSS legs get the same comparison, labelled FHSS). Each leg's `tail:` line lists the base PROBE seqs sent after the tractor's last logged one. They count as undelivered, but are often end-of-log artefacts, so check them before quoting a miss | archive `tx_daemon.log` (tractor), `rx_daemon.log` (base) |
+| command delivery (§8.6) | Per leg: the distinct PROBE seqs in the tractor's `LoRa cmd: PROBE seq=N … (rx#M)` lines that also appear in the base's `PROBE TX seq=N … (tx#K)` lines, over the base's PROBE TX count. Pool VECTOR (2a + 2a′) and `mono_g4` (2c + 2c′). **Not worse** (amended 2026-10-22) = `NOT WORSE (margin rule)` from `py -3 rs13_probe_score.py --margin <PP> <A2a> <A2a2> <A2c> <A2c2>`: the one-sided 95 % lower bound of VECTOR minus `mono_g4` delivery (Newcombe hybrid score interval) is above −PP, with PP and the legs per codec written in RESULTS before leg 1 (a 300 s DTS leg fired about 210 probes on 2026-10-19; the template's comment gives the count per arm a margin needs). The 2026-10-19 legs flew under "VECTOR ≥ `mono_g4`, or two-sided Fisher exact on delivered / undelivered p ≥ 0.05"; the Fisher lines still print, unchanged, but that rule passes whenever the sample is too small (390/400 against 396/400 gives p = 0.176). Ignore the base's own `probe:` line: with `-ProbeEcho 0` it counts echoes and reads 0 %. `py -3 rs13_probe_score.py <archive> > <legs>/leg<X>_probe_score.txt` per leg; the pooled run pools by codec (read from params.txt) and prints the Fisher p and the verdict, then the margin lines; it pools per profile and codec and withholds the verdict (exit 1) unless every leg's params show `probe_echo=0`, a VECTOR or `mono_g4` codec, one profile (`reg_profile=2` gives the §8.6 verdict; FHSS legs get the same comparison, labelled FHSS) and, since 2026-10-22, one `log_window` value (absent counts as one). Legs that share a `log_window` other than `after_stop` still pool, with a `!!` line under the margin verdict: the pass rule needs `after_stop` on every leg. Each leg's `tail:` line lists the base PROBE seqs sent after the tractor's last logged one. They count as undelivered, but are often end-of-log artefacts, so check them before quoting a miss (on an `after_stop` leg both logs end after both daemons stopped). On these `-ReactiveFire 1` legs every base `command TX opcode=` line should be 0x69: a `!! base command TX attempts other than PROBE (0x69)` line in a leg's block means control or profile traffic shared the command channel with the probes (0x63 is expected only on a 2d switch leg) | archive `tx_daemon.log` (tractor), `rx_daemon.log` (base) |
 | A16 confirmation (2a, 2a′, bw500) | Every resync episode opened by an **isolated** lost frame (a seq gap of one frame, and no other loss within 25 frames after it) ends **by DIGEST** (`digest` in the dry-run `resync:` episodes line) within **≈ 25 frames of the lost frame**, counted in capture rows from the seq gap to the episode's end. That is the `a16_sil.py` acceptance figure; a lost DEL's ghost alone holds the base out of step for TTL_FRAMES = 20 applied frames. No such episode ends at an epoch start more than 25 frames after its loss. `py -3 rs13_digest_trace.py <legs>/legA2a_base.jsonl <legs>/legA2a2_base.jsonl` prints the table rows of the A16 confirmation, the per-episode trace (keep it as `<legs>/leg<X>_digest_trace.txt`) and the pooled verdict with the thin count; its trace shows the base's live count back at the encoder's DIGEST `n_live` within those frames, with no later row where the encoder counts more live shapes than the base. A loss-opened episode that is not scored (not isolated, or leg loss > 10 %) is still traced in full, across the next loss. If it ends at an epoch start more than 25 rows after its loss, or the encoder still counts more live shapes than the base after the last equal count, the tool flags it: `!! A16 shape` in its row and beside the verdict. Read that trace before quoting the verdict. When it is not isolated, its back-in-step cell reads `n/a (next loss at row N)` or `n/a (burst of N frames)`. The tool refuses (exit 2) a capture with a second meta line, a line that is not JSON with a ts and hex, a payload the replay cannot parse or a VECTOR body the store rejects. Record the base's `ttl_dropped`, and `tractor-log`'s `counters` line, which covers the leg (the harness starts a fresh `camera_service` for each): at V0 one frame in four gets the repair share (`share_frames` ≈ `frames` ÷ 4), with its re-sends, the carousel re-sends and the DEL repeats beside it. `counters: none on these lines` means a `camera_service` older than the counters: check the image. The final `digest_ok` is not `False` (`leg_replay.py`'s `last DIGEST checked` beside it) | capture summary, `leg_replay.py`, `rs13_digest_trace.py` |
 | emitter fold | `scripts/fold_emitter.py` on every archive with ≥ 5 lost frames. A significant fold at 7.07–7.09 s (random-frame null p < 0.05) means the RS-11.6 emitter still reaches the link: re-check the carrier and the shielding before Round B | archive `rx_daemon.log` |
 
@@ -620,7 +638,8 @@ Copy into `bench-evidence/RS_13_range_edge_<date>/RESULTS.md` and fill every
 passed, what failed, the edge per profile and codec>.**
 
 Procedure: firmware/x8_lora_bootloader_helper/bench_tools/RS13_RANGE_EDGE_LEG.md
-@ `<sha>`; leg criteria RS13_VECTOR_LEG.md as amended 2026-10-10. GOs: Round A
+@ `<sha>`; leg criteria RS13_VECTOR_LEG.md as amended 2026-10-10 and
+2026-10-22. GOs: Round A
 <date, time, operator's words>; Round B <…>; Round C <…>.
 
 ## Software under test
@@ -644,6 +663,28 @@ Procedure: firmware/x8_lora_bootloader_helper/bench_tools/RS13_RANGE_EDGE_LEG.md
 
 ## RF setup
 
+<!-- Fill before leg 1 and check again at the start of every later session:
+     a physical change between sessions (an antenna swapped, a board moved
+     or turned, a cable or adapter added) leaves no trace in the logs
+     (added 2026-10-22). On the antennas (the A2* legs) fill this table and
+     mark the conducted table below "not flown: no attenuation equipment
+     (2026-10-19)". -->
+
+| item | base 2D0A1209DABC240B | tractor 2E2C1209DABC240B |
+|---|---|---|
+| antenna part / model | <maker, part number, gain dBi> | |
+| cable / adapter | <cable type and length, connectors, every adapter in the path; or "antenna on the board connector"> | |
+| position | <where on the bench or in the room, height above the surface, distance to walls and metal> | |
+| orientation | <antenna axis (vertical / horizontal, tilt), which way the board faces> | |
+
+Placement and separation: <antenna-to-antenna distance (cm), line of sight or
+what is between the boards, metal, the PC, other radios nearby and their state>.
+Unchanged since <previous session, date>? <yes | no — what changed>.
+Photo: `legs/rf_setup_<date>.jpg` <both boards and antennas in one frame, or one
+per board>.
+
+Conducted path:
+
 | item | value |
 |---|---|
 | tractor jack | pad A <dB, marking / serial> |
@@ -664,6 +705,31 @@ Spot-check: `legs/spot_check_<date>.jsonl`; pick <Hz>; floor at the pick <dBm>;
 <minutes> before the first DTS leg; `FRF readback: … (OK)` on both boards on
 every DTS leg <yes / list>.
 
+## Pass rule (written before leg 1)
+
+<!-- Added 2026-10-22. Write this section before the first leg flies and do
+     not change it afterwards. One row per criterion that compares VECTOR
+     with mono_g4, each with its own metric, margin and bound. A two-sided
+     Fisher p ≥ 0.05 is not a pass rule: it passes whenever the sample is
+     too small to tell (390/400 against 396/400 gives p = 0.176). Count per
+     arm for 80 % power at a one-sided 95 % bound (normal approximation):
+     true rates 98 % / 98 % need 606 / 270 / 152 for a 2 / 3 / 4 pp margin,
+     97 % / 97 % need 900 / 400 / 225; the score bound is a little stricter.
+     A 300 s DTS leg fired about 210 probes on 2026-10-19, so at 98 % a 3 pp
+     margin needs about 2 legs per codec and a 2 pp margin 3 to 4. -->
+
+| item | value |
+|---|---|
+| command delivery (§8.6) | tractor PROBE seqs that the base sent / base PROBE TX per codec, over every `-ReactiveFire 1 -ProbeEcho 0` leg of one profile; margin <PP> pp: NOT WORSE when `py -3 rs13_probe_score.py --margin <PP> <archive> [<archive> …]` prints `NOT WORSE (margin rule)` |
+| P3 frame loss | frames received / expected per codec, pooled over each leg's `capture seq gaps` line (`rs12_leg_report.py --capture`; expected = received + lost): VECTOR legs <A2a, A2a2> against `mono_g4` legs <A2c, A2c2>. Margin <PP> pp, the same bound; run in `bench_tools`: `py -3 -c "import rs13_probe_score as s; print(*s.margin_rule((<rx V>, <exp V>), (<rx M>, <exp M>), <PP>, 'P3 frame loss'), sep='\n')"` (its lines say delivery and probes: read frames) |
+| legs per codec | <n> |
+| probes per leg | <expected, e.g. ~210 on a 300 s DTS leg>; per arm <legs × per leg>, against the <n> per arm the margin needs at the expected rates |
+| interleaving order | <e.g. A2c, A2a, A2c2, A2a2, …> |
+| kit commit | `<sha>` (the harness and bench kit every leg flies with) |
+| `-StopDrainS` | <s>, the same on every leg the rule pools (params `stop_drain_s`; `leg_prep.sh` writes 2 s on DTS) |
+| `log_window` | `after_stop` on every leg (params). A leg that is not (`after_stop_unverified`, or absent) is re-flown, or dropped under this rule: <rule> |
+| written | <date, time, by whom — before leg 1> |
+
 ## Round A — the 0 dB step (DTS @ <pick>)
 
 Flight order: 2c, 2a, 2c′, 2a′. Harness lines: <paste>. Tractor reset per leg
@@ -672,9 +738,11 @@ Flight order: 2c, 2a, 2c′, 2a′. Harness lines: <paste>. Tractor reset per le
 | # | criterion | 2c | 2a | 2c′ | 2a′ | pass? |
 |---|---|---|---|---|---|---|
 | archive | | | | | | |
+| `log_window` | params; `after_stop` on every leg (copy `log_window_detail` beside `after_stop_unverified`) | | | | | |
+| `stop_drain_s` | params; one value on every leg | | | | | |
 | P1 | dry-run checks, loss rule (`store:`, `resync:` episodes, final `digest_ok`, `last DIGEST checked`) | n/a | | n/a | | |
 | P2 | `published frame_id` ÷ 300 | | | | | |
-| P3 | `capture seq gaps`; pooled VECTOR <x/y> vs mono_g4 <x/y>, Fisher p <p> | | | | | |
+| P3 | `capture seq gaps`; pooled VECTOR <x/y> vs mono_g4 <x/y>; margin <PP> pp, lower bound <±x.xx pp>, <NOT WORSE (margin rule), or not shown at this margin> | | | | | |
 | P4 | max K, K = 1 count, ABORTED | | | | | |
 | P5 | gaps > 3 s | | | | | |
 | P7 | link_stats `rx_codec_name` | | | | | |
@@ -682,8 +750,11 @@ Flight order: 2c, 2a, 2c′, 2a′. Harness lines: <paste>. Tractor reset per le
 | R0 | `rx_rf:` median RSSI / SNR | | | | | |
 | cmd | PROBE delivered / sent (tractor ∩ base seqs) | | | | | |
 
-Command delivery (§8.6): VECTOR <x/y = %> vs mono_g4 <x/y = %>, Fisher p <p>,
-<PASS | FAIL>.
+Command delivery (§8.6): VECTOR <x/y = %> vs mono_g4 <x/y = %>;
+`rs13_probe_score.py --margin <PP>`: lower bound <±x.xx pp>, <NOT WORSE
+(margin rule) | not shown at this margin>; Fisher p <p> (printed for
+comparison with older records); `!!` lines (other opcodes, log window)
+<none | list>; <PASS | FAIL> against the pass rule above.
 
 A16 confirmation (bw500):
 

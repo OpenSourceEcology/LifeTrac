@@ -77,7 +77,7 @@ case $BW in bw250) REGP=1; BUDGET=203 ;; bw500) REGP=2; BUDGET=243 ;; esac
 if [ -z "$SMIN" ]; then case $SCENE in *moving*|*yt*|*youtube*) SMIN=8 ;; *) SMIN=0 ;; esac; fi
 if [ $FROM_WORK = 1 ]; then WDIR=/work; SCRIPT=/work/camera_service.py; else WDIR=/app; SCRIPT=camera_service.py; fi
 L=$BOARD_STAGE/legs
-E=$(bench_evidence_dir) || die "cannot create $EVIDENCE_DIR"
+E=$(bench_evidence_dir) || die "no evidence folder: $EVIDENCE_DIR (see above)"
 OUT="$BENCH_SCRATCH/step1_$TAG"
 # The run's console into the evidence folder too. tee ignores Ctrl+C, so the EXIT
 # trap's cleanup and its "step1 exit=<rc>" line still reach the transcript.

@@ -400,8 +400,59 @@ def main(argv: list[str] | None = None) -> int:
     # BEFORE it stopped the daemons (TX log first, then RX), while the post
     # brackets are read after; a harness that reads them after the stop says
     # so with log_window=after_stop in params.txt.
+    # 2026-10-22: the harness writes after_stop only when both daemon stops
+    # worked and both logs hold their SIGTERM shutdown line; otherwise it
+    # writes log_window=after_stop_unverified and the reason in
+    # log_window_detail=. Only the exact after_stop drops the note; any other
+    # value, or none (every archive before 10-22), keeps the old note.
+    # The unverified note is printed after the loss block (whole-log,
+    # shared-window and capture seq-gap lines), not here: leg_post.sh shows
+    # only the report's first 8 lines on the console, and the capture line
+    # (the loss of record) must stay among them (2026-10-22 review). Its
+    # wording follows the reason: a docker stop the harness could not
+    # confirm leaves the old artefact possible (a daemon still ran when its
+    # log was read); a missing SIGTERM shutdown line after both stops
+    # worked is the opposite case, a daemon that died (or a log that did
+    # not come back whole) before the stop, so that log ends early.
     m = re.search(r"log_window=(\S+)", params)
-    logs_after_stop = bool(m) and m.group(1) == "after_stop"
+    log_window = m.group(1) if m else None
+    logs_after_stop = log_window == "after_stop"
+    logs_unverified = log_window == "after_stop_unverified"
+    unverified_note = None
+    if logs_unverified:
+        md = re.search(r"^log_window_detail=(.*?)\s*$", params, re.M)
+        detail = (md.group(1) if md and md.group(1)
+                  else "params.txt has no log_window_detail")
+        stop_failed = re.search(r"\b(?:tx|rx)_smoke stop:", detail)
+        no_shutdown = re.search(r"\b(?:tx|rx)_smoke log has no shutdown line",
+                                detail)
+        if stop_failed:
+            why = ("a daemon stop was not confirmed, so that daemon may "
+                   "still have run when its log was read and the logs may "
+                   "not cover the post-stop window — a 'received > sent' "
+                   "line above or a small positive FIRMWARE DROP below can "
+                   "carry the old log-window artefact (logs read while a "
+                   "daemon ran), not the link or the firmware")
+            if no_shutdown:
+                why += ("; a log without its shutdown line can also mean "
+                        "that daemon died before the stop, so its log ends "
+                        "early")
+        elif no_shutdown:
+            why = ("both daemon stops were confirmed, but a daemon log has "
+                   "no SIGTERM shutdown line — that daemon may have died "
+                   "before the stop (look for a traceback in its log) or "
+                   "its log did not come back whole, so the log can end "
+                   "before the leg did and the log-derived figures above "
+                   "cover less than the leg (an RX log that ends early "
+                   "inflates the whole-log loss and the FIRMWARE DROP "
+                   "below); this is not the old read-while-running artefact")
+        else:
+            why = ("the harness could not confirm that each daemon ran until "
+                   "its stop and had stopped before its log was read, so the "
+                   "log-derived figures above and a FIRMWARE DROP below may "
+                   "not cover the leg's window")
+        unverified_note = (f"  !! LOG WINDOW UNVERIFIED (log_window_detail: "
+                           f"{detail}): {why}")
 
     # PR #125 review round 6 (2026-09-15): `frags_ok=` is the TX daemon's LAST
     # periodic stats line and can be stale independently of the RX stats
@@ -496,6 +547,10 @@ def main(argv: list[str] | None = None) -> int:
             hint = ("read the shared-window line" if shared_ok else
                     "re-run with --capture <leg>_base.jsonl for the seq-gap "
                     "figure (no shared-window figure here)")
+        if logs_unverified:
+            # 2026-10-22 (review): the note is printed below the loss block.
+            hint += ("; the log window is unverified, see the LOG WINDOW "
+                     "UNVERIFIED note below")
         print(f"  !! received {rcvd} > sent {sent}: the TX and RX logs disagree "
               f"on the window; whole-log loss shown as 0 — {hint}")
         rcvd = sent
@@ -514,6 +569,8 @@ def main(argv: list[str] | None = None) -> int:
         for line in format_seq_loss(seq_gap_loss(frames), args.capture.name,
                                     names):
             print(line)
+    if unverified_note:
+        print(unverified_note)
 
     # per-index loss histogram (attribution instrument)
     idx: collections.Counter = collections.Counter()
@@ -607,7 +664,19 @@ def main(argv: list[str] | None = None) -> int:
         fw_drop = d.get("radio_rx_ok", 0) - rcvd_host
         print(f"FIRMWARE DROP (drx_ok - host URCs): "
               f"{d.get('radio_rx_ok', 0)} - {rcvd_host} = {fw_drop}")
-        if not logs_after_stop:
+        if logs_unverified:
+            # 2026-10-22: the stop or a shutdown line was not confirmed (the
+            # LOG WINDOW UNVERIFIED note above says which). Worded for both
+            # causes: a daemon read while it ran, or an RX daemon that died
+            # before its stop (its log ends early, the bracket does not).
+            print("  (log window: after_stop_unverified, see the LOG WINDOW "
+                  "UNVERIFIED note above — if a daemon still ran when its "
+                  "log was read, or the RX daemon died before its stop, "
+                  "fragments the base received after its log ended count in "
+                  "drx_ok but not in the log: a positive drop can be that "
+                  "window, not the firmware; rx_urc_lost on the URC-path "
+                  "line counts the URCs the L072 really lost)")
+        elif not logs_after_stop:
             # Every 10-18/10-19 leg read 4-5 here (4-6 with the old clamp):
             # mostly the fragments the base decoded between the RX log read
             # and the daemon stop, which are in the post bracket's

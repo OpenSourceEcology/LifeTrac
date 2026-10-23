@@ -30,6 +30,9 @@
 #            leg<leg>_deltas.txt        bracket_deltas.py <legs> <leg>, when the kit has it
 #          A scorer's failure is reported with its exit code ("scorer exit codes:" line)
 #          and never stops the post step or the park.
+#          An EVIDENCE_DIR that already holds files tracked by git (a committed record)
+#          or is dated another day gets a WARNING in the transcript, never a stop: the
+#          other leg scripts refuse a committed folder, this one must still park.
 # Boards:  waits for and removes rs13_cap_base (a re-run finds it gone and keeps the
 #          files the first run wrote); then refuses the brackets and the park while a
 #          leg daemon (tx_smoke / rx_smoke / synth_pub / camera_svc) still runs or
@@ -82,7 +85,16 @@ fi
 ARCH=$(win_path "$ARCH")
 [ -f "$ARCH/params.txt" ] || die "not a harness archive (no params.txt): $ARCH"
 
-E=$(bench_evidence_dir) || die "cannot create $EVIDENCE_DIR"
+# Committed-evidence guard (2026-10-22): WARN ONLY here, never a refusal. This script
+# parks both radios at the end, and the park is safety-critical: where the evidence
+# lands must never keep the radios from being parked. So --warn-only: a committed (or
+# wrongly dated) EVIDENCE_DIR is named in the transcript and the run goes on to the
+# park; sort the files out afterwards. (leg_prep.sh refuses such a folder before any
+# board action, so here it fires when EVIDENCE_DIR changed after the prep, or the prep
+# ran with BENCH_EVIDENCE_APPEND=1 and this run without it.) Called directly, so
+# BENCH_EVIDENCE_MSG reaches the transcript below.
+bench_evidence_guard --warn-only 2>/dev/null
+E=$(bench_evidence_dir --warn-only) || die "no evidence folder: $EVIDENCE_DIR (see above) -- nothing was parked: bash \"$(win_path "$LEGS_DIR/power_up_guard.sh")\" parks both radios"
 # tee ignores Ctrl+C: the EXIT trap's cleanup lines still reach the transcript, and
 # the shell never writes into a pipe whose reader the signal killed.
 exec > >(trap '' INT TERM; exec tee -a "$E/leg${LEG}_post_transcript.txt") 2>&1
@@ -138,6 +150,7 @@ probe_on() {   # probe_on WHO IMAGE SCRIPT: one UART probe in a container named 
 }
 
 stamp "== leg $LEG post (archive $ARCH)"
+[ -z "$BENCH_EVIDENCE_MSG" ] || printf '%s\n' "$BENCH_EVIDENCE_MSG"      # the guard's WARNING / NOTE, never a stop
 REGP=$(param reg_profile); FRF=$(param force_frf_hz)
 [ "$REGP" = 1 ] && PROF=image_bw250 || PROF=image_bw500
 

@@ -29,7 +29,7 @@ set -u
 LEG=${1:-2d}
 case $LEG in -h|--help) bench_usage; exit 0 ;; esac
 bench_check_name "leg tag" "$LEG"
-E=$(bench_evidence_dir) || die "cannot create $EVIDENCE_DIR"
+E=$(bench_evidence_dir) || die "no evidence folder: $EVIDENCE_DIR (see above)"
 M="docker exec $BASE_BROKER_CONTAINER"
 ACKS=/tmp/leg${LEG}_acks.txt                     # inside the broker container (its /tmp is not the host's)
 OVR=lifetrac/v25/control/encode_mode_override

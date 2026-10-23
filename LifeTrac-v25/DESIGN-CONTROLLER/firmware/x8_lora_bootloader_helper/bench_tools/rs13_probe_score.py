@@ -9,7 +9,7 @@ the base's `PROBE TX seq=N ... (tx#K)` lines (rx_daemon.log), over the base's
 PROBE TX count. The base's own `probe:` line counts echoes, so with
 -ProbeEcho 0 it reads 0 % and is ignored here.
 
-    py -3 rs13_probe_score.py <archive_dir> [<archive_dir> ...]
+    py -3 rs13_probe_score.py [--margin PP] <archive_dir> [<archive_dir> ...]
 
 Prints one block per archive (keep it as legs/leg<X>_probe_score.txt). Its
 `tail:` line lists the base PROBE seqs sent after the last one the tractor
@@ -43,6 +43,37 @@ the comparison pools VECTOR and mono_g4 legs of one profile flown with
 scores 0 delivered: that is a real result on a dead reverse link (RS-0.12
 B1, 0/86), and the block says so loudly. Timestamps are not used to score:
 the base and tractor clocks are not comparable.
+
+Log window (2026-10-22). params.txt log_window says when the harness read the
+daemon logs: after_stop = after both daemons stopped, so both logs end
+together; absent = an older harness, which read the tractor's log and then
+the base's while both daemons still ran, so a tail seq can be a read-window
+artefact (2 of 10-19's 418/420 mono_g4 misses were). A leg that is not
+after_stop (absent, or e.g. after_stop_unverified when the harness could not
+confirm a stop) says so in its block, with log_window_detail when given, and
+a set of legs whose log_window values differ (absent counts as one value) is
+not pooled (exit 1): their tails are not counted alike.
+
+Other opcodes (2026-10-22). On a -ReactiveFire 1 leg every base `command TX
+opcode=` attempt should be the PROBE, 0x69. A `!!` line tallies the others
+(0x60 REQ_KEYFRAME, 0x63 ENCODE_MODE, ...): control or profile traffic that
+shared the command channel with the probes. On a 2d switch leg
+leg2d_switch.sh sends 0x63 on purpose, so there it is expected. It withholds
+nothing.
+
+--margin PP (2026-10-22) adds a non-inferiority rule to the pooled
+comparison: the pooled difference VECTOR minus mono_g4 in delivery, its
+one-sided 95 % lower confidence bound (Newcombe's hybrid score interval,
+method 10, built from Wilson score intervals), NOT WORSE (margin rule) when
+that bound is above -PP and "not shown at this margin" otherwise, and roughly
+how many probes per arm the bound would need to clear -PP if the observed
+rates held. The Fisher lines print unchanged, so old outputs still compare,
+but the Fisher rule passes whenever the sample is too small to tell (390/400
+against 396/400 gives p = 0.176): a pass rule written before the legs should
+name the margin. Pooling treats every probe as independent; leg-to-leg
+variation is not modelled. Legs that share a log_window other than after_stop
+still pool, but a `!!` line under the margin verdict says that it does not
+meet a pass rule needing log_window=after_stop on every leg.
 """
 from __future__ import annotations
 
@@ -50,6 +81,8 @@ import argparse
 import math
 import os
 import re
+from fractions import Fraction
+from statistics import NormalDist
 
 _BASE_MARK = re.compile(r"PROBE TX\b")
 _BASE_TX = re.compile(r"PROBE TX seq=(\d+) phase_ms=(-?\d+) size_b=(\d+) \(tx#(\d+)\)")
@@ -57,13 +90,24 @@ _TR_MARK = re.compile(r"LoRa cmd: PROBE\b")
 _TR_RX = re.compile(r"LoRa cmd: PROBE seq=(\d+) phase_ms=(-?\d+) \(rx#(\d+)\)")
 # image_rx_daemon._send_command_frame logs every attempt; PROBE is opcode 0x69.
 _ON_AIR = re.compile(r"command TX opcode=0x69 copy=\d+/\d+ (OK \(on air\)|FAILED)")
+# The same attempt line for any opcode (2026-10-22: the other-opcode tally).
+_CMD_TX = re.compile(r"command TX opcode=0x([0-9a-fA-F]{2}) copy=\d+/\d+ (OK \(on air\)|FAILED)")
+PROBE_OPCODE = 0x69
+# lora_proto.py CMD_OP_* (base -> tractor), for the other-opcode tally.
+OPCODE_NAME = {0x60: "REQ_KEYFRAME", 0x63: "ENCODE_MODE", 0x65: "RADIO_PROFILE",
+               0x67: "RADIO_PROFILE_CONF", 0x6B: "CTRL_DITTO", 0x6C: "TILE_STALE"}
 _MODE = re.compile(r"LIFETRAC_ENCODE_MODE=(\d+)")
 # A daemon log line (Python logging's asctime): proof the file is a daemon log.
 _TS_LINE = re.compile(r"^\ufeff?\d{4}-\d\d-\d\d \d\d:\d\d:\d\d,\d{3} ", re.M)
 CODEC_BY_MODE = {"9": "vector", "6": "mono_g4"}
 # params reg_profile values whose legs pool (host_cfg_keys.h REG_PROFILE_*)
 PROFILE_LABEL = {"1": "FHSS", "2": "DTS"}
+# params log_window: the harness read both daemon logs after both had stopped.
+LOG_WINDOW_AFTER_STOP = "after_stop"
 ALPHA = 0.05
+# The margin rule's one-sided 95 % bound: z = 1.6449, i.e. the lower end of
+# the two-sided 90 % interval.
+Z_ONE_SIDED_95 = NormalDist().inv_cdf(0.95)
 TAIL_SHOWN = 20
 
 
@@ -121,11 +165,12 @@ def score_leg(rx_text: str, tx_text: str) -> dict:
     """Score one leg from the base (rx_daemon) and tractor (tx_daemon) logs.
 
     Returns ``sent`` (base PROBE TX lines), ``delivered`` (distinct tractor
-    seqs that the base sent), the tractor line count and duplicates, and the
+    seqs that the base sent), the tractor line count and duplicates, the
     base's on-air / failed attempts for opcode 0x69 (None where the base log
-    predates that line). Raises ScoreError on anything that would make the
-    figure wrong rather than low, including a log that is not a daemon log
-    (the tractor's is checked only when the base fired a probe)."""
+    predates that line), and ``other_ops``: {opcode: (attempts, on air)} for
+    every other opcode the base attempted. Raises ScoreError on anything that
+    would make the figure wrong rather than low, including a log that is not
+    a daemon log (the tractor's is checked only when the base fired a probe)."""
     if not _TS_LINE.search(rx_text):
         raise ScoreError("rx_daemon.log holds no timestamped daemon line: the base log is "
                          "missing or empty (a failed `docker logs rx_smoke`)")
@@ -162,6 +207,15 @@ def score_leg(rx_text: str, tx_text: str) -> dict:
             f"log ({stray[:10]}): the two logs are not from the same leg")
     on_air = _ON_AIR.findall(rx_text)
     ok = sum(1 for o in on_air if o.startswith("OK"))
+    # Every other opcode the base attempted (2026-10-22): on a -ReactiveFire 1 leg
+    # the base should send PROBEs only, so these are control or profile traffic
+    # that shared the command channel with the probes.
+    other_ops: dict[int, tuple[int, int]] = {}
+    for op_hex, outcome in _CMD_TX.findall(rx_text):
+        op = int(op_hex, 16)
+        if op != PROBE_OPCODE:
+            n, n_ok = other_ops.get(op, (0, 0))
+            other_ops[op] = (n + 1, n_ok + outcome.startswith("OK"))
     # The tail: base seqs sent after the last one the tractor logged (in the base's
     # send order). Undelivered by construction; at the end of a leg, often probes
     # that landed after the tractor's log was captured. Informational only.
@@ -179,6 +233,7 @@ def score_leg(rx_text: str, tx_text: str) -> dict:
         "failed": len(on_air) - ok if on_air else None,
         "tx_daemon_lines": sum(1 for line in tx_text.splitlines() if line.strip()),
         "tail": tail, "tail_after": tail_after,
+        "other_ops": dict(sorted(other_ops.items())),
     }
 
 
@@ -199,6 +254,73 @@ def fisher_two_sided(a: int, b: int, c: int, d: int) -> float:
     p = sum(q for q in (prob(x) for x in range(max(0, k - n2), min(k, n1) + 1))
             if q <= p_obs * (1 + 1e-9))
     return min(1.0, p)
+
+
+def wilson_interval(x: float, n: float, z: float) -> tuple[float, float]:
+    """Wilson score interval (no continuity correction) for x successes in n:
+    the p0 where |x/n - p0| = z sqrt(p0 (1 - p0) / n), in closed form. x may
+    be fractional (probes_per_arm_to_clear scales the counts)."""
+    den = n + z * z
+    centre = (x + z * z / 2) / den
+    half = z / den * math.sqrt(max(0.0, x * (n - x) / n) + z * z / 4)
+    return max(0.0, centre - half), min(1.0, centre + half)
+
+
+def newcombe_interval(x1: float, n1: float, x2: float, n2: float,
+                      z: float) -> tuple[float, float]:
+    """Newcombe's hybrid score interval for p1 - p2 (method 10 of Newcombe
+    1998, Stat Med 17:873-890): each proportion's Wilson limits l, u, then
+    p1 - p2 - sqrt((p1 - l1)^2 + (u2 - p2)^2) to
+    p1 - p2 + sqrt((u1 - p1)^2 + (p2 - l2)^2).
+
+    Checked (2026-10-22) against the paper's worked examples, Table II method
+    10 at 95 % (z = 1.96): 56/70 - 48/80 gives 0.0524 to 0.3339, 9/10 - 3/10
+    0.1705 to 0.8090, 10/10 - 0/20 0.6791 to 1.0000 (the SIL tests pin them),
+    and the Wilson limits against an independent bisection of the score-test
+    equation (also in the tests)."""
+    p1, p2 = x1 / n1, x2 / n2
+    l1, u1 = wilson_interval(x1, n1, z)
+    l2, u2 = wilson_interval(x2, n2, z)
+    d = p1 - p2
+    return (d - math.sqrt((p1 - l1) ** 2 + (u2 - p2) ** 2),
+            d + math.sqrt((u1 - p1) ** 2 + (p2 - l2) ** 2))
+
+
+def probes_per_arm_to_clear(p1: float, p2: float, margin: float,
+                            z: float = Z_ONE_SIDED_95, limit: int = 10 ** 9) -> int | None:
+    """Smallest n such that the Newcombe lower bound of p1 - p2, with n probes
+    per arm at exactly these rates, is above -margin (fractions, not pp).
+    None when p1 - p2 <= -margin (no n will do) or n would exceed ``limit``;
+    a shortfall of exactly the margin can land on either side of that float
+    test and then returns None by the limit, so a caller holding the counts
+    decides that case exactly (margin_rule does).
+
+    Approximate: it assumes the rates hold exactly, so at that n the bound
+    clears about half the time; it is not a power calculation. It searches
+    the score bound itself rather than the normal approximation
+    n = z^2 (p1 q1 + p2 q2) / (p1 - p2 + margin)^2, which has no variance
+    at 100 % (10-19: VECTOR 433/433) and then asks for far too few probes.
+    The bound rises with n at fixed rates (both Wilson half-widths shrink),
+    so a doubling search and a bisection find it."""
+    if p1 - p2 <= -margin:
+        return None
+
+    def clears(n: int) -> bool:
+        return newcombe_interval(p1 * n, n, p2 * n, n, z)[0] > -margin
+
+    hi = 1
+    while not clears(hi):
+        hi *= 2
+        if hi > limit:
+            return None
+    lo = hi // 2
+    while hi - lo > 1:
+        mid = (lo + hi) // 2
+        if clears(mid):
+            hi = mid
+        else:
+            lo = mid
+    return hi
 
 
 def _pct(x: int, y: int) -> str:
@@ -245,13 +367,38 @@ def format_leg(name: str, params: dict[str, str], res: dict) -> list[str]:
         out.append("  !! probe_echo is on: the tractor's echo deafens the window the next "
                    "command needs (RS-0.12: 56 % with echo, 91 % without), so this score "
                    "does not compare with -ProbeEcho 0 legs")
+    others = res.get("other_ops") or {}
+    if params.get("reactive_fire") == "1" and others:
+        tally = ", ".join(f"0x{op:02x}{' ' + OPCODE_NAME[op] if op in OPCODE_NAME else ''} "
+                          f"{n} ({n_ok} on air)" for op, (n, n_ok) in others.items())
+        line = (f"  !! base command TX attempts other than PROBE (0x69) on this -ReactiveFire 1 "
+                f"leg: {tally}: control or profile traffic shared the command channel with "
+                f"the probes")
+        if 0x63 in others:
+            line += (" (0x63 is expected only on a 2d switch leg, where leg2d_switch.sh sends it "
+                     "on purpose; on any other leg it is unplanned traffic)")
+        out.append(line)
+    window = params.get("log_window")
+    if not window:
+        out.append("  log window: params.txt has no log_window, so an older harness read the "
+                   "tractor's log, then the base's, while both daemons still ran: a tail seq can "
+                   "be a read-window artefact. Pools only with legs read the same way")
+    elif window != LOG_WINDOW_AFTER_STOP:
+        # e.g. after_stop_unverified: a docker stop at the leg's end was not confirmed,
+        # and the harness gives its reason in log_window_detail.
+        detail = params.get("log_window_detail")
+        out.append(f"  log window: log_window={window}, not {LOG_WINDOW_AFTER_STOP}"
+                   + (f" (log_window_detail: {detail})" if detail else "")
+                   + ": pools only with legs of the same log_window")
     return out
 
 
-def pooled_verdict(vec: tuple[int, int], mono: tuple[int, int], profile: str = "2") -> list[str]:
+def pooled_verdict(vec: tuple[int, int], mono: tuple[int, int], profile: str = "2",
+                   margin_pp: float | None = None) -> list[str]:
     """vec / mono: (delivered, sent) pooled per codec, all legs on ``profile``
     (params reg_profile). DTS ("2") prints the VECTOR_SCENE 8.6 verdict; any
-    other profile the same comparison, labelled with it."""
+    other profile the same comparison, labelled with it. With ``margin_pp``
+    the margin rule's lines follow the Fisher lines, which do not change."""
     (dv, sv), (dm, sm) = vec, mono
     p = fisher_two_sided(dv, sv - dv, dm, sm - dm)
     if profile == "2":
@@ -269,6 +416,44 @@ def pooled_verdict(vec: tuple[int, int], mono: tuple[int, int], profile: str = "
         out.append(f"{head}: NOT WORSE (VECTOR below mono_g4, Fisher p = {p:.3g} >= {ALPHA})")
     else:
         out.append(f"{head}: WORSE (VECTOR below mono_g4, Fisher p = {p:.3g} < {ALPHA})")
+    if margin_pp is not None:
+        out += margin_rule(vec, mono, margin_pp, head)
+    return out
+
+
+def margin_rule(vec: tuple[int, int], mono: tuple[int, int], margin_pp: float,
+                head: str) -> list[str]:
+    """The --margin lines (2026-10-22): VECTOR minus mono_g4 in delivery, its
+    one-sided 95 % Newcombe lower bound, the verdict against -margin_pp, and
+    the approximate probes per arm that bound needs at the observed rates."""
+    (dv, sv), (dm, sm) = vec, mono
+    p1, p2, m = dv / sv, dm / sm, margin_pp / 100.0
+    # Whether no probe count can clear the margin, decided exactly on the counts
+    # (2026-10-22 review): a shortfall of exactly the margin, e.g. 184/200 against
+    # 188/200 at 2 pp, comes out a hair above -m in floats.
+    hopeless = Fraction(dv, sv) - Fraction(dm, sm) <= -Fraction(repr(margin_pp)) / 100
+    lo = newcombe_interval(dv, sv, dm, sm, Z_ONE_SIDED_95)[0]
+    out = [f"margin rule, {margin_pp:g} pp: VECTOR minus mono_g4 delivery "
+           f"{100 * (p1 - p2):+.2f} pp, one-sided 95 % lower bound {100 * lo:+.2f} pp "
+           f"(Newcombe hybrid score interval, method 10)"]
+    if lo > -m:
+        out.append(f"{head}, margin {margin_pp:g} pp: NOT WORSE (margin rule): the lower bound "
+                   f"{100 * lo:+.2f} pp is above -{margin_pp:g} pp")
+    else:
+        out.append(f"{head}, margin {margin_pp:g} pp: not shown at this margin: the lower bound "
+                   f"{100 * lo:+.2f} pp is not above -{margin_pp:g} pp")
+    n = None if hopeless else probes_per_arm_to_clear(p1, p2, m)
+    if n is None:
+        why = ("no number would do: VECTOR's observed shortfall, "
+               f"{100 * (p2 - p1):.2f} pp, is not smaller than the margin" if hopeless
+               else "more than 10^9")
+        out.append(f"  probes per arm for the bound to clear -{margin_pp:g} pp at these rates: "
+                   f"{why}")
+    else:
+        out.append(f"  probes per arm for the bound to clear -{margin_pp:g} pp if these rates "
+                   f"held: ~{n} (approximate: the same bound at these rates with n per arm, so "
+                   f"about an even chance of clearing at n, not a power calculation; this pool "
+                   f"has {sv} VECTOR / {sm} mono_g4)")
     return out
 
 
@@ -276,12 +461,19 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("archive", nargs="+",
                     help="harness archive dir(s): radio_monitor_<stamp>_<sha>")
+    ap.add_argument("--margin", type=float, metavar="PP",
+                    help="non-inferiority margin in percentage points: adds the margin rule "
+                         "(one-sided 95 %% Newcombe lower bound of VECTOR minus mono_g4 "
+                         "delivery against -PP) to the pooled comparison")
     a = ap.parse_args(argv)
+    if a.margin is not None and not 0 < a.margin < 100:
+        ap.error(f"--margin {a.margin:g}: give a margin between 0 and 100 percentage points")
     rc = 0
     pools: dict[tuple[str, str], list[int]] = {}     # (reg_profile, codec) -> [delivered, sent]
     unlike: list[str] = []                   # legs not shown to be FHSS / DTS with -ProbeEcho 0
     other: list[str] = []                    # legs that are neither VECTOR nor mono_g4
     scored: list[str] = []                   # every scored leg, with its profile and echo
+    windows: dict[str, list[str]] = {}       # params log_window ("" = absent) -> legs
     for arch in a.archive:
         name = os.path.basename(os.path.normpath(arch))
         try:
@@ -311,6 +503,7 @@ def main(argv: list[str] | None = None) -> int:
         scored.append(leg)
         if prof not in PROFILE_LABEL or params.get("probe_echo") != "0":
             unlike.append(leg)
+        windows.setdefault(params.get("log_window", ""), []).append(name)
     if len(a.archive) > 1:
         codecs = {c for _, c in pools}
         profiles = sorted({p for p, _ in pools})
@@ -332,11 +525,34 @@ def main(argv: list[str] | None = None) -> int:
                   + "; ".join(scored) + "); the comparison pools the legs of one profile. The "
                   "per-leg figures above stand")
             rc = 1
+        elif len(windows) > 1:
+            # 2026-10-22: a log read while its daemon ran ends at another moment than
+            # one read after the stop, so the tails do not count alike. The pools are
+            # not split by window, so even one codec's figures are withheld.
+            groups = "; ".join(
+                (f"log_window={w}" if w else "no log_window (read while running)")
+                + ": " + ", ".join(legs) for w, legs in windows.items())
+            print(f"pooled {'verdict' if both else 'figures'} withheld: the legs mix log windows ("
+                  + groups + "); a log read while its daemon ran ends at another moment than "
+                  "one read after the stop, so their tails do not count alike: pool the legs of "
+                  "one log window. The per-leg figures above stand")
+            rc = 1
         elif both:
             prof = profiles[0]
             for line in pooled_verdict(tuple(pools[(prof, "vector")]),
-                                       tuple(pools[(prof, "mono_g4")]), prof):
+                                       tuple(pools[(prof, "mono_g4")]), prof, a.margin):
                 print(line)
+            window = next(iter(windows))
+            if a.margin is not None and window != LOG_WINDOW_AFTER_STOP:
+                # 2026-10-22 review: one shared window pools, but a pass rule needs
+                # after_stop on every leg, so the margin verdict says when it is not.
+                print("!! the margin verdict above pools legs with "
+                      + (f"log_window={window}" if window else
+                         "no log_window (read while running)")
+                      + f", not {LOG_WINDOW_AFTER_STOP}: their tail seqs can be read-window "
+                      "artefacts, so it does not meet a pass rule that needs log_window="
+                      f"{LOG_WINDOW_AFTER_STOP} on every leg (re-fly them, or drop them under "
+                      "a rule written before leg 1)")
         else:
             print("pooled: " + "; ".join(
                 f"{PROFILE_LABEL.get(p, f'reg_profile={p}')} {c} {d}/{s} = {_pct(d, s)}"

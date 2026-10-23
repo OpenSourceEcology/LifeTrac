@@ -14,7 +14,12 @@ loss over the window both logs cover (``txdone_arrival`` trains matched to
 whole-log line, which is kept and labelled; the FIRMWARE DROP line uses the
 base's own count, not the one clamped to the TX count, and says when the
 logs were read before the daemons stopped (no ``log_window=after_stop``);
-on the committed archives the shared-window figures are ERRATA §3's.
+on the committed archives the shared-window figures are ERRATA §3's;
+(4) 2026-10-22: only the exact ``log_window=after_stop`` drops that note,
+and ``log_window=after_stop_unverified`` (a daemon stop or a SIGTERM
+shutdown line the harness could not confirm) gets its own note quoting
+``log_window_detail=``, worded by reason and printed below the loss block
+(leg_post.sh shows only the report's first 8 lines).
 """
 from __future__ import annotations
 
@@ -627,6 +632,7 @@ class SharedWindowReport(unittest.TestCase):
             out = _run([arch] + _brackets(Path(d), 59))
         self.assertIn("FIRMWARE DROP (drx_ok - host URCs): 59 - 59 = 0", out)
         self.assertNotIn("log window:", out)
+        self.assertNotIn("LOG WINDOW UNVERIFIED", out)
         self.assertIn("log_window=after_stop", out.splitlines()[0])
 
     def test_another_log_window_value_still_gets_the_note(self) -> None:
@@ -634,6 +640,156 @@ class SharedWindowReport(unittest.TestCase):
             arch = self._archive(Path(d), params="log_window=before_stop\n")
             out = _run([arch] + _brackets(Path(d), 61))
         self.assertIn("(log window: params.txt has no log_window=after_stop", out)
+        self.assertNotIn("LOG WINDOW UNVERIFIED", out)
+
+    # 2026-10-22: the harness writes log_window=after_stop only when both
+    # daemon stops worked and both logs hold their SIGTERM shutdown line;
+    # otherwise after_stop_unverified plus log_window_detail=<reason>.
+    UNVERIFIED = ("log_window=after_stop_unverified\n"
+                  "log_window_detail=tx_smoke stop: docker stop exit 1: Error "
+                  "response from daemon: No such container: tx_smoke\n"
+                  "stop_drain_s=2\n")
+
+    def test_unverified_window_gets_its_own_note_quoting_the_detail(self) -> None:
+        with tempfile.TemporaryDirectory() as d:
+            arch = self._archive(Path(d), params=self.UNVERIFIED)
+            out = _run([arch] + _brackets(Path(d), 61))
+        lines = out.splitlines()
+        self.assertIn("log_window=after_stop_unverified", lines[0])
+        note = next(n for n, ln in enumerate(lines)
+                    if "LOG WINDOW UNVERIFIED (" in ln)
+        # a failed stop: the old read-while-running artefact is possible
+        self.assertEqual(
+            lines[note],
+            "  !! LOG WINDOW UNVERIFIED (log_window_detail: tx_smoke stop: "
+            "docker stop exit 1: Error response from daemon: No such "
+            "container: tx_smoke): a daemon stop was not confirmed, so that "
+            "daemon may still have run when its log was read and the logs "
+            "may not cover the post-stop window — a 'received > sent' line "
+            "above or a small positive FIRMWARE DROP below can carry the old "
+            "log-window artefact (logs read while a daemon ran), not the "
+            "link or the firmware")
+        # 2026-10-22 review: below the loss block (leg_post.sh shows only the
+        # first 8 lines), above the FIRMWARE DROP it qualifies, and the
+        # 'received > sent' line points down at it
+        warn = next(n for n, ln in enumerate(lines) if "received 59 > sent 45" in ln)
+        self.assertTrue(lines[warn].endswith(
+            "read the shared-window line; the log window is unverified, see "
+            "the LOG WINDOW UNVERIFIED note below"), lines[warn])
+        shared = next(n for n, ln in enumerate(lines)
+                      if ln.startswith("shared-window loss "))
+        drop = next(n for n, ln in enumerate(lines)
+                    if ln.startswith("FIRMWARE DROP"))
+        self.assertLess(warn, note)
+        self.assertLess(shared + 1, note)          # after the 'left out' line
+        self.assertLess(note, drop)
+        self.assertIn("FIRMWARE DROP (drx_ok - host URCs): 61 - 59 = 2", out)
+        self.assertIn("(log window: after_stop_unverified, see the LOG WINDOW "
+                      "UNVERIFIED note above — if a daemon still ran when its "
+                      "log was read, or the RX daemon died before its stop,", out)
+        # not the pre-10-22 note, which says the logs were read BEFORE the stop
+        self.assertNotIn("params.txt has no log_window=after_stop", out)
+
+    def test_unverified_note_leaves_leg_posts_8_line_excerpt_alone(self) -> None:
+        # legs/leg_post.sh prints `head -n 8` of the report: with --capture
+        # the capture seq-gap line (the loss of record) is among those lines
+        # on every leg, the unverified ones included; only the header and
+        # the pointer at the end of the 'received > sent' line differ.
+        def run(d: Path, params: str) -> list:
+            arch = self._archive(d, params=params)
+            cap = d / "leg2x_base.jsonl"
+            _write_capture(cap, [(float(s), _payload(V, s, key=(s == 1)))
+                                 for s in (1, 2, 3, 4)])
+            return _run([arch, "--capture", cap] + _brackets(d, 61)).splitlines()
+        with tempfile.TemporaryDirectory() as d1, \
+                tempfile.TemporaryDirectory() as d2:
+            old = run(Path(d1), "")
+            unv = run(Path(d2), self.UNVERIFIED)
+        cap_old = next(n for n, ln in enumerate(old)
+                       if ln.startswith("capture seq gaps (leg2x_base.jsonl)"))
+        cap_unv = next(n for n, ln in enumerate(unv)
+                       if ln.startswith("capture seq gaps (leg2x_base.jsonl)"))
+        self.assertEqual(cap_unv, cap_old)
+        self.assertLess(cap_unv, 8)
+        self.assertTrue(unv[cap_unv + 1].startswith("  !! LOG WINDOW UNVERIFIED ("),
+                        unv[cap_unv + 1])
+        warn = next(n for n, ln in enumerate(unv) if "received 59 > sent 45" in ln)
+        for n in range(1, cap_unv + 1):
+            if n == warn:
+                self.assertEqual(unv[n], old[n] + "; the log window is "
+                                 "unverified, see the LOG WINDOW UNVERIFIED "
+                                 "note below")
+            else:
+                self.assertEqual(unv[n], old[n])
+
+    def test_unverified_note_is_printed_without_brackets_too(self) -> None:
+        # 'received > sent' needs no brackets, so neither does the note.
+        with tempfile.TemporaryDirectory() as d:
+            arch = self._archive(Path(d), params=self.UNVERIFIED)
+            out = _run([arch])
+        self.assertIn("!! LOG WINDOW UNVERIFIED (log_window_detail: tx_smoke "
+                      "stop: docker stop exit 1:", out)
+        self.assertNotIn("FIRMWARE DROP (drx_ok", out)
+        self.assertNotIn("(log window:", out)
+
+    def test_missing_shutdown_line_after_good_stops_says_the_daemon_died_first(
+            self) -> None:
+        # Out-File -Encoding utf8 on Windows: a BOM and CRLF line ends; the
+        # quoted detail must not carry the CR. Both stops worked (no 'stop:'
+        # reason), so the log ends EARLY: not the read-while-running artefact.
+        with tempfile.TemporaryDirectory() as d:
+            arch = self._archive(Path(d))
+            (arch / "params.txt").write_bytes(
+                ("﻿git_sha=0000000\r\nlog_window=after_stop_unverified\r\n"
+                 "log_window_detail=rx_smoke log has no shutdown line\r\n"
+                 "feed_stop=synth_pub stopped\r\n").encode("utf-8"))
+            out = _run([arch])
+        self.assertIn("!! LOG WINDOW UNVERIFIED (log_window_detail: rx_smoke "
+                      "log has no shutdown line): both daemon stops were "
+                      "confirmed, but a daemon log has no SIGTERM shutdown "
+                      "line — that daemon may have died before the stop", out)
+        self.assertIn("so the log can end before the leg did and the "
+                      "log-derived figures above cover less than the leg", out)
+        self.assertIn("this is not the old read-while-running artefact", out)
+        self.assertNotIn("may still have run when its log was read", out)
+        self.assertNotIn("\r", out)
+
+    def test_a_failed_stop_and_a_missing_line_name_both_causes(self) -> None:
+        params = ("log_window=after_stop_unverified\n"
+                  "log_window_detail=tx_smoke stop: docker stop exit 1: no "
+                  "output; rx_smoke stop: no exit status came back (adb "
+                  "failed?): no output; tx_smoke log has no shutdown line\n")
+        with tempfile.TemporaryDirectory() as d:
+            out = _run([self._archive(Path(d), params=params)])
+        note = next(ln for ln in out.splitlines()
+                    if "LOG WINDOW UNVERIFIED (" in ln)
+        self.assertIn("a daemon stop was not confirmed, so that daemon may "
+                      "still have run when its log was read", note)
+        self.assertTrue(note.endswith(
+            "; a log without its shutdown line can also mean that daemon "
+            "died before the stop, so its log ends early"), note)
+
+    def test_unverified_without_a_detail_line_says_so(self) -> None:
+        with tempfile.TemporaryDirectory() as d:
+            arch = self._archive(
+                Path(d), params="log_window=after_stop_unverified\n")
+            out = _run([arch])
+        # no reason to choose by: one neutral sentence
+        self.assertIn("!! LOG WINDOW UNVERIFIED (log_window_detail: params.txt "
+                      "has no log_window_detail): the harness could not "
+                      "confirm that each daemon ran until its stop and had "
+                      "stopped before its log was read", out)
+
+    def test_no_key_keeps_the_old_note_and_no_unverified_line(self) -> None:
+        # every archive before 10-22 (none has the key): unchanged output
+        with tempfile.TemporaryDirectory() as d:
+            arch = self._archive(Path(d))
+            out = _run([arch] + _brackets(Path(d), 61))
+        self.assertIn("(log window: params.txt has no log_window=after_stop — "
+                      "this harness read the daemon logs BEFORE it stopped "
+                      "the daemons", out)
+        self.assertNotIn("LOG WINDOW UNVERIFIED", out)
+        self.assertNotIn("after_stop_unverified", out)
 
 
 # -- committed evidence ---------------------------------------------------------

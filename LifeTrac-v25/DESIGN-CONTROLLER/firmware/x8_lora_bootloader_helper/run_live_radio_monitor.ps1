@@ -32,9 +32,16 @@
 
     Bench kit (2026-10-19): at leg end the frame source stops first, then
     tx_smoke (after -StopDrainS s), then rx_smoke, and only then are the
-    daemon logs read (params.txt: log_window=after_stop), so both logs cover
-    the same window as the post brackets. The tractor reset runs from the
-    pushed bench_tools/ocd_reset.sh, which ignores SIGHUP before it forks
+    daemon logs read, so both logs cover the same window as the post
+    brackets. Since 2026-10-22 that is checked, not assumed: params.txt says
+    log_window=after_stop only when both docker stops worked (container name
+    printed, exit 0) and both daemon logs hold their SIGTERM shutdown line;
+    otherwise log_window=after_stop_unverified with the reason in
+    log_window_detail=, and LEG CHECKS prints the same verdict as LOG_WINDOW.
+    The frame source's stop is recorded too (feed_stop=), as a detail only.
+
+    Also 2026-10-19: the tractor reset runs from the pushed
+    bench_tools/ocd_reset.sh, which ignores SIGHUP before it forks
     (the 10-19 A2c2 miss, OCD_EXIT=129). Every adb push is checked (output,
     exit status, then md5 against the PC copy) and a failure stops the leg
     before any daemon starts. params.txt records each board's clock offset
@@ -688,6 +695,109 @@ function Confirm-AdbPushedFiles {
     return @{ Checked = $r.Checked; Total = $list.Count; Mismatch = $r.Mismatch; Missing = $r.Missing; Rows = $r.Rows; Summary = $summary }
 }
 
+# --- Helpers (bench kit, 2026-10-22) -----------------------------------------
+# The leg-end log window, checked. Up to 2026-10-22 every leg-end docker stop
+# went to Out-Null and params.txt said log_window=after_stop whatever happened,
+# so a stop that failed (the daemon still running while its log was read, the
+# pre-10-19 artefact) looked the same as one that worked. Get-DockerStopResult,
+# Test-DaemonShutdownLine and Get-LogWindowVerdict are pure; Invoke-DockerStop
+# calls adb (the offline tests give it a stub adb).
+
+function Invoke-DockerStop {
+    # One leg-end `docker stop -t 1 <Name>` on a board, its output and exit
+    # status kept: the board shell appends __STOP_RC=<docker's exit status>
+    # (the sudo pipeline's status is docker's), and adb's own stderr is merged
+    # INSIDE the cmd string (as in Invoke-AdbPush), so a failed adb call comes
+    # back as its error line with no __STOP_RC. Returns the cleaned lines, for
+    # Get-DockerStopResult / Get-LogWindowVerdict.
+    param([string]$Adb, [string]$Serial, [string]$Name)
+    return @(ConvertFrom-AdbOutput (cmd /c "`"$Adb`" -s $Serial shell `"echo fio | sudo -S -p '' docker stop -t 1 $Name 2>&1; echo __STOP_RC=`$?`" 2>&1"))
+}
+
+function Get-DockerStopResult {
+    # Judges one Invoke-DockerStop. docker prints the container's name and
+    # exits 0 when the stop worked, also for a container that had already
+    # exited (the daemon's shutdown line tells those apart, see
+    # Get-LogWindowVerdict); a failure prints "Error response from daemon: ..."
+    # and exits 1. No __STOP_RC line = the adb call failed (device gone, adb
+    # error), so nothing says the container stopped. Returns @{ Ok; Rc; Text },
+    # Text one line (it goes into params.txt).
+    param([object]$Output, [string]$Name)
+    $rc = $null
+    $rest = New-Object System.Collections.Generic.List[string]
+    foreach ($l in @(ConvertFrom-AdbOutput $Output)) {
+        if ($l -match '^__STOP_RC=(\d+)$') { $rc = [int]$Matches[1] }
+        else { $rest.Add($l) }
+    }
+    $text = "no output"
+    if ($rest.Count -gt 0) { $text = $rest -join ' | ' }
+    if ($text.Length -gt 200) { $text = $text.Substring(0, 200) + "..." }
+    if ($null -eq $rc) { return @{ Ok = $false; Rc = $null; Text = "no exit status came back (adb failed?): $text" } }
+    if ($rc -ne 0) { return @{ Ok = $false; Rc = $rc; Text = "docker stop exit ${rc}: $text" } }
+    if (-not $rest.Contains($Name)) { return @{ Ok = $false; Rc = 0; Text = "docker stop exit 0 without the container name: $text" } }
+    return @{ Ok = $true; Rc = 0; Text = "stopped" }
+}
+
+function Test-DaemonShutdownLine {
+    # True when a daemon log (`docker logs` output) holds the line the
+    # daemon's SIGTERM handler writes, "<Daemon>: signal received; shutting
+    # down" (_handle_signal in image_tx_daemon.py and image_rx_daemon.py,
+    # logged as the signal lands, so it is there even when docker stop's 1 s
+    # grace runs out and SIGKILL follows).
+    param([object]$Log, [string]$Daemon)
+    $needle = "${Daemon}: signal received; shutting down"
+    foreach ($l in @(ConvertFrom-AdbOutput $Log)) {
+        if ($l.Contains($needle)) { return $true }
+    }
+    return $false
+}
+
+function Get-LogWindowVerdict {
+    # The window the archived daemon logs cover. after_stop only when both
+    # daemon stops worked (Get-DockerStopResult) AND both logs, read after the
+    # stops, hold their daemon's SIGTERM shutdown line; anything else is
+    # after_stop_unverified with the reasons in Detail (one line, for
+    # params.txt log_window_detail=). Color for LEG CHECKS: Red when a stop
+    # failed (the daemon may still have been running when its log was read),
+    # Yellow when only a shutdown line is missing (the daemon had already
+    # exited, a crash, or its log did not come back). The frame-source stop
+    # is not part of the verdict. Hint is the LEG CHECKS line printed under
+    # an unverified LOG_WINDOW, worded by reason (2026-10-22 review): a stop
+    # that failed leaves the old artefact possible (a daemon still ran while
+    # its log was read), while a missing shutdown line after a stop that
+    # worked is the opposite case, a daemon that died (or a log that did not
+    # come back whole) BEFORE the stop, so its log ends early.
+    # Returns @{ Value; Verified; Detail; Color; Hint }.
+    param([object]$TxStopOutput, [object]$RxStopOutput, [object]$TxLog, [object]$RxLog)
+    $why = New-Object System.Collections.Generic.List[string]
+    $color = "Green"
+    $noShut = $false
+    $txStop = Get-DockerStopResult -Output $TxStopOutput -Name "tx_smoke"
+    $rxStop = Get-DockerStopResult -Output $RxStopOutput -Name "rx_smoke"
+    if (-not $txStop.Ok) { $why.Add("tx_smoke stop: $($txStop.Text)"); $color = "Red" }
+    if (-not $rxStop.Ok) { $why.Add("rx_smoke stop: $($rxStop.Text)"); $color = "Red" }
+    if (-not (Test-DaemonShutdownLine -Log $TxLog -Daemon "image_tx_daemon")) {
+        $why.Add("tx_smoke log has no shutdown line")
+        $noShut = $true
+        if ($color -eq "Green") { $color = "Yellow" }
+    }
+    if (-not (Test-DaemonShutdownLine -Log $RxLog -Daemon "image_rx_daemon")) {
+        $why.Add("rx_smoke log has no shutdown line")
+        $noShut = $true
+        if ($color -eq "Green") { $color = "Yellow" }
+    }
+    if ($why.Count -eq 0) {
+        return @{ Value = "after_stop"; Verified = $true; Detail = "both stops ok, both daemon logs hold their SIGTERM shutdown line"; Color = "Green"; Hint = "" }
+    }
+    if ($color -eq "Red") {
+        $hint = "A daemon stop was not confirmed: that daemon may still have run when its log was read, so the logs may not cover the post-stop window and rs12_leg_report.py's 'received > sent' and FIRMWARE DROP figures can carry the old log-window artefact (logs read while a daemon ran)."
+        if ($noShut) { $hint += " A log without its shutdown line can also mean that daemon died before the stop (look for a traceback in its final log above)." }
+    } else {
+        $hint = "Both daemon stops worked, but a daemon log has no SIGTERM shutdown line: that daemon may have died before the stop (look for a traceback in its final log above) or its log did not come back whole, so the log can end before the leg did and rs12_leg_report.py's figures can cover less than the leg."
+    }
+    return @{ Value = "after_stop_unverified"; Verified = $false; Detail = ($why -join '; '); Color = $color; Hint = $hint }
+}
+
 # Bench kit (2026-10-10): refuse a DTS leg on the default carrier BEFORE
 # anything touches a board. Legs that pass -ForceFrfHz are unaffected.
 if ($RegProfile -eq 2 -and $ForceFrfHz -eq 0 -and -not $AllowDefaultCarrier) {
@@ -1220,19 +1330,31 @@ while (((Get-Date) - $startT).TotalSeconds -lt $DurationS) {
 # showed (10-19 A2c 211/210, A2a 217/216, A2a2 218/217, A2c2 211/210) and
 # rs12_leg_report.py saw "received > sent" (A2c 612 > 611, A2a 609 > 607). A
 # stopped container keeps its log until it is removed (the next launch's
-# rm -f), so reading after the stop loses nothing. params.txt says
-# log_window=after_stop.
+# rm -f), so reading after the stop loses nothing.
+# 2026-10-22: each stop's output and exit status are kept (Invoke-DockerStop;
+# they went to Out-Null before) and judged in 8c with the SIGTERM shutdown
+# line of each daemon's log (Get-LogWindowVerdict): params.txt says
+# log_window=after_stop only when both stops worked and both lines are there,
+# else log_window=after_stop_unverified and log_window_detail=<reason>. The
+# frame source's stop is recorded as feed_stop= only (not in the verdict).
 Write-Host "[STOP] frame source, then tx_smoke after a $StopDrainS s drain, then rx_smoke; the logs are read after the stop..." -ForegroundColor Cyan
-if ($pubProc -and -not $pubProc.HasExited) {
-    try { $pubProc.Kill() } catch {}
+$feedStopNote = "none"
+if ($pubProc) {
+    if ($pubProc.HasExited) {
+        $feedStopNote = "host publisher on the PC had already exited"
+    } else {
+        try { $pubProc.Kill(); $feedStopNote = "host publisher on the PC killed" } catch { $feedStopNote = "host publisher on the PC: kill failed: " + ($_.Exception.Message -replace '[\r\n]+', ' ') }
+    }
 }
 if ($TxFeed -eq "camera") {
     # Stopped, not removed: its log is read below (the next launch rm -f's it),
     # and the camera is free for the next leg.
-    cmd /c "`"$adbExe`" -s $TxAdbSerial shell `"echo fio | sudo -S -p '' docker stop -t 1 camera_svc 2>&1`"" | Out-Null
+    $feedStopOut = Invoke-DockerStop -Adb $adbExe -Serial $TxAdbSerial -Name "camera_svc"
+    $feedStopNote = "camera_svc " + (Get-DockerStopResult -Output $feedStopOut -Name "camera_svc").Text
 } elseif ($TxFeed -eq "local") {
     # Stopped, not removed: its OFFERED line is read below, then it is removed.
-    cmd /c "`"$adbExe`" -s $TxAdbSerial shell `"echo fio | sudo -S -p '' docker stop -t 1 synth_pub 2>&1`"" | Out-Null
+    $feedStopOut = Invoke-DockerStop -Adb $adbExe -Serial $TxAdbSerial -Name "synth_pub"
+    $feedStopNote = "synth_pub " + (Get-DockerStopResult -Output $feedStopOut -Name "synth_pub").Text
 }
 $feedStoppedAt = Get-Date
 
@@ -1252,10 +1374,11 @@ if ($injectSpec) {
 
 $drainLeftMs = [int][math]::Round(($StopDrainS * 1000.0) - ((Get-Date) - $feedStoppedAt).TotalMilliseconds)
 if ($drainLeftMs -gt 0) { Start-Sleep -Milliseconds $drainLeftMs }
-cmd /c "`"$adbExe`" -s $TxAdbSerial shell `"echo fio | sudo -S -p '' docker stop -t 1 tx_smoke 2>&1`"" | Out-Null
+$txStopOut = Invoke-DockerStop -Adb $adbExe -Serial $TxAdbSerial -Name "tx_smoke"
 # The base keeps listening a moment longer, for a frame still on air.
 Start-Sleep -Milliseconds 500
-cmd /c "`"$adbExe`" -s $RxAdbSerial shell `"echo fio | sudo -S -p '' docker stop -t 1 rx_smoke 2>&1`"" | Out-Null
+$rxStopOut = Invoke-DockerStop -Adb $adbExe -Serial $RxAdbSerial -Name "rx_smoke"
+Write-Host "  [STOP] feed: $feedStopNote; tx_smoke: $((Get-DockerStopResult -Output $txStopOut -Name 'tx_smoke').Text); rx_smoke: $((Get-DockerStopResult -Output $rxStopOut -Name 'rx_smoke').Text)"
 
 # 8b0. Board clocks (2026-10-19), read only: each board's `date +%s.%N` minus
 # the PC's UTC epoch at the adb call's midpoint. The tractor clock runs ~19 days
@@ -1300,7 +1423,11 @@ Write-Host "--- RX DAEMON FINAL LOGS ---" -ForegroundColor Yellow
 Write-Host $rxFinal
 
 # 8c. Leg checks (2026-10-18), printed before the [EVIDENCE] line that
-# legs/leg_post.sh looks for, and repeated in params.txt.
+# legs/leg_post.sh looks for, and repeated in params.txt. LOG_WINDOW
+# (2026-10-22) is judged here, from the 8. stop outputs and the final logs
+# read above: green after_stop, or after_stop_unverified (red when a daemon
+# stop failed, yellow when only a shutdown line is missing) with the reason.
+$logWin = Get-LogWindowVerdict -TxStopOutput $txStopOut -RxStopOutput $rxStopOut -TxLog $txFinal -RxLog $rxFinal
 $baseResetLine = "BASE_L072_RESET unverified (gpio163 pulse sent; nothing checks that the base L072 rebooted, and it has not since 2026-08: score base brackets as post - pre)"
 $nrstNote = "none"
 if ($nrstOut.Count -gt 0) { $nrstNote = $nrstOut -join ' | ' }
@@ -1318,7 +1445,17 @@ Write-Host "  gpio163 pulse output: $nrstNote"
 # daemon logs cover.
 $clockLine = "CLOCKS board minus PC: tractor $($clkTractor.Text); base $($clkBase.Text) (read only)"
 Write-Host $clockLine
-Write-Host "LOG_WINDOW after_stop (feed stopped, $StopDrainS s drain, tx_smoke stopped, rx_smoke stopped 0.5 s later, then the logs were read)"
+# The feed's own stop result speaks for itself (feed: ...), since it is not
+# part of the verdict and can have failed on a verified window.
+if ($logWin.Verified) {
+    $logWinLine = "LOG_WINDOW after_stop (feed: $feedStopNote; $StopDrainS s drain, tx_smoke stopped, rx_smoke stopped 0.5 s later, then the logs were read; $($logWin.Detail))"
+} else {
+    $logWinLine = "LOG_WINDOW after_stop_unverified ($($logWin.Detail); feed: $feedStopNote)"
+}
+Write-Host $logWinLine -ForegroundColor $logWin.Color
+if (-not $logWin.Verified) {
+    Write-Host "  $($logWin.Hint)" -ForegroundColor Yellow
+}
 $injectLine = ""
 if ($injectSpec) {
     $injTrigTxt = "-"; if ($injSum.Trigger -ne "") { $injTrigTxt = $injSum.Trigger }
@@ -1366,6 +1503,10 @@ if ($Archive) {
     if ($null -ne $clkTractor.RttS) { $tRtt = $clkTractor.RttS.ToString("F3", $inv) }
     if ($clkBase.Ok) { $bOff = $clkBase.OffsetS.ToString("F3", $inv) }
     if ($null -ne $clkBase.RttS) { $bRtt = $clkBase.RttS.ToString("F3", $inv) }
+    # 2026-10-22: log_window_detail= only on an unverified window; the empty
+    # placeholder is dropped below (every other line starts with its key).
+    $logWinDetailLine = ""
+    if (-not $logWin.Verified) { $logWinDetailLine = "log_window_detail=$($logWin.Detail)" }
     @(
         "git_sha=$sha",
         "duration_s=$DurationS",
@@ -1414,7 +1555,9 @@ if ($Archive) {
         "tractor_ocd_tag=$ocdTag",
         "base_l072_reset=unverified",
         "base_gpio163_output=$nrstNote",
-        "log_window=after_stop",
+        "log_window=$($logWin.Value)",
+        $logWinDetailLine,
+        "feed_stop=$feedStopNote",
         "stop_drain_s=$StopDrainS",
         "tractor_clock_offset_s=$tOff",
         "base_clock_offset_s=$bOff",
@@ -1424,7 +1567,7 @@ if ($Archive) {
         "tractor_deploy_md5=$($deployMd5Note[$TxAdbSerial])",
         "base_deploy_md5=$($deployMd5Note[$RxAdbSerial])",
         "timestamp=$stamp"
-    ) | Out-File -FilePath (Join-Path $dir "params.txt") -Encoding utf8
+    ) | Where-Object { $_ -ne "" } | Out-File -FilePath (Join-Path $dir "params.txt") -Encoding utf8
     Write-Host "[EVIDENCE] archived to $dir" -ForegroundColor Green
 }
 

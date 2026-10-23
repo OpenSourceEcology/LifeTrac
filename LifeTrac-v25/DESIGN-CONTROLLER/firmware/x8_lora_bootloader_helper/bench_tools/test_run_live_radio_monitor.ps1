@@ -17,6 +17,10 @@
     spawn's process group the way the adb/sudo session hangup does. Those
     shell checks are SKIPPED when Git for Windows' usr\bin is not found.
 
+    Bench kit (2026-10-22): the leg-end log window verdict (the docker stop
+    results and the daemons' SIGTERM shutdown lines, Get-LogWindowVerdict)
+    and Invoke-DockerStop against a stub adb.
+
         powershell -NoProfile -File bench_tools\test_run_live_radio_monitor.ps1
 
     Exit 0 = all passed, 1 = a failure (listed), 2 = the harness did not parse.
@@ -34,7 +38,8 @@ if ($errs.Count -gt 0) {
 $names = @("ConvertFrom-AdbOutput", "ConvertTo-InjectSpec", "Test-InjectFaultLine",
            "Get-InjectWatchPid", "Get-InjectSummary", "Get-TractorResetVerdict",
            "Test-AdbPushOutput", "Get-PushedFileList", "Get-CleanPushSource", "Test-PushedMd5", "Get-ClockOffset",
-           "Get-PcEpochS", "Read-BoardClock", "Invoke-AdbPush", "Confirm-AdbPushedFiles")
+           "Get-PcEpochS", "Read-BoardClock", "Invoke-AdbPush", "Confirm-AdbPushedFiles",
+           "Invoke-DockerStop", "Get-DockerStopResult", "Test-DaemonShutdownLine", "Get-LogWindowVerdict")
 foreach ($n in $names) {
     $fn = $ast.Find({ param($x) $x -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $x.Name -eq $n }, $true)
     if (-not $fn) { Write-Host "MISSING function $n in the harness"; exit 2 }
@@ -307,6 +312,75 @@ try {
 $e0 = Get-PcEpochS
 Check "clock: the PC epoch is now-ish" ($e0 -gt 1.7e9 -and $e0 -lt 4.1e9) "$e0"
 
+# --- Get-DockerStopResult / Test-DaemonShutdownLine / Get-LogWindowVerdict ----
+# (2026-10-22) Stop output as `docker stop -t 1 <name> 2>&1; echo __STOP_RC=$?`
+# prints it through adb, and log lines in the daemons' own format
+# (image_tx_daemon.py / image_rx_daemon.py _handle_signal; the 08-01 archived
+# rx_daemon.log holds the same line).
+$txShut = "2026-09-30 14:16:03,512 INFO image_tx_daemon: signal received; shutting down"
+$rxShut = "2026-10-22 14:16:04,020 INFO image_rx_daemon: signal received; shutting down"
+$txBody = "2026-09-30 14:16:02,900 INFO image_tx_daemon: frame seq=12 done (pipelined): 4 fragments ok`n"
+$rxBody = "2026-10-22 14:16:03,100 INFO image_rx_daemon: published frame_id=0 seq=12 241 B -> lifetrac/v25/video/tile_delta`n"
+$txLogOk = CmdLines ($txBody + "$txShut`n2026-09-30 14:16:03,700 INFO image_tx_daemon: image_tx_daemon exit`n")
+$rxLogOk = CmdLines ($rxBody + "$rxShut`n2026-10-22 14:16:04,300 INFO image_rx_daemon: RX worker exit`n")
+$txStopOk = CmdLines "tx_smoke`n__STOP_RC=0`n"
+$rxStopOk = CmdLines "rx_smoke`n__STOP_RC=0`n"
+
+$r = Get-DockerStopResult -Output $txStopOk -Name "tx_smoke"
+Check "stop: the name and __STOP_RC=0 through cmd /c is ok" ($r.Ok -and $r.Rc -eq 0 -and $r.Text -eq "stopped") $r.Text
+$r = Get-DockerStopResult -Output "rx_smoke`r`r`n__STOP_RC=0`r`r`n" -Name "rx_smoke"
+Check "stop: one CR-laden string is ok" ($r.Ok -and $r.Rc -eq 0) $r.Text
+$r = Get-DockerStopResult -Output (CmdLines "Error response from daemon: No such container: tx_smoke`n__STOP_RC=1`n") -Name "tx_smoke"
+Check "stop: a docker error fails with docker's line and exit status" (-not $r.Ok -and $r.Rc -eq 1 -and $r.Text -eq "docker stop exit 1: Error response from daemon: No such container: tx_smoke") $r.Text
+$r = Get-DockerStopResult -Output (CmdLines "error: device '2D0A1209DABC240B' not found`n") -Name "rx_smoke"
+Check "stop: no __STOP_RC (the adb call failed) fails with adb's line" (-not $r.Ok -and $null -eq $r.Rc -and $r.Text -like "no exit status came back (adb failed?): error: device*not found") $r.Text
+$r = Get-DockerStopResult -Output $null -Name "tx_smoke"
+Check "stop: nothing came back fails" (-not $r.Ok -and $r.Text -like "*adb failed?): no output") $r.Text
+$r = Get-DockerStopResult -Output (CmdLines "__STOP_RC=0`n") -Name "rx_smoke"
+Check "stop: exit 0 without the container name fails" (-not $r.Ok -and $r.Text -like "*without the container name: no output") $r.Text
+$r = Get-DockerStopResult -Output (CmdLines "tx_smoke`n__STOP_RC=0`n") -Name "rx_smoke"
+Check "stop: another container's name is not this one's" (-not $r.Ok) $r.Text
+$r = Get-DockerStopResult -Output (@("x" * 300) + @("__STOP_RC=1")) -Name "tx_smoke"
+Check "stop: a long reason is cut to one short line" (-not $r.Ok -and $r.Text.Length -lt 240 -and $r.Text.EndsWith("...")) "$($r.Text.Length)"
+
+Check "shutdown line: tx found in \r\r\n output" (Test-DaemonShutdownLine -Log $txLogOk -Daemon "image_tx_daemon")
+Check "shutdown line: rx found in one CR-laden string" (Test-DaemonShutdownLine -Log ($rxBody + "$rxShut`n").Replace("`n", "`r`r`n") -Daemon "image_rx_daemon")
+Check "shutdown line: the other daemon's line does not count" (-not (Test-DaemonShutdownLine -Log $txLogOk -Daemon "image_rx_daemon"))
+Check "shutdown line: none in a log without it" (-not (Test-DaemonShutdownLine -Log (CmdLines $txBody) -Daemon "image_tx_daemon"))
+Check "shutdown line: none in nothing" (-not (Test-DaemonShutdownLine -Log $null -Daemon "image_tx_daemon"))
+
+$v = Get-LogWindowVerdict -TxStopOutput $txStopOk -RxStopOutput $rxStopOk -TxLog $txLogOk -RxLog $rxLogOk
+Check "log window: both stops ok and both shutdown lines -> after_stop, green" ($v.Verified -and $v.Value -eq "after_stop" -and $v.Color -eq "Green") "$($v.Value) $($v.Color): $($v.Detail)"
+$v = Get-LogWindowVerdict -TxStopOutput "tx_smoke`r`r`n__STOP_RC=0`r`r`n" -RxStopOutput "rx_smoke`r`r`n__STOP_RC=0`r`r`n" -TxLog ($txBody + "$txShut`n").Replace("`n", "`r`r`n") -RxLog ($rxBody + "$rxShut`n").Replace("`n", "`r`r`n")
+Check "log window: after_stop from single \r\r\n strings" ($v.Verified -and $v.Value -eq "after_stop") "$($v.Value): $($v.Detail)"
+$v = Get-LogWindowVerdict -TxStopOutput (CmdLines "Error response from daemon: cannot stop container: tx_smoke: permission denied`n__STOP_RC=1`n") -RxStopOutput $rxStopOk -TxLog $txLogOk -RxLog $rxLogOk
+Check "log window: tx_smoke stop failed -> unverified, red, docker's reason" (-not $v.Verified -and $v.Value -eq "after_stop_unverified" -and $v.Color -eq "Red" -and $v.Detail -eq "tx_smoke stop: docker stop exit 1: Error response from daemon: cannot stop container: tx_smoke: permission denied") "$($v.Color): $($v.Detail)"
+$v = Get-LogWindowVerdict -TxStopOutput $txStopOk -RxStopOutput (CmdLines "error: device '2D0A1209DABC240B' not found`n") -TxLog $txLogOk -RxLog $rxLogOk
+Check "log window: rx_smoke stop with no exit status (adb failed) -> unverified, red" (-not $v.Verified -and $v.Color -eq "Red" -and $v.Detail -like "rx_smoke stop: no exit status came back (adb failed?): error: device*") "$($v.Color): $($v.Detail)"
+$crash = CmdLines ($txBody + "Traceback (most recent call last):`n  File `"/work/image_tx_daemon.py`", line 1, in <module>`nRuntimeError: boom`n")
+$v = Get-LogWindowVerdict -TxStopOutput $txStopOk -RxStopOutput $rxStopOk -TxLog $crash -RxLog $rxLogOk
+Check "log window: tx log without its shutdown line (the daemon had died) -> unverified, yellow" (-not $v.Verified -and $v.Color -eq "Yellow" -and $v.Detail -eq "tx_smoke log has no shutdown line") "$($v.Color): $($v.Detail)"
+$v = Get-LogWindowVerdict -TxStopOutput $txStopOk -RxStopOutput $rxStopOk -TxLog $txLogOk -RxLog $null
+Check "log window: no rx log came back -> unverified, yellow" (-not $v.Verified -and $v.Color -eq "Yellow" -and $v.Detail -eq "rx_smoke log has no shutdown line") "$($v.Color): $($v.Detail)"
+$v = Get-LogWindowVerdict -TxStopOutput $txStopOk -RxStopOutput $rxStopOk -TxLog $txLogOk -RxLog $txLogOk
+Check "log window: the tx line in the rx log does not count" (-not $v.Verified -and $v.Detail -eq "rx_smoke log has no shutdown line") $v.Detail
+$v = Get-LogWindowVerdict -TxStopOutput (CmdLines "__STOP_RC=1`n") -RxStopOutput $null -TxLog (CmdLines $txBody) -RxLog $rxLogOk
+Check "log window: every reason, in order, red" (-not $v.Verified -and $v.Color -eq "Red" -and $v.Detail -eq "tx_smoke stop: docker stop exit 1: no output; rx_smoke stop: no exit status came back (adb failed?): no output; tx_smoke log has no shutdown line") "$($v.Color): $($v.Detail)"
+# The hint under LOG_WINDOW follows the reason (2026-10-22 review): a failed
+# stop can leave the old read-while-running artefact; a missing shutdown line
+# after a stop that worked is a daemon that died (or a log that did not come
+# back whole) before the stop, the opposite case.
+Check "log window hint: a failed stop and a missing line name both causes" ($v.Hint -like "A daemon stop was not confirmed:*old log-window artefact (logs read while a daemon ran).*A log without its shutdown line can also mean that daemon died before the stop*") $v.Hint
+$v = Get-LogWindowVerdict -TxStopOutput (CmdLines "Error response from daemon: cannot stop container: tx_smoke: permission denied`n__STOP_RC=1`n") -RxStopOutput $rxStopOk -TxLog $txLogOk -RxLog $rxLogOk
+Check "log window hint: a failed stop alone (red) warns of the old artefact" ($v.Color -eq "Red" -and $v.Hint -like "A daemon stop was not confirmed: that daemon may still have run when its log was read*" -and $v.Hint -notlike "*died before the stop*") $v.Hint
+$v = Get-LogWindowVerdict -TxStopOutput $txStopOk -RxStopOutput $rxStopOk -TxLog $crash -RxLog $rxLogOk
+Check "log window hint: a missing line after good stops (yellow) says the daemon may have died first, not the old artefact" ($v.Color -eq "Yellow" -and $v.Hint -like "Both daemon stops worked, but a daemon log has no SIGTERM shutdown line: that daemon may have died before the stop*cover less than the leg." -and $v.Hint -notlike "*artefact*" -and $v.Hint -notlike "*still have run*") $v.Hint
+$v = Get-LogWindowVerdict -TxStopOutput $txStopOk -RxStopOutput $rxStopOk -TxLog $txLogOk -RxLog $rxLogOk
+Check "log window hint: none on a verified window" ($v.Verified -and $v.Hint -eq "") $v.Hint
+$v = Get-LogWindowVerdict -TxStopOutput (CmdLines "__STOP_RC=1`n") -RxStopOutput $null -TxLog (CmdLines $txBody) -RxLog $rxLogOk
+$pl = "log_window_detail=$($v.Detail)"
+Check "log window: the detail is one key=value line for params.txt" ($pl -notmatch "[`r`n]" -and $pl -match '^log_window_detail=\S') $pl
+
 # --- Invoke-AdbPush / Confirm-AdbPushedFiles / Read-BoardClock (stub adb) ------
 # Stub adb .cmd files only: the real adb is never called.
 $stubs = Join-Path $work "adbstub"
@@ -379,6 +453,21 @@ $dateArgs = (Get-Content -LiteralPath (Join-Path $stubs "date_args.txt") -Raw).T
 Check "Read-BoardClock: %s.%N reaches adb unexpanded through cmd" ($dateArgs -like '*shell "date +%s.%N*"*') $dateArgs
 Check "Read-BoardClock: offset and round trip from the stub" ($c.Ok -and $c.RttS -gt 0 -and $c.RttS -lt 30 -and [math]::Abs(($c.OffsetS + (Get-PcEpochS)) - 1792340518.123) -lt 60) "$($c.OffsetS) rtt=$($c.RttS)"
 
+# Invoke-DockerStop (2026-10-22): the board command reaches adb whole, with
+# $? unexpanded (an expanded $? would print __STOP_RC=True and every leg would
+# read unverified), and adb's own stderr comes back as output.
+$adbStop = StubCmd "adb_stop.cmd" "echo %*>`"%~dp0stop_args.txt`"`necho tx_smoke`necho __STOP_RC=0`nexit /b 0`n"
+$o = Invoke-DockerStop -Adb $adbStop -Serial "TESTSERIAL" -Name "tx_smoke"
+$stopArgs = (Get-Content -LiteralPath (Join-Path $stubs "stop_args.txt") -Raw).Trim()
+Check "Invoke-DockerStop: docker stop and the __STOP_RC=`$? marker reach adb unexpanded" ($stopArgs -eq "-s TESTSERIAL shell `"echo fio | sudo -S -p '' docker stop -t 1 tx_smoke 2>&1; echo __STOP_RC=`$?`"") $stopArgs
+$r = Get-DockerStopResult -Output $o -Name "tx_smoke"
+Check "Invoke-DockerStop: the stub's stop is judged ok" ($r.Ok -and @($o).Count -eq 2) "$($r.Text) | $($o -join ' / ')"
+$adbGone = StubCmd "adb_gone.cmd" "echo error: device '%2' not found 1>&2`nexit /b 1`n"
+$cap = @(& { $ErrorActionPreference = "Continue"; Invoke-DockerStop -Adb $adbGone -Serial "TESTSERIAL" -Name "rx_smoke" } *>&1)
+Check "Invoke-DockerStop: adb's stderr comes back as output, no error record under *>&1" ((@($cap | Where-Object { $_ -is [System.Management.Automation.ErrorRecord] }).Count -eq 0) -and (@($cap) -contains "error: device 'TESTSERIAL' not found")) ($cap -join ' | ')
+$r = Get-DockerStopResult -Output $cap -Name "rx_smoke"
+Check "Invoke-DockerStop: a failed adb call is a failed stop" (-not $r.Ok -and $r.Text -eq "no exit status came back (adb failed?): error: device 'TESTSERIAL' not found") $r.Text
+
 # --- Leg-end order and push wiring, read from the harness text ----------------
 $hLines = [System.IO.File]::ReadAllLines((Resolve-Path $harness).Path)
 function LineOf([string]$Needle, [int]$From = 0) {
@@ -386,11 +475,11 @@ function LineOf([string]$Needle, [int]$From = 0) {
     return -1
 }
 $s8 = LineOf "# 8. End of leg"
-$camStop = LineOf "docker stop -t 1 camera_svc" $s8
-$synthStop = LineOf "docker stop -t 1 synth_pub" $s8
+$camStop = LineOf 'Invoke-DockerStop -Adb $adbExe -Serial $TxAdbSerial -Name "camera_svc"' $s8
+$synthStop = LineOf 'Invoke-DockerStop -Adb $adbExe -Serial $TxAdbSerial -Name "synth_pub"' $s8
 $injStop = LineOf '$injWatchCmd stop' $s8
-$txStop = LineOf "docker stop -t 1 tx_smoke" $s8
-$rxStop = LineOf "docker stop -t 1 rx_smoke" $s8
+$txStop = LineOf '$txStopOut = Invoke-DockerStop -Adb $adbExe -Serial $TxAdbSerial -Name "tx_smoke"' $s8
+$rxStop = LineOf '$rxStopOut = Invoke-DockerStop -Adb $adbExe -Serial $RxAdbSerial -Name "rx_smoke"' $s8
 $clk = LineOf "Read-BoardClock -Adb" $s8
 $txLog = LineOf "docker logs tx_smoke 2>&1" $s8
 $rxLog = LineOf "docker logs rx_smoke 2>&1" $s8
@@ -403,9 +492,18 @@ Check "order: every leg-end step found after '# 8. End of leg'" (@($all | Where-
 Check "order: feed stop, then injector stop, then tx_smoke, then rx_smoke" ($camStop -lt $injStop -and $synthStop -lt $injStop -and $injStop -lt $txStop -and $txStop -lt $rxStop) ($all -join ',')
 Check "order: daemon, camera and synth logs read only after rx_smoke stopped" ($rxStop -lt $clk -and $clk -lt $txLog -and $txLog -lt $rxLog -and $rxStop -lt $camLog -and $rxStop -lt $synthLog -and $synthLog -lt $synthRm) ($all -join ',')
 Check "order: the reset log is read after the daemons stop" ($rxStop -lt $ocdRead) ($all -join ',')
-Check "params: log_window=after_stop recorded" ((LineOf '"log_window=after_stop",') -gt $ocdRead)
+# 2026-10-22: the log window is judged, after both final logs are read.
+$lwVerdict = LineOf '$logWin = Get-LogWindowVerdict -TxStopOutput $txStopOut -RxStopOutput $rxStopOut -TxLog $txFinal -RxLog $rxFinal' $s8
+Check "log window: judged after both daemon logs were read" ($lwVerdict -gt $rxLog -and $rxLog -gt 0) "verdict=$lwVerdict rxLog=$rxLog"
+Check "LEG CHECKS: LOG_WINDOW printed in the verdict's color" ((LineOf 'Write-Host $logWinLine -ForegroundColor $logWin.Color' $s8) -gt $lwVerdict)
+Check "LEG CHECKS: the hint under an unverified LOG_WINDOW is the verdict's own (worded by reason)" ((LineOf 'Write-Host "  $($logWin.Hint)" -ForegroundColor Yellow' $s8) -gt (LineOf 'Write-Host $logWinLine -ForegroundColor $logWin.Color' $s8))
+Check "LEG CHECKS: a verified LOG_WINDOW does not claim the feed stopped (feed: <its own stop result>)" ((LineOf '$logWinLine = "LOG_WINDOW after_stop (feed: $feedStopNote; ' $s8) -gt $lwVerdict -and (LineOf 'LOG_WINDOW after_stop (feed stopped' $s8) -lt 0)
+Check "params: log_window is the verdict's value, never a fixed after_stop" ((LineOf '"log_window=$($logWin.Value)",') -gt $lwVerdict -and (LineOf '"log_window=after_stop"') -lt 0)
+Check "params: log_window_detail only on an unverified window (placeholder dropped)" ((LineOf 'if (-not $logWin.Verified) { $logWinDetailLine = "log_window_detail=$($logWin.Detail)" }') -gt $lwVerdict -and (LineOf '$logWinDetailLine,') -gt $lwVerdict -and (LineOf ') | Where-Object { $_ -ne "" } | Out-File -FilePath (Join-Path $dir "params.txt") -Encoding utf8') -gt $lwVerdict)
+Check "params: the frame-source stop recorded as feed_stop=" ((LineOf '"feed_stop=$feedStopNote",') -gt $lwVerdict)
 Check "params: clock offsets recorded" ((LineOf '"tractor_clock_offset_s=$tOff",') -gt 0 -and (LineOf '"base_clock_offset_s=$bOff",') -gt 0)
 $code = @($hLines | Where-Object { $_ -notmatch '^\s*#' })
+Check "stop: the only leg-end docker stop is inside Invoke-DockerStop, its status kept, never Out-Null" ((@($code | Where-Object { $_ -match 'docker stop -t 1 ' }).Count -eq 1) -and (@($code | Where-Object { $_ -match 'docker stop -t 1 \$Name 2>&1; echo __STOP_RC=`\$\?`" 2>&1"' -and $_ -notmatch 'Out-Null' }).Count -eq 1))
 Check "push: no adb push piped to Out-Null any more" (@($code | Where-Object { $_ -match '\bpush\b.*\|\s*Out-Null' -and $_ -notmatch 'Invoke-AdbPush' }).Count -eq 0)
 Check "push: the only raw adb push is inside Invoke-AdbPush, with 2>&1 in the cmd string" ((@($code | Where-Object { $_ -match '-s \$\w+ push ' }).Count -eq 1) -and (@($code | Where-Object { $_ -match '-s \$Serial push .* 2>&1"$' }).Count -eq 1))
 Check "reset: spawned from the pushed ocd_reset.sh" (@($code | Where-Object { $_ -like '*$swdReset = *sh /tmp/lifetrac_p0c/ocd_reset.sh $ocdTag*' }).Count -eq 1)

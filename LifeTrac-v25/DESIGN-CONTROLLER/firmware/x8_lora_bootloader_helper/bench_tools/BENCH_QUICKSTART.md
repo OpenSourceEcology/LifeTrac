@@ -82,6 +82,11 @@ Fill in, following the comments in the file:
   see it. The harness gets it as `-HostIp` and the base rx daemon uses it as
   its control broker.
 - `BASE_TRANSPORT`: `adb` (radio legs need the base on USB) or `ssh`.
+- `EVIDENCE_DIR`: where the leg scripts write their records. Left empty it
+  is `bench-evidence/RS_13_vector_scene_<UTC date>/legs`. Give each session
+  a new dated folder: since 2026-10-22 the leg scripts refuse a folder that
+  already holds files tracked by git (a committed evidence record), and warn
+  when the last date in its path is not today (step 6).
 
 Check what the scripts will use:
 
@@ -218,7 +223,10 @@ Wheel versions are pinned in the `requirements.lock.txt` files next to each
 
    This re-pushes `/tmp/lifetrac_strict` on both boards. Run it after any
    reboot (and every flash reboots) or when the last push is 5 days old,
-   because `systemd-tmpfiles` ages `/tmp`. Afterwards,
+   because `systemd-tmpfiles` ages `/tmp`. It writes its md5 record into
+   `EVIDENCE_DIR`, so it stops with `REFUSED: EVIDENCE_DIR=...` (exit 7),
+   before any board is touched, when that folder holds committed files:
+   set a new folder in `bench.env` first (step 1). Afterwards,
    `ls /tmp/lifetrac_strict | wc -l` must be at least 19 (23 on a fresh full
    staging, `channel_survey_sniff.py` included). The flash staging
    in `/tmp/lifetrac_p0c` is separate: `flash_l072.sh <board> <bin>` without
@@ -306,6 +314,26 @@ helper directory with the serials, `-HostIp` and `-ForceFrfHz` from
 `leg_post.sh`. If PowerShell says that running scripts is disabled, see
 [PC_SETUP.md](PC_SETUP.md#powershell-execution-policy).
 
+The harness line carries `-StopDrainS` (since 2026-10-22): 4 s on FHSS
+(`image_bw250`), 2 s on DTS (`image_bw500`). `--stop-drain S` (0 < S ≤ 30)
+overrides it; fly both codecs of a round (its `mono_g4` and VECTOR legs) with
+the same value, and the prep prints a NOTE when it is not the default.
+
+**Evidence folder** (2026-10-22). `leg_prep.sh` refuses an `EVIDENCE_DIR`
+that already holds files tracked by git, a committed evidence record: it
+prints `REFUSED: EVIDENCE_DIR=...` and exits 7 before any board action
+(`--print-harness` shows the same verdict and still writes the preview).
+Point `EVIDENCE_DIR` in `bench.env` at a new folder. To append to a
+committed record on purpose, put `BENCH_EVIDENCE_APPEND=1` in front of
+**every** script of the leg (`BENCH_EVIDENCE_APPEND=1 bash ...`): the
+follow-up scripts refuse the folder without it, and the follow-up lines
+the prep prints then carry it. It is an environment setting only; a
+`BENCH_EVIDENCE_APPEND` line in `bench.env` is ignored with a WARN. A
+folder whose last date is not today gets a WARNING, not a refusal.
+`leg_post.sh` never refuses the folder: it parks both radios at the end, so
+it only prints a WARNING into its transcript and goes on to the park; move
+the files afterwards.
+
 The harness output ends with `=== LEG CHECKS ===`, just above the
 `[EVIDENCE]` line. `TRACTOR_L072_RESET landed` is the normal line; `failed`
 or `unknown` means score the tractor brackets with
@@ -314,27 +342,52 @@ or `unknown` means score the tractor brackets with
 prints on every leg until the RS-5.2 base follow-up is done.
 
 Since the bench kit of 2026-10-19 (not yet flown) the harness ends a leg by
-stopping the frame source, the injector, then tx_smoke (after `-StopDrainS`,
-default 2 s; pass e.g. 4 on a saturated multi-fragment FHSS leg) and
-rx_smoke, and only then reads the daemon logs (`log_window=after_stop` in
-`params.txt`). LEG CHECKS adds `CLOCKS board minus PC: ...` (read only; the
-offsets are in `params.txt`) and `LOG_WINDOW after_stop (...)`. Every adb
-push is checked and md5-compared with the PC copy (`deploy_md5.txt` in the
-archive). A leg that stops at `[DEPLOY]` with `adb push FAILED` or
-`md5 MISMATCH` and `No daemon was started.` transmitted nothing: look for a
+stopping the frame source, the injector, then tx_smoke (after `-StopDrainS`)
+and rx_smoke, and only then reads the daemon logs. LEG CHECKS adds
+`CLOCKS board minus PC: ...` (read only; the offsets are in `params.txt`) and
+a `LOG_WINDOW` line, checked since 2026-10-22:
+
+- green `LOG_WINDOW after_stop (...)`: both daemon stops worked and both
+  daemon logs hold their SIGTERM shutdown line (`params.txt`:
+  `log_window=after_stop`);
+- red `LOG_WINDOW after_stop_unverified (...)`: a daemon stop was not
+  confirmed. That daemon may have run while its log was read, and may still
+  run: `leg_post.sh` stops before the brackets and the park while a leg
+  daemon runs (exit 3); `bash "$BT/legs/power_up_guard.sh" --stop-leg-daemons`
+  stops it and parks, then re-run `leg_post.sh`;
+- yellow `LOG_WINDOW after_stop_unverified (...)`: both stops worked, but a
+  daemon log has no shutdown line. The daemon may have died before the stop
+  (look for a traceback in its final log above LEG CHECKS), or its log did
+  not come back whole: the log ends early.
+
+An unverified window puts `log_window=after_stop_unverified` and the reason
+(`log_window_detail=`) in `params.txt`, with a hint line under LOG_WINDOW.
+`feed_stop=` records the frame source's own stop. It does not change the
+colour: if the LOG_WINDOW line shows `feed: camera_svc` (or `synth_pub`)
+with a docker stop exit other than 0, or no exit status, that container
+may still run, and `leg_post.sh` stops at exit 3; run
+`bash "$BT/legs/power_up_guard.sh" --stop-leg-daemons`, then re-run
+`leg_post.sh`.
+
+Every adb push is checked and md5-compared with the PC copy
+(`deploy_md5.txt` in the archive). A leg that stops at `[DEPLOY]` with
+`adb push FAILED` or `md5 MISMATCH` and `No daemon was started.`
+transmitted nothing: look for a
 root-owned file or folder in `/tmp/lifetrac_strict` or `/tmp/lifetrac_p0c`
 on that board, remove it with sudo and re-run the leg. Details: BENCH_RUNBOOK,
 "A leg".
 
 If you must type the harness command yourself, it is the line below, with
 every `<...>` replaced by your `bench.env` values. Typed by hand, it skips
-`leg_prep.sh`'s carrier gate and the archive record, so pass the archive to
+`leg_prep.sh`'s carrier gate, its evidence-folder refusal (`leg_post.sh`
+only warns about a committed `EVIDENCE_DIR`, and writes there) and the
+archive record, so check `EVIDENCE_DIR` first and pass the archive to
 `leg_post.sh 2a <archive dir>`:
 
 ```powershell
 cd LifeTrac-v25\DESIGN-CONTROLLER\firmware\x8_lora_bootloader_helper
 .\run_live_radio_monitor.ps1 -TxAdbSerial <TRACTOR_SERIAL> -RxAdbSerial <BASE_SERIAL> -HostIp <PC_HOST> `
-   -TxFeed camera -RegProfile 2 -ForceFrfHz <DTS_CARRIER_HZ from today's spot-check> -DurationS 300 -SynthFps 2 `
+   -TxFeed camera -RegProfile 2 -ForceFrfHz <DTS_CARRIER_HZ from today's spot-check> -DurationS 300 -StopDrainS 2 -SynthFps 2 `
    -KfRequestDisable 1 -ReactiveFire 0 -ProbeEcho 0 -LogFragArrivals 1 -TxBatch 0 `
    -CamExtraEnv "-e LIFETRAC_ENCODE_MODE=9 -e LIFETRAC_VECTOR_DETAIL=80" -Archive
 ```
@@ -342,7 +395,7 @@ cd LifeTrac-v25\DESIGN-CONTROLLER\firmware\x8_lora_bootloader_helper
 The other RS-13 legs (legs/README.md, "The four RS-13 legs"):
 
 - 2b is the same leg on FHSS: `leg_prep.sh 2b image_bw250` (`-RegProfile 1`,
-  no `-ForceFrfHz`).
+  no `-ForceFrfHz`, `-StopDrainS 4`).
 - 2c is the `mono_g4` control: `leg_prep.sh 2c image_bw500`
   (`-CamExtraEnv "-e LIFETRAC_ENCODE_MODE=6"`).
 - 2d is the over-the-air switch: `leg_prep.sh 2d image_bw500`, then
@@ -364,7 +417,9 @@ stops the leftover containers and parks both radios.
 
 [RS13_VECTOR_LEG.md](RS13_VECTOR_LEG.md) gives each leg and the pass criteria
 P1–P8. Start the session's `RESULTS.md` from
-[RS13_RESULTS_TEMPLATE.md](RS13_RESULTS_TEMPLATE.md). For RS-12-style tile
+[RS13_RESULTS_TEMPLATE.md](RS13_RESULTS_TEMPLATE.md), and fill its RF setup
+(antennas, cables, positions) and its pass rule (margin and legs per codec)
+before leg 1 (sections added 2026-10-22). For RS-12-style tile
 legs, see [BENCH_RUNBOOK.md](BENCH_RUNBOOK.md), "A leg". The archive goes to
 `DESIGN-CONTROLLER/bench-evidence/radio_monitor_<stamp>_<sha>/`, and its
 `params.txt` records what actually ran.
@@ -404,11 +459,19 @@ two logs cannot be lined up: an outage of about one u8 seq wrap, or a train
 with key-frame copies or parity. (With
 `--capture`, the warning points at the capture seq-gap line, which is the
 loss of record on an RS-13 leg.) `FIRMWARE DROP` subtracts the base's own
-fragment count. When params.txt has no `log_window=after_stop`, a note says
-the logs were read before the daemons stopped. Every
-10-18/10-19 leg shows 4-5 there: `rx_urc_lost` (0-2 on those legs, on the
-URC-path line) is the part the L072 really lost, and the rest is expected to be
-that window (first leg with `log_window=after_stop` to confirm).
+fragment count. The report's first line repeats params.txt's `log_window`.
+On `log_window=after_stop` there is no log-window note. When params.txt has
+no `log_window` (every archive flown so far), a note says the logs were read
+before the daemons stopped. Every 10-18/10-19 leg shows 4-5 there:
+`rx_urc_lost` (0-2 on those legs, on the URC-path line) is the part the L072
+really lost, and the rest is expected to be that window (first leg with
+`log_window=after_stop` to confirm). On `log_window=after_stop_unverified`
+(2026-10-22) the report prints `!! LOG WINDOW UNVERIFIED (log_window_detail:
+...)` after the loss lines, worded by the reason (a stop not confirmed: the
+old artefact is possible; a missing shutdown line after good stops: a log
+that ends early), points to it from a `received > sent` line, and adds a note
+under FIRMWARE DROP. That note can fall below the 8 lines `leg_post.sh` shows
+on the console, so read the report file.
 
 The loss of record is the report's `capture seq gaps` line. The counter
 `loss` line can be stale (RS13_VECTOR_LEG A14) or frozen by a dead stats
@@ -426,6 +489,21 @@ the level only), `rs13_probe_score.py` (command delivery, pooled per profile
 and codec, with a `tail:` line per leg) and `rs13_digest_trace.py` (A16
 confirmation). They take paths, so they need no copy; each exits non-zero on
 missing or garbled input. RS13_RANGE_EDGE_LEG.md says which to run per leg.
+
+Since 2026-10-22 `rs13_probe_score.py` also:
+
+- refuses to pool legs whose params `log_window` values differ (exit 1),
+  and names a leg whose window is not `after_stop` in its block;
+- prints a `!! base command TX attempts other than PROBE (0x69)` line on a
+  `-ReactiveFire 1` leg whose base sent other opcodes (control or profile
+  traffic among the probes; the 0x63 commands of a 2d switch leg are
+  expected);
+- takes `--margin PP`: under the unchanged Fisher lines it prints VECTOR
+  minus `mono_g4` delivery, its one-sided 95 % lower bound (Newcombe hybrid
+  score interval) and `NOT WORSE (margin rule)` when that bound is above
+  −PP pp. A two-sided Fisher p ≥ 0.05 passes whenever the sample is too
+  small, so write the margin and the legs per codec into RESULTS before leg
+  1 ([RS13_RESULTS_TEMPLATE.md](RS13_RESULTS_TEMPLATE.md), "Pass rule").
 
 ## 8. Park and power down
 
@@ -488,4 +566,7 @@ list. These are the common symptoms:
 | board resets about 60 s into a long operation | the U-Boot-armed X8 watchdog | FLASH_RUNBOOK §3; close `/dev/watchdog0` with `V` |
 | a harness parameter seems ignored | misspelled name | the harness now rejects unknown names; read the archive's `params.txt` |
 | harness stops at `[DEPLOY] adb push FAILED ...` or `[DEPLOY] md5 MISMATCH ...`, `No daemon was started.` | since the 2026-10-19 bench kit every push is checked; usually a root-owned file or folder in `/tmp/lifetrac_strict` or `/tmp/lifetrac_p0c` on that board | remove it with sudo on that board and re-run the leg; nothing was transmitted |
+| a leg script prints `REFUSED: EVIDENCE_DIR=... already holds N file(s) tracked by git` (`leg_prep.sh` / `stage_boards.sh` exit 7) | `EVIDENCE_DIR` in `bench.env` points at a committed evidence record (since 2026-10-22) | point it at a new folder for this session; for a deliberate append, run every script of the leg with `BENCH_EVIDENCE_APPEND=1` in front (step 6) |
+| LEG CHECKS prints `LOG_WINDOW after_stop_unverified` in red | a daemon's `docker stop` at leg end was not confirmed (2026-10-22 check); the reason is in `params.txt` `log_window_detail=` | run `leg_post.sh` as usual: if a leg daemon still runs it stops before the brackets and the park (exit 3); then `bash "$BT/legs/power_up_guard.sh" --stop-leg-daemons` (it parks too) and re-run `leg_post.sh` |
+| LEG CHECKS prints `LOG_WINDOW after_stop_unverified` in yellow | a daemon log has no SIGTERM shutdown line: the daemon may have died before the stop, or its log did not come back whole | look for a traceback in that daemon's final log; its figures cover less than the leg |
 | adb lost the board after `adb kill-server` | the board's adbd hung | run `adb -s <serial> wait-for-device` once; if that fails, replug USB-C or press RESET. Avoid `kill-server` while the boards are enumerating ([ADB_TIPS_AND_TRICKS.md](../../../X8_HEALTH_AND_RECOVERY/recovery/ADB_TIPS_AND_TRICKS.md)) |

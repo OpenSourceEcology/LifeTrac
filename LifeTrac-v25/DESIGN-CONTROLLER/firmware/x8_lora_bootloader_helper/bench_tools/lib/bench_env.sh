@@ -52,7 +52,15 @@
 #   bench_require_dts_carrier  return 1 (with the reason) unless DTS_CARRIER_HZ may be flown
 #   bench_check_name WHAT VAL  die unless VAL matches ^[A-Za-z0-9_.-]+$ (leg tags, scene
 #                              names: they end up in file names and board shell commands)
-#   bench_evidence_dir         mkdir -p $EVIDENCE_DIR and print it
+#   bench_evidence_guard [--warn-only]
+#                              check $EVIDENCE_DIR before anything is written there (below);
+#                              returns 1 on a refusal. Messages go to stderr and into
+#                              BENCH_EVIDENCE_MSG (call it directly, not in $(...), to keep
+#                              that variable for a record started after the check)
+#   bench_evidence_dir [--warn-only]
+#                              bench_evidence_guard, then mkdir -p $EVIDENCE_DIR and print it
+#   bench_evidence_tracked DIR number of files tracked by git in DIR (0 outside a checkout;
+#                              'error: <git message>' when git cannot answer)
 #   bench_git_desc             "<branch> @ <short sha>[ +dirty]" of this checkout
 #   bench_show_env             print the effective settings (password masked)
 #
@@ -60,6 +68,25 @@
 # BOARD_FLASH_STAGE=/tmp/lifetrac_p0c, SUDO (sudo prefix with the password piped),
 # PROBE_RUN (docker run prefix WITH the radio UART mapped -- radio probes only),
 # WORK_RUN (the same without any device).
+#
+# Committed evidence (2026-10-22): bench_evidence_guard REFUSES an EVIDENCE_DIR that
+# already holds files tracked by git (in this checkout, or in whichever checkout holds
+# that folder): it is a committed evidence record, and a stale bench.env would append a
+# new session's files to it (the 10-22 review found the flight bench.env still pointing
+# at RS_13_range_edge_2026-10-19/legs). A folder that does not exist yet, holds only
+# untracked files or lies outside any checkout passes. When git cannot answer (git
+# missing, 'dubious ownership', a broken worktree link) the guard refuses as for a
+# committed folder: it never guesses 'not committed'. For a deliberate append, set
+# BENCH_EVIDENCE_APPEND=1 in the ENVIRONMENT for that run (prefix the command, or export
+# it in that Git Bash window). EVERY script of the leg needs it -- leg2d_switch.sh and
+# link_sample.sh refuse the folder without it while the harness is already on the air --
+# so leg_prep.sh prints its follow-up lines with the prefix. It is not a bench.env
+# setting: a BENCH_EVIDENCE_APPEND line in the settings file is ignored with a WARN, so
+# it cannot be left on. --warn-only turns the refusal into a WARNING, for the one
+# caller that must not be stopped (leg_post.sh: its park is safety-critical). The guard
+# also WARNS when the last YYYY-MM-DD in the EVIDENCE_DIR path is not today (local or
+# UTC date). Each warning prints once per process tree (BENCH_EVIDENCE_WARNED is
+# exported after a direct call); a refusal prints every time.
 
 [ -n "${BASH_VERSION:-}" ] || { echo "bench_env.sh needs bash" >&2; return 1 2>/dev/null || exit 1; }
 
@@ -127,7 +154,13 @@ fi
 [ -f "$BENCH_ENV_FILE" ] || { echo "bench_env: settings file not found: $BENCH_ENV_FILE" >&2; return 1 2>/dev/null || exit 1; }
 # shellcheck source=env_file.sh
 . "$BENCH_LIB_DIR/env_file.sh" || { echo "bench_env: cannot load $BENCH_LIB_DIR/env_file.sh" >&2; return 1 2>/dev/null || exit 1; }
+_bench_append=${BENCH_EVIDENCE_APPEND-}         # environment only (2026-10-22): the file may not set it
 bench_load_env_file "$BENCH_ENV_FILE" || { return 1 2>/dev/null || exit 1; }   # CRLF-tolerant; the environment wins
+if [ "${BENCH_EVIDENCE_APPEND-}" != "$_bench_append" ]; then
+  echo "bench_env: WARN: BENCH_EVIDENCE_APPEND in $BENCH_ENV_FILE is ignored -- it is a one-run override for the environment (BENCH_EVIDENCE_APPEND=1 bash <script>, on every script of the leg), never a settings-file value" >&2
+  BENCH_EVIDENCE_APPEND=$_bench_append
+fi
+unset _bench_append
 
 : "${BASE_SERIAL:=2D0A1209DABC240B}"
 : "${TRACTOR_SERIAL:=2E2C1209DABC240B}"
@@ -327,7 +360,85 @@ bench_check_name() {                     # bench_check_name WHAT VALUE
   esac
 }
 
-bench_evidence_dir() {
+bench_evidence_tracked() {               # bench_evidence_tracked DIR: files git tracks in DIR
+  # A folder not made yet is asked about from its nearest existing parent. git runs in
+  # that folder, so the checkout that holds it answers (C:/... works from Git Bash with
+  # MSYS_NO_PATHCONV=1); outside any checkout the answer is 0. Any other git failure
+  # (git missing, "dubious ownership", a broken worktree link) prints "error: <git's
+  # message>" instead of a count, so the guard never passes a folder it could not check.
+  local d=$1 rel="" p err out
+  while [ "${#d}" -gt 1 ] && [ "${d%/}" != "$d" ]; do d=${d%/}; done
+  while [ ! -d "$d" ]; do
+    p=$(dirname "$d")
+    [ "$p" != "$d" ] || { echo 0; return 0; }
+    rel="$(basename "$d")${rel:+/$rel}"
+    d=$p
+  done
+  command -v git >/dev/null 2>&1 || { echo "error: git is not on PATH"; return 0; }
+  if ! err=$(git -C "$d" rev-parse --is-inside-work-tree 2>&1 >/dev/null); then
+    # Only git's "outside any checkout" message means 0; a broken .git link says
+    # "not a git repository: <path>" without the "(or any" part.
+    case $err in *"not a git repository (or any"*) echo 0; return 0 ;; esac
+    echo "error: $(printf '%s\n' "$err" | head -n 1)"; return 0
+  fi
+  if ! out=$(git --literal-pathspecs -C "$d" ls-files -- "${rel:-.}" 2>&1); then
+    echo "error: $(printf '%s\n' "$out" | head -n 1)"; return 0
+  fi
+  printf '%s\n' "$out" | grep -c .
+}
+
+bench_evidence_guard() {                 # [--warn-only]; the rules are in the header
+  local warn_only=0 n last today_l today_u msg=""
+  [ "${1:-}" = --warn-only ] && warn_only=1
+  BENCH_EVIDENCE_MSG=""
+  n=$(bench_evidence_tracked "$EVIDENCE_DIR")
+  case $n in
+    error:*)      # git could not answer: refuse unless asked, never guess "not committed"
+      if [ "${BENCH_EVIDENCE_APPEND:-}" = 1 ]; then
+        msg="NOTE: BENCH_EVIDENCE_APPEND=1 -- git could not say whether EVIDENCE_DIR=$EVIDENCE_DIR holds committed files (${n#error: }); writing there on purpose"
+      elif [ $warn_only = 1 ]; then
+        msg="WARNING: git could not say whether EVIDENCE_DIR=$EVIDENCE_DIR holds committed files (${n#error: }). This step must not be stopped, so its files go there anyway: check that folder before the next run."
+      else
+        BENCH_EVIDENCE_MSG="REFUSED: git could not say whether EVIDENCE_DIR=$EVIDENCE_DIR holds committed files (${n#error: }).
+         Fix git in that checkout (for 'dubious ownership': git config --global --add safe.directory <repo>),
+         or, to write there anyway, run this and every other script of the leg with BENCH_EVIDENCE_APPEND=1 in the environment (not in bench.env)."
+        printf '%s\n' "$BENCH_EVIDENCE_MSG" >&2
+        return 1
+      fi
+      n=0 ;;
+    ''|*[!0-9]*) n=0 ;;
+  esac
+  if [ "$n" -gt 0 ]; then
+    if [ "${BENCH_EVIDENCE_APPEND:-}" = 1 ]; then
+      msg="NOTE: BENCH_EVIDENCE_APPEND=1 -- appending on purpose to EVIDENCE_DIR=$EVIDENCE_DIR, a committed evidence record ($n file(s) tracked by git)"
+    elif [ $warn_only = 1 ]; then
+      msg="WARNING: EVIDENCE_DIR=$EVIDENCE_DIR already holds $n file(s) tracked by git (a committed evidence record). This step must not be stopped, so its files go there anyway: move them out (or commit them on purpose) and point EVIDENCE_DIR in $BENCH_ENV_FILE at a new folder before the next run. (If this append was deliberate, run every script of the leg with BENCH_EVIDENCE_APPEND=1: this becomes a NOTE.)"
+    else
+      BENCH_EVIDENCE_MSG="REFUSED: EVIDENCE_DIR=$EVIDENCE_DIR already holds $n file(s) tracked by git: it is a committed evidence record, and this run would add its files to it.
+         Point EVIDENCE_DIR in $BENCH_ENV_FILE at a new folder for this session (e.g. bench-evidence/<campaign>_$(date +%Y-%m-%d)/legs),
+         or, to append to that record on purpose, run this and every other script of the leg with BENCH_EVIDENCE_APPEND=1 in the environment (not in bench.env)."
+      printf '%s\n' "$BENCH_EVIDENCE_MSG" >&2
+      return 1
+    fi
+  fi
+  if [[ $EVIDENCE_DIR =~ ^.*([0-9]{4}-[0-9]{2}-[0-9]{2}) ]]; then     # the last date in the path
+    last=${BASH_REMATCH[1]}
+    today_l=$(date +%Y-%m-%d); today_u=$(date -u +%Y-%m-%d)
+    if [ "$last" != "$today_l" ] && [ "$last" != "$today_u" ]; then
+      msg="${msg:+$msg
+}WARNING: EVIDENCE_DIR=$EVIDENCE_DIR is dated $last, not today ($today_l): is it this session's folder? (EVIDENCE_DIR in $BENCH_ENV_FILE)"
+    fi
+  fi
+  if [ -n "$msg" ] && [ "${BENCH_EVIDENCE_WARNED:-}" != "$EVIDENCE_DIR" ]; then
+    BENCH_EVIDENCE_MSG=$msg
+    printf '%s\n' "$msg" >&2
+    export BENCH_EVIDENCE_WARNED=$EVIDENCE_DIR      # once per process tree (from a direct call)
+  fi
+  return 0
+}
+
+bench_evidence_dir() {                   # [--warn-only]
+  bench_evidence_guard "$@" || return 1
   mkdir -p "$EVIDENCE_DIR" || return 1
   printf '%s\n' "$EVIDENCE_DIR"
 }
@@ -348,4 +459,5 @@ bench_show_env() {
     [ "$v" = BENCH_SUDO_PW ] && { echo "BENCH_SUDO_PW=(set, not shown)"; continue; }
     echo "$v=${!v}"
   done
+  [ -z "${BENCH_EVIDENCE_APPEND:-}" ] || echo "BENCH_EVIDENCE_APPEND=$BENCH_EVIDENCE_APPEND (environment only; 1 = appends to a committed EVIDENCE_DIR allowed)"
 }

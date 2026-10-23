@@ -38,6 +38,57 @@ the counters in the brackets are attributable.
 Health probes at bracket time: <`rs116_health_probe.py` one-liners, both boards;
 the whole output kept in `legs/leg<X>_health_{base,tractor}.txt`>.
 
+## RF setup
+
+<!-- Added 2026-10-22. Fill before leg 1 and check again at the start of every
+     later session: a physical change between sessions (an antenna swapped, a
+     board moved or turned, a cable or adapter added) leaves no trace in the
+     logs, so it cannot be reconstructed afterwards. -->
+
+| item | base 2D0A1209DABC240B | tractor 2E2C1209DABC240B |
+|---|---|---|
+| antenna part / model | <maker, part number, gain dBi> | |
+| cable / adapter | <cable type and length, connectors, every adapter in the path; or "antenna on the board connector"> | |
+| position | <where on the bench or in the room, height above the surface, distance to walls and metal> | |
+| orientation | <antenna axis (vertical / horizontal, tilt), which way the board faces> | |
+
+Placement and separation: <antenna-to-antenna distance (cm), line of sight or
+what is between the boards, metal, the PC, other radios nearby and their state>.
+Unchanged since <previous session, date>? <yes | no — what changed>.
+Photo: `legs/rf_setup_<date>.jpg` <both boards and antennas in one frame, or one
+per board>.
+
+## Pass rule (written before leg 1)
+
+<!-- Added 2026-10-22. Write this section before the first leg flies, and do
+     not change it afterwards: a rule chosen after the numbers are seen is not
+     a test. One row per criterion that compares VECTOR with mono_g4, each with
+     its own metric, margin and bound. A two-sided Fisher p ≥ 0.05 is not a
+     pass rule: it passes whenever the sample is too small to tell (390/400
+     against 396/400 gives p = 0.176). Count per arm (frames or probes) for
+     80 % power at a one-sided 95 % bound (normal approximation): true rates
+     98 % / 98 % need 606 / 270 / 152 for a 2 / 3 / 4 pp margin, 97 % / 97 %
+     need 900 / 400 / 225; the score bound is a little stricter (about 25 to 50 more
+     per arm for the same power: 654 / 306 / 186 and 926 / 424 / 255). A 300 s leg at 2 fps publishes about 600
+     frames, but frames are lost in bursts, not one at a time, so a pooled
+     frame count overstates the sample and the bound is optimistic: the
+     interleaved legs (A15) are the check on it. These legs fire no PROBE;
+     command delivery (§8.6) is scored on -ReactiveFire 1 -ProbeEcho 0 legs,
+     recorded with the range-edge template (a 300 s DTS leg fired about 210
+     probes on 2026-10-19). -->
+
+| item | value |
+|---|---|
+| P3 frame loss | frames received / expected per codec, pooled over each leg's `capture seq gaps` line (`rs12_leg_report.py --capture`; expected = received + lost): VECTOR legs <2a, 2a′> against control legs <2c, 2c′>, VECTOR minus mono_g4. Margin <PP> percentage points: NOT WORSE when the one-sided 95 % lower bound (Newcombe hybrid score) is above −<PP> pp. Bound, run in `bench_tools`: `py -3 -c "import rs13_probe_score as s; print(*s.margin_rule((<rx V>, <exp V>), (<rx M>, <exp M>), <PP>, 'P3 frame loss'), sep='\n')"` (its lines say delivery and probes: read frames) |
+| command delivery (§8.6) | <n/a: these legs fire no PROBE> — only on legs flown with `-ReactiveFire 1 -ProbeEcho 0`: tractor PROBE seqs that the base sent / base PROBE TX per codec, margin <PP> pp, `py -3 rs13_probe_score.py --margin <PP> <archive> [<archive> …]` over every such leg of one profile |
+| legs per codec | <n> |
+| frames per leg | <expected per leg, e.g. ~600 at 2 fps over 300 s>; per arm <legs × per leg>, against the <n> per arm the margin needs at the expected rates |
+| interleaving order | <e.g. mono_g4, VECTOR, mono_g4, VECTOR, …; the flight order below follows it> |
+| kit commit | `<sha>` (the harness and bench kit every leg flies with) |
+| `-StopDrainS` | <s>, the same on every leg the rule pools (params `stop_drain_s`; `leg_prep.sh` writes 4 s on FHSS, 2 s on DTS, `--stop-drain S` to change it) |
+| `log_window` | `after_stop` on every leg (params). A leg that is not (`after_stop_unverified`, or absent) is re-flown, or dropped under this rule: <rule> |
+| written | <date, time, by whom — before leg 1> |
+
 ## Step 0 — image smoke
 
 ```
@@ -83,12 +134,20 @@ read from lock (A7) and the tractor is not FHSS time authority (A11)>
 
 ### Legs
 
-| leg | profile | boot mode | harness archive | base capture | brackets | duration | verdict |
-|---|---|---|---|---|---|---|---|
-| 2a | 2 (DTS) | vector | `radio_monitor_<stamp>_<sha>` | `legs/leg2a_base.jsonl` | `legs/leg2a_pre_*`, `legs/leg2a_post_*` | 300 s | |
-| 2b | 1 (FHSS) | vector | | | | 300 s | |
-| 2c | 2 (DTS) | mono_g4 (control) | | | | 300 s | |
-| 2d | 2 (DTS) | mono_g4 → vector @ T+60 s → mono_g4 @ T+180 s | | | | 300 s | |
+| leg | profile | boot mode | harness archive | log_window | stop_drain_s | base capture | brackets | duration | verdict |
+|---|---|---|---|---|---|---|---|---|---|
+| 2a | 2 (DTS) | vector | `radio_monitor_<stamp>_<sha>` | <`after_stop`> | <s> | `legs/leg2a_base.jsonl` | `legs/leg2a_pre_*`, `legs/leg2a_post_*` | 300 s | |
+| 2b | 1 (FHSS) | vector | | | | | | 300 s | |
+| 2c | 2 (DTS) | mono_g4 (control) | | | | | | 300 s | |
+| 2d | 2 (DTS) | mono_g4 → vector @ T+60 s → mono_g4 @ T+180 s | | | | | | 300 s | |
+
+`log_window` and `stop_drain_s` are copied from each archive's `params.txt`
+(2026-10-22). `after_stop`: the harness read both daemon logs after both
+daemons stopped. `after_stop_unverified`: a daemon stop, or a daemon log's
+SIGTERM shutdown line, was not confirmed; copy `log_window_detail` beside
+it. Absent: an older harness read them while the daemons ran. The pass rule
+needs `after_stop` on every leg, and every leg should carry its
+`-StopDrainS`.
 
 Flight order: <e.g. 2c, 2a, 2c′, 2a′, 2b, 2d — interleave control and VECTOR
 legs if P3 compares them leg-for-leg (A15)>.
@@ -116,7 +175,8 @@ reports; every `PARK_TRANSIENT` and its re-park ~60 s later
 FHSS time authority (A11): tractor `tx_stream_streak_max` in the 2b
 post-bracket: <n> (≥ 8 = authority reached; < 8 expected at 1 fps).
 P3 basis: <interleaved: pooled control x / y vs VECTOR x / y | margin stated
-before the legs (date and rule, e.g. two-sided Fisher exact p ≥ 0.05)>.
+before the legs (the "P3 frame loss" row of the "Pass rule (written before
+leg 1)" section above): the bound and verdict line>.
 
 `vector_dry_run.py` summaries (paste the `== vector dry run summary ==` block
 of each base capture):

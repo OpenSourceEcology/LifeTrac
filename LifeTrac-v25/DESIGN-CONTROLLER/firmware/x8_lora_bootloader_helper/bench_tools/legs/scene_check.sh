@@ -43,7 +43,7 @@ done
 [ -n "$TAG" ] || { bench_usage; exit 2; }
 bench_check_name "tag" "$TAG"
 case $MIN in ''|*[!0-9.]*) die "min_pct must be a number, not '$MIN'" ;; esac
-E=$(bench_evidence_dir) || die "cannot create $EVIDENCE_DIR"
+E=$(bench_evidence_dir) || die "no evidence folder: $EVIDENCE_DIR (see above)"
 board_present tractor || die "tractor ($TRACTOR_SERIAL) is not reachable via adb"
 
 if [ $FRONT = 1 ]; then
