@@ -28,6 +28,7 @@ for f in mh_cobs mh_crc16 murata_host mh_stats mh_uart mh_stream mh_link mh_runt
 done
 c++ -std=gnu++17 -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -Wno-unused-parameter $DEFS $INCS \
     -c "$SKETCH/murata_host/mh_uart_arduino.cpp" -o "$OUT/mh_uart_arduino.o"
+cc -std=gnu11 -Wall -Wextra -Werror $DEFS $INCS -c "$SKETCH/lt_entropy.c" -o "$OUT/lt_entropy.o"
 cc -std=gnu11 $DEFS $INCS -c "$OUT/stage/src/lora_proto/lora_proto.c" -o "$OUT/lora_proto.o"
 cc -std=gnu11 $DEFS $INCS -c "$OUT/stage/src/lora_proto/crypto_stub.c" -o "$OUT/crypto_stub.o"
 c++ -std=gnu++17 -Wall -Wextra -Wno-unused-function -Wno-unused-variable -Wno-unused-parameter \
