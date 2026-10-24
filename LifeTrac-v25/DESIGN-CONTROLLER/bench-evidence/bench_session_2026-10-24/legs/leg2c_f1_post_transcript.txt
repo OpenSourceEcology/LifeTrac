@@ -1,0 +1,101 @@
+14:53:26Z == leg 2c_f1 post (archive C:/Users/dorkm/Documents/GitHub/LifeTrac-bench-main/LifeTrac-v25/DESIGN-CONTROLLER/bench-evidence/radio_monitor_20261024_095315_d28bc2ca)
+14:53:26Z -- waiting for the base capture (rs13_cap_base) to finish its 480 s
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+== vector dry run summary ==
+profile image_bw250: one-fragment limit 203 B (epoch starts 202 B)
+frames: 475 total, 0 vector, 475 other, 0 unparseable; by codec {'mono_g4': 475}
+wire bytes (vector): min 0 / p50 0 / p95 0 / max 0; over limit: 0
+epoch starts: 0 received, 0 applied
+arrival: 0.00 fps mean over 0.0 s; gap p50 0.00 s, p95 0.00 s, max 0.00 s; first applied at never (0 frame(s) before it)
+store: applied 0, bad 0 , epoch_behind 0, orphans 0, digest 0 checked / 0 mismatched, epochs 0, handovers 0, ttl_dropped 0, resync 0 (0 ended by DIGEST), records 0
+resync: none
+scene: none (no frame applied)
+checks:
+  [PASS] parse_ok       0 unparseable payload(s)
+  [FAIL] all_vector     475 non-vector frame(s): {'mono_g4': 475}
+  [PASS] one_fragment   0 over 203 B (epoch starts 202 B); max 0 B
+  [PASS] store_clean    frames_bad=0 
+  [PASS] no_orphans     orphans=0
+  [PASS] digest         0 checked, 0 mismatched, scene digest_ok=None
+  [FAIL] epoch_seen     0 epoch start(s) applied of 0 received
+  [FAIL] first_apply    0 frame(s) before the first apply
+  [FAIL] applied_ratio  0/0 applied = 0.0% (need >= 90%)
+  [FAIL] min_frames     0 vector frame(s), need >= 500
+RESULT: FAIL
+json report -> /work/legs/leg2c_f1_base.json
+14:55:27Z -- radio quiet check before the brackets and the park
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+base: leg daemons [] ttymxc3 holders []
+tractor: leg daemons [] ttymxc3 holders []
+14:55:52Z -- post-brackets (rs115) both boards
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+radio_rx_ok=8048 radio_crc_err=16 radio_tx_ok=1176  (base)
+radio_rx_ok=161 radio_crc_err=0 radio_tx_ok=614  (tractor)
+14:55:56Z -- rs12_leg_report (--capture) + frag_gap_report
+train_gap_ms=40  tx_pipeline_depth=2  synth_budget_b=250  force_frf_hz=0  git_sha=d28bc2ca  log_window=after_stop  
+  (tx frags_ok counter 608 is stale; using 613 fragments from per-frame TX events)
+  (rx rx_frames counter 471 is stale; using 475 fragments from frag_arrival events)
+loss 138/613 = 22.5%   crc_dumps=0  timeouts=0  published=475   [whole logs]
+shared-window loss 138/613 = 22.5%   [txdone_arrival vs frag_arrival, train by train over the window both logs cover; 138 of 613 trains not heard]
+capture seq gaps (leg2c_f1_base.jsonl): lost 0/475 = 0.0%  (received 475, 0 gaps, longest 0; 1 codec run; period 0.54 s)
+  first frame heard at seq 139: the 138 frame(s) numbered before it are not in the figure above (the camera numbers from seq 1 at start-up — an acquisition delay or a late capture, RS-13.1 A7); counting from seq 1: 138/613 = 22.5%
+radio deltas: {'radio_dio0': 637, 'radio_rx_ok': 475, 'radio_crc_err': 0, 'radio_tx_ok': 161}
+n_frag=475 span=237s max_gap=0.7s gaps>3s=0 total_silent=0.0s
+episodes (start s from first frag, +length): NONE
+base sends on air=161 | tractor decoded cmds=161
+tractor cmd offsets (s from its first): 0.0, 1.5, 3.0, 4.5, 6.0, 7.5, 9.0, 10.5, 12.0, 13.5, 15.0, 16.5, 18.0, 19.5, 21.0, 22.5, 24.0, 25.5, 26.9, 28.5, 30.0, 31.5, 32.9, 33.9, 35.5, 36.9, 38.0, 39.5, 40.9, 42.5, 43.9, 45.5, 47.0, 48.5, 50.0, 51.5, 53.0, 54.5, 56.0, 57.5
+14:55:57Z -- P2 / P4 from the archive
+# leg 2c_f1 P2/P4 greps on C:/Users/dorkm/Documents/GitHub/LifeTrac-bench-main/LifeTrac-v25/DESIGN-CONTROLLER/bench-evidence/radio_monitor_20261024_095315_d28bc2ca
+harness: reg_profile=1 force_frf_hz=0 tx_batch=0 synth_fps=2 cam_extra_env=-e LIFETRAC_ENCODE_MODE=6
+published frame_id lines (rx_daemon.log): 475
+tx done K=1 lines: 613
+tx done K>=2 lines: 0
+tx ABORTED lines: 0
+max K: 1 fragments
+camera_service vector_stats lines: 0
+tx drops before air (last tx stats line): drop_full=0 drop_stale=0 
+tractor FHSS authority (post bracket): tx_first_anchor=1 tx_stream_streak_max=613 
+seq-gap loss (per codec run): leg 2c_f1: 475 frames received; seq gaps within same-codec runs (row, lost): [] -> 0 lost of 475 = 0.0 % after the first received frame (0 codec switch(es) not counted)
+no vector_stats lines found (VECTOR mode logs one every LIFETRAC_CAMERA_HEALTH_EVERY_S, default 2 s)
+14:55:58Z -- archive files into legs/
+copied: leg2c_f1_tractor_ocd_reset.log; not in this archive: inject.log inject_trigger.txt
+14:55:58Z -- RS-13 scorers (PC only; a failure is reported, it never stops the post step or the park)
+radio_monitor_20261024_095315_d28bc2ca: codec mono_g4, reg_profile=1, reactive_fire=1, probe_echo=0, duration_s=300
+  base PROBE TX: 161 (seq 1..161; on air 161, failed 0)
+  tractor LoRa cmd: PROBE: 161 line(s), 161 distinct seq(s), duplicates 0
+  delivered 161/161 = 100.0 %  (tractor seqs that the base sent, over base PROBE TX)
+  tail: none (the tractor logged the base's last PROBE, seq 161)
+  (rs13_probe_score: exit 0 -> leg2c_f1_probe_score.txt)
+radio_monitor_20261024_095315_d28bc2ca: reg_profile=1 force_frf_hz=0 encode_mode=6 duration_s=300
+  rx_rf windows: 24, +81..+311 s from the log start
+  RSSI: median of window medians -64.0 dBm; min of window medians -66 dBm; min of window mins -73 dBm; max -61 dBm; n = 24 windows, 471 frames
+  SNR:  median of window medians 10.0 dB; min of window medians 10.0 dB; min of window mins 5.0 dB; max 14.0 dB; n = 24 windows, 471 frames
+  crc_dump: 0
+  published frame_id: 475; frag_arrival: 475; rx_frames (last counter max): 471
+  row: RSSI med / min -64.0 / -73 dBm | SNR med / min 10.0 / 5.0 dB | CRC err 0 | n 24
+  FRF readback: base none; tractor none
+  (rs13_rf_extract: exit 0 -> leg2c_f1_rf.txt)
+  (rs13_digest_trace: skipped -- the capture holds no VECTOR frame)
+leg 2c_f1: reg_profile=1 (FHSS, from leg2c_f1_params.txt) -> the RS-12.15 bracket criteria apply
+base: L072 counters not reset -> delta = post - pre
+tractor: L072 counters RESET during the leg (evidence: radio_dio0, radio_rx_ok, radio_tx_ok, host_parse_ok, tx_fifo_rb_ok, fhss_dec_rej_not_init, tx_done_to_rearm_max_us, d(host_parse_ok) < d(radio_tx_ok)) -> delta = post
+cross-check: brackets 161/161 vs logs: base sends on air=161, tractor decoded cmds=161 -> AGREE
+STOP RULE: not tripped
+  (bracket_deltas: exit 0 -> leg2c_f1_deltas.txt)
+14:55:59Z scorer exit codes (0 = ran clean; the files hold the reasons): rs12_leg_report=0 frag_gap_report=0 leg_replay=0 tractor_log=0 rs13_probe_score=0 rs13_rf_extract=0 bracket_deltas=0
+14:55:59Z -- park both radios (last)
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+base:    attempt 1: PARK_OK {"opmode_readback": "0x80", "opmode_after_settle": "0x80", "settle_s": 1.5}
+tractor: attempt 1: PARK_OK {"opmode_readback": "0x80", "opmode_after_settle": "0x80", "settle_s": 1.5}
+14:56:06Z == leg 2c_f1 post done (evidence: C:/Users/dorkm/Documents/GitHub/LifeTrac-bench-main/LifeTrac-v25/DESIGN-CONTROLLER/bench-evidence/bench_session_2026-10-24/legs)

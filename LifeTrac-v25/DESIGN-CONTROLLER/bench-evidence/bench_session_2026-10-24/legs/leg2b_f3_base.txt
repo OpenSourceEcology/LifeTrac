@@ -1,0 +1,30 @@
+capture -> /work/legs/leg2b_f3_base.jsonl (profile image_bw250, limit 203 B); 480 sconnected to 127.0.0.1:1883 (rc=0); subscribing lifetrac/v25/video/tile_delta
+
+#   0 +    0.00s 198B/203 K=0 seq=  8 body=192 ep=3 L0 age=0 rec=39 applied dig=BAD EPOCH-SWITCH RESYNC
+#   1 +   14.56s 199B/203 K=0 seq= 37 body=193 ep=3 L0 age=0 rec=34 applied dig=BAD RESYNC
+#   2 +   40.89s 169B/203 K=0 seq= 90 body=163 ep=4 L0 age=0 rec=38 applied dig=BAD EPOCH-SWITCH RESYNC
+#   3 +   46.91s 196B/203 K=0 seq=102 body=190 ep=5 L0 age=0 rec=36 applied dig=BAD EPOCH-SWITCH RESYNC
+#   4 +  114.96s 141B/203 K=0 seq=238 body=135 ep=14 L0 age=0 rec=30 applied dig=BAD EPOCH-SWITCH RESYNC
+captured 5 payload(s) to /work/legs/leg2b_f3_base.jsonl
+== vector dry run summary ==
+profile image_bw250: one-fragment limit 203 B (epoch starts 202 B)
+frames: 5 total, 5 vector, 0 other, 0 unparseable; by codec {'vector': 5}
+wire bytes (vector): min 141 / p50 196 / p95 199 / max 199; over limit: 0
+epoch starts: 0 received, 0 applied
+arrival: 0.03 fps mean over 115.0 s; gap p50 26.33 s, p95 68.05 s, max 68.05 s; first applied at +0.00 s (0 frame(s) before it)
+store: applied 5, bad 0 , epoch_behind 0, orphans 72, digest 5 checked / 5 mismatched, epochs 4, handovers 0, ttl_dropped 0, resync 1 (0 ended by DIGEST), records 177
+resync: 1 episode(s), 5 frame(s): #0-end (5)
+scene: epoch 14, level 0, badge 7, digest_ok False, horizon none, L1=17 L2=0 L3=9 L4=0, cal_rev None, anchor age None ms, HANDOVER PENDING
+checks:
+  [PASS] parse_ok       0 unparseable payload(s)
+  [PASS] all_vector     0 non-vector frame(s): {'vector': 5}
+  [PASS] one_fragment   0 over 203 B (epoch starts 202 B); max 199 B
+  [PASS] store_clean    frames_bad=0 
+  [FAIL] no_orphans     orphans=72
+  [FAIL] digest         5 checked, 5 mismatched, scene digest_ok=False
+  [FAIL] epoch_seen     0 epoch start(s) applied of 0 received
+  [PASS] first_apply    0 frame(s) before the first apply
+  [PASS] applied_ratio  5/5 applied = 100.0% (need >= 90%)
+  [FAIL] min_frames     5 vector frame(s), need >= 500
+RESULT: FAIL
+json report -> /work/legs/leg2b_f3_base.json

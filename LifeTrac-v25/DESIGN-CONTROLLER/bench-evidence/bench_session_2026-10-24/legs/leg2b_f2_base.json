@@ -1,0 +1,139 @@
+{
+  "profile": "image_bw250",
+  "one_fragment_limit": 203,
+  "frames": {
+    "total": 552,
+    "vector": 552,
+    "other": 0,
+    "parse_errors": 0,
+    "by_codec": {
+      "vector": 552
+    }
+  },
+  "wire": {
+    "min": 113,
+    "p50": 201.0,
+    "p95": 203.0,
+    "max": 203,
+    "over_limit": 0
+  },
+  "epoch_starts": 20,
+  "epoch_starts_applied": 20,
+  "arrival": {
+    "span_s": 275.96275067329407,
+    "fps_mean": 1.996646281629205,
+    "gap_p50_s": 0.5765776634216309,
+    "gap_p95_s": 0.6118311882019043,
+    "gap_max_s": 0.997089147567749,
+    "first_applied_t_rel_s": 0.0,
+    "frames_before_first_apply": 0
+  },
+  "store": {
+    "frames_rx": 552,
+    "frames_bad": 0,
+    "frames_applied": 552,
+    "epoch_behind": 0,
+    "orphans": 46,
+    "digest_checks": 420,
+    "digest_mismatch": 12,
+    "bad_version": 0,
+    "epochs": 21,
+    "handovers": 20,
+    "ttl_dropped": 0,
+    "resync_events": 3,
+    "resync_digest_ends": 2,
+    "records_applied": 20733,
+    "resync": false,
+    "bad_reasons": {},
+    "epoch": 5,
+    "shapes": 28,
+    "cached_shapes": 0
+  },
+  "resync_episodes": [
+    {
+      "start": 3,
+      "end": 13,
+      "frames": 10,
+      "t_start_s": 1.5951166152954102,
+      "t_end_s": 6.590193510055542,
+      "ended_by": "digest"
+    },
+    {
+      "start": 437,
+      "end": 441,
+      "frames": 4,
+      "t_start_s": 219.04330778121948,
+      "t_end_s": 221.02825164794922,
+      "ended_by": "digest"
+    }
+  ],
+  "scene": {
+    "epoch": 5,
+    "level": 0,
+    "badge": 7,
+    "digest_ok": true,
+    "horizon_mode": "none",
+    "layers": {
+      "L1": 23,
+      "L2": 0,
+      "L3": 5,
+      "L4": 0
+    },
+    "cal_rev": null,
+    "anchor_age_ms": 19546,
+    "handover": false
+  },
+  "checks": [
+    [
+      "parse_ok",
+      true,
+      "0 unparseable payload(s)"
+    ],
+    [
+      "all_vector",
+      true,
+      "0 non-vector frame(s): {'vector': 552}"
+    ],
+    [
+      "one_fragment",
+      true,
+      "0 over 203 B (epoch starts 202 B); max 203 B"
+    ],
+    [
+      "store_clean",
+      true,
+      "frames_bad=0 "
+    ],
+    [
+      "no_orphans",
+      false,
+      "orphans=46"
+    ],
+    [
+      "digest",
+      false,
+      "420 checked, 12 mismatched, scene digest_ok=True"
+    ],
+    [
+      "epoch_seen",
+      true,
+      "20 epoch start(s) applied of 20 received"
+    ],
+    [
+      "first_apply",
+      true,
+      "0 frame(s) before the first apply"
+    ],
+    [
+      "applied_ratio",
+      true,
+      "552/552 applied = 100.0% (need >= 90%)"
+    ],
+    [
+      "min_frames",
+      true,
+      "552 vector frame(s), need >= 500"
+    ]
+  ],
+  "pass": false
+}

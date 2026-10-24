@@ -1,0 +1,14 @@
+train_gap_ms=40  tx_pipeline_depth=2  synth_budget_b=250  force_frf_hz=0  git_sha=d28bc2ca  log_window=after_stop  
+  (tx frags_ok counter 607 is stale; using 610 fragments from per-frame TX events)
+  (rx rx_frames counter 589 is stale; using 590 fragments from frag_arrival events)
+loss 20/610 = 3.3%   crc_dumps=0  timeouts=0  published=590   [whole logs]
+shared-window loss 20/610 = 3.3%   [txdone_arrival vs frag_arrival, train by train over the window both logs cover; 20 of 610 trains not heard]
+capture seq gaps (leg2c_f3_base.jsonl): lost 2/592 = 0.3%  (received 590, 2 gaps, longest 1; 1 codec run; period 0.55 s)
+  first frame heard at seq 19: the 18 frame(s) numbered before it are not in the figure above (the camera numbers from seq 1 at start-up — an acquisition delay or a late capture, RS-13.1 A7); counting from seq 1: 20/610 = 3.3%
+radio deltas: {'radio_dio0': 795, 'radio_rx_ok': 590, 'radio_crc_err': 1, 'radio_tx_ok': 203}
+FIRMWARE DROP (drx_ok - host URCs): 590 - 590 = 0
+identity residue: 1
+crc closure: dcrc_err=1 vs crc_dumps=0
+URC-path: rx_urc_lost=8 rx_pretx_drained=0
+RS-12.10: rx_fifo_skip=0 tx_deaf_sum=6089042 us over 203 TX (mean 30.0 ms) tx_deaf_max=30.7 ms tx_done_to_rearm_max=1855 us (max fields: post-bracket values)
+RS-12.15: consider_remote deltas aligned=589 snapped=1 locked_out=0 epoch_drift=0 bad_hop=0 not_init=0 | demotion reset=1 kept=0 | tx_first_anchor delta=0 (post 0) | streak_max post=1

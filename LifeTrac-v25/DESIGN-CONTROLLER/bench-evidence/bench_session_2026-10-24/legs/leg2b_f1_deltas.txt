@@ -1,0 +1,27 @@
+leg 2b_f1: reg_profile=1 (FHSS, from leg2b_f1_params.txt) -> the RS-12.15 bracket criteria apply
+base: L072 counters not reset -> delta = post - pre
+tractor: L072 counters RESET during the leg (evidence: host_parse_ok, clk_demotion_kept, d(host_parse_ok) < d(radio_tx_ok)) -> delta = post
+leg 2b_f1: counter deltas (pre -> post)
+  counter                                    base            tractor
+  radio_tx_ok                  1176->1367 (d=191)   614->616 (d=616)
+  radio_rx_ok                  8048->8606 (d=558)   161->191 (d=191)
+  radio_crc_err                      16->16 (d=0)         0->0 (d=0)
+  fhss_dec_aligned             5583->6140 (d=557)   161->191 (d=191)
+  fhss_dec_snapped                     5->6 (d=1)         0->0 (d=0)
+  fhss_dec_rej_locked_out              0->0 (d=0)         0->0 (d=0)
+  fhss_dec_rej_epoch_drift             0->0 (d=0)         0->0 (d=0)
+  clk_demotion_reset                   5->6 (d=1)         0->0 (d=0)
+  clk_demotion_kept                    0->0 (d=0)         2->1 (d=1)
+  tx_first_anchor                      0->0 (d=0)         1->1 (d=1)
+  tx_stream_streak_max                 1->1 (d=0)   613->615 (d=615)
+
+cross-check: brackets 191/191 vs logs: base sends on air=191, tractor decoded cmds=191 -> AGREE
+
+bracket criteria (DC/TODO.md RS-12.15 reverse-delivery PASS / STOP):
+  [PASS] command delivery tractor d(radio_rx_ok)/base d(radio_tx_ok) = 191/191 = 100.0 % >= 60 %
+  [PASS] tractor clk_demotion_reset delta = 0 (must be 0; STOP if > 0)
+  [PASS] tractor tx_first_anchor delta = 1 (post 1; must be 1, the activation's anchor; STOP if > 1)
+  [PASS] tractor fhss_dec_snapped delta = 0 (must be 0)
+  [PASS] tractor fhss_dec_rej_epoch_drift delta = 0 (must be 0)
+  [PASS] base tx_stream_streak_max post = 1 (d=0; a high-water mark since the base L072 booted; must be < 8)
+STOP RULE: not tripped
