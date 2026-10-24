@@ -1,0 +1,67 @@
+== rs13_digest_trace: leg2b_f2_base.jsonl (leg 2b_f2, profile image_bw250, 552 rows, 552 vector; horizon 25 rows) ==
+capture seq gaps (leg2b_f2_base.jsonl): lost 1/553 = 0.2%  (received 552, 1 gap, longest 1; 1 codec run; period 0.57 s)
+  first frame heard at seq 57: the 56 frame(s) numbered before it are not in the figure above (the camera numbers from seq 1 at start-up — an acquisition delay or a late capture, RS-13.1 A7); counting from seq 1: 57/609 = 9.4%
+seq gaps (row, frames lost): [(435, 1)]
+store: ttl_dropped 0, orphans 46, digest 420 checked / 12 mismatched; final digest_ok True; last DIGEST checked (row, result): (551, 'ok')
+resync: 2 episode(s), 14 frame(s): #3-#13 (10, 5.0 s, digest), #437-#441 (4, 2.0 s, digest)
+DIGEST mismatch runs: 2 (each starts within the horizon after a seq gap, or at the join)
+
+| leg | loss at row | episode (start-end, frames, s) | ended by | back in step (digest_trace, frames after the loss) | isolated? | pass? |
+|---|---|---|---|---|---|---|
+| 2b_f2 | - | #3-#13 (10, 5.0 s) | digest | - | - | join (not scored): its DIGEST mismatch run starts (row 0) before the first epoch start in the capture (row 68: the base joining mid-epoch) |
+| 2b_f2 | 435 | #437-#441 (4, 2.0 s) | digest | #439 (+4) | yes | PASS |
+
+# episode #437-#441 (4, 2.0 s) opened by the loss at row 435: trace rows 435-485 (enc/base n_live = the DIGEST record's n_live vs the base store's live count at the check)
+#435 seq=237 kind=0 202B rec=32 dig=BAD enc/base n_live=(24, 20) orph+1 ttl=0 rs=0 +[7, 9, 10, 12, 14, 16, 17, 18, 19, 23, 25] -[4, 24, 29, 63]  <- loss: 1 frame(s) lost before this row
+#436 seq=238 kind=0 199B rec=32 dig=BAD enc/base n_live=(23, 20) orph+3 ttl=0 rs=0 +[4, 5, 11, 24, 26, 27, 29, 30] -[1, 13, 14, 15, 17, 18, 21, 23]
+#437 seq=239 kind=0 203B rec=31 dig=BAD enc/base n_live=(26, 24) orph+3 ttl=0 rs=1 +[1, 8, 13, 14, 15, 17, 18, 21, 23] -[4, 11, 26, 29, 30]  <- resync in
+#438 seq=240 kind=0 201B rec=31 dig=BAD enc/base n_live=(27, 26) orph+0 ttl=0 rs=1 +[4, 11, 26, 29, 30, 31, 67] -[5, 15, 17, 18, 21]
+#439 seq=241 kind=0 200B rec=35 dig=ok  enc/base n_live=(32, 32) orph+0 ttl=0 rs=1 +[5, 15, 17, 18, 21, 58, 60, 70, 72, 73, 74, 76, 78] -[11, 12, 13, 19, 26, 29, 67]
+#440 seq=242 kind=0 200B rec=36 dig=ok  enc/base n_live=(36, 36) orph+0 ttl=0 rs=1 +[11, 12, 13, 19, 26, 28, 29, 61, 75, 77] -[15, 58, 60, 70, 76, 78]
+#441 seq=243 kind=0 201B rec=34 dig=ok  enc/base n_live=(33, 33) orph+0 ttl=0 rs=0 +[15, 79] -[21, 26, 30, 72, 77]  <- resync out (digest)
+#442 seq=244 kind=0 199B rec=32 dig=ok  enc/base n_live=(32, 32) orph+0 ttl=0 rs=0 +[21, 26, 30, 56] -[12, 17, 29, 75, 79]
+#443 seq=245 kind=0 195B rec=35 dig=ok  enc/base n_live=(31, 31) orph+0 ttl=0 rs=0 +[12, 17, 29, 62, 64, 68] -[7, 21, 26, 30, 56, 61, 73]
+#444 seq=246 kind=0 197B rec=34 dig=ok  enc/base n_live=(33, 33) orph+0 ttl=0 rs=0 +[7, 21, 26, 30, 57, 59, 65, 66, 69] -[19, 27, 29, 62, 64, 68, 74]
+#445 seq=247 kind=0 201B rec=37 dig=ok  enc/base n_live=(33, 33) orph+0 ttl=0 rs=0 +[19, 27, 29, 58, 63, 67, 71] -[11, 12, 24, 26, 59, 65, 69]
+#446 seq=248 kind=0 202B rec=35 dig=ok  enc/base n_live=(34, 34) orph+0 ttl=0 rs=0 +[11, 12, 24, 26, 60, 70] -[17, 19, 27, 66, 71]
+#447 seq=249 kind=0 201B rec=34 dig=ok  enc/base n_live=(36, 36) orph+0 ttl=0 rs=0 +[17, 19, 27, 72, 76, 77, 78] -[29, 58, 60, 67, 70]
+#448 seq=250 kind=0 197B rec=36 dig=ok  enc/base n_live=(35, 35) orph+0 ttl=0 rs=0 +[29, 56, 61, 73, 75, 79] -[11, 13, 24, 26, 72, 76, 77]
+#449 seq=251 kind=0 169B rec=35 dig=ok  enc/base n_live=(38, 38) orph+0 ttl=0 rs=0 +[11, 13, 24, 59, 62, 64, 65, 66, 68, 69, 74] -[15, 29, 56, 61, 63, 73, 75, 79]
+#450 seq=252 kind=0 197B rec=38 dig=ok  enc/base n_live=(38, 38) orph+0 ttl=0 rs=0 +[15, 26, 29, 58, 60, 67, 71] -[13, 27, 59, 62, 66, 69, 74]
+#451 seq=253 kind=0 170B rec=35 dig=ok  enc/base n_live=(37, 37) orph+0 ttl=0 rs=0 +[13, 27, 70, 72] -[11, 19, 64, 67, 68]
+#452 seq=254 kind=0 142B rec=26 dig=ok  enc/base n_live=(37, 37) orph+0 ttl=0 rs=0 +[11, 19, 76, 77] -[58, 60, 70, 78]
+#453 seq=255 kind=0 113B rec=27 dig=ok  enc/base n_live=(30, 30) orph+0 ttl=0 rs=0 +[56, 61] -[9, 11, 13, 15, 21, 24, 27, 65, 71]
+#454 seq=  0 kind=0 199B rec=36 dig=ok  enc/base n_live=(29, 29) orph+0 ttl=0 rs=0 +[9, 11, 13, 15, 21] -[17, 31, 56, 61, 76, 77]
+#455 seq=  1 kind=0 196B rec=34 dig=ok  enc/base n_live=(37, 37) orph+0 ttl=0 rs=0 +[17, 24, 27, 31, 59, 62, 63, 66, 73, 75, 79] -[11, 13, 26]
+#456 seq=  2 kind=0 198B rec=33 dig=ok  enc/base n_live=(35, 35) orph+0 ttl=0 rs=0 +[11, 13, 26, 69, 74] -[17, 21, 31, 59, 66, 73, 75]
+#457 seq=  3 kind=0 169B rec=32 dig=ok  enc/base n_live=(34, 34) orph+0 ttl=0 rs=0 +[17, 21, 31, 64, 67] -[9, 12, 13, 26, 74, 79]
+#458 seq=  4 kind=0 194B rec=33 dig=ok  enc/base n_live=(38, 38) orph+0 ttl=0 rs=0 +[9, 12, 13, 26, 58, 60, 68] -[21, 29, 64]
+#459 seq=  5 kind=0 121B rec=26 dig=ok  enc/base n_live=(34, 34) orph+0 ttl=0 rs=0 +[21, 29, 70, 78] -[9, 12, 17, 26, 31, 58, 60, 72]
+#460 seq=  6 kind=0 160B rec=29 dig=ok  enc/base n_live=(39, 39) orph+0 ttl=0 rs=0 +[9, 12, 17, 26, 31, 56, 61, 65, 71] -[29, 62, 63, 70]
+#461 seq=  7 kind=0 163B rec=32 dig=ok  enc/base n_live=(31, 31) orph+0 ttl=0 rs=0 +[29, 76] -[9, 21, 27, 31, 56, 61, 65, 67, 68, 78]
+#462 seq=  8 kind=0 200B rec=39 dig=ok  enc/base n_live=(33, 33) orph+0 ttl=0 rs=0 +[9, 21, 27, 31, 59, 66, 74, 77] -[12, 13, 17, 29, 69, 76]
+#463 seq=  9 kind=0 200B rec=33 dig=ok  enc/base n_live=(36, 36) orph+0 ttl=0 rs=0 +[12, 13, 17, 29, 73, 75, 79] -[9, 26, 31, 59]
+#464 seq= 10 kind=0 156B rec=29 dig=ok  enc/base n_live=(35, 35) orph+0 ttl=0 rs=0 +[9, 26, 31, 64] -[27, 73, 74, 75, 77]
+#465 seq= 11 kind=0 142B rec=31 dig=ok  enc/base n_live=(32, 32) orph+0 ttl=0 rs=0 +[27, 58, 60, 72] -[12, 13, 17, 18, 26, 31, 71]
+#466 seq= 12 kind=0 197B rec=36 dig=ok  enc/base n_live=(32, 32) orph+0 ttl=0 rs=0 +[12, 13, 17, 18, 26, 31, 62, 63] -[9, 24, 27, 29, 58, 60, 64, 72]
+#467 seq= 13 kind=0 181B rec=33 dig=ok  enc/base n_live=(34, 34) orph+0 ttl=0 rs=0 +[9, 24, 27, 29, 56, 70] -[17, 31, 62, 63]
+#468 seq= 14 kind=0 182B rec=35 dig=ok  enc/base n_live=(32, 32) orph+0 ttl=0 rs=0 +[17, 31, 61, 65, 67, 68] -[19, 21, 24, 26, 27, 56, 70, 79]
+#469 seq= 15 kind=1 200B rec=27 dig=ok  enc/base n_live=(11, 11) orph+0 ttl=0 rs=0 +[] -[9, 11, 12, 13, 15, 16, 17, 18, 22, 23, 25, 28, 29, 30, 31, 57, 61, 65, 66, 67, 68]  <- epoch start
+#470 seq= 16 kind=0 200B rec=33 dig=ok  enc/base n_live=(15, 15) orph+0 ttl=0 rs=0 +[15, 16, 22, 23, 25, 28, 30, 66] -[7, 8, 14, 20]
+#471 seq= 17 kind=0 202B rec=35 dig=-   enc/base n_live=None orph+0 ttl=0 rs=0 +[9, 11, 12, 13, 17, 18, 19, 29, 31] -[6, 15, 22, 23, 30]
+#472 seq= 18 kind=0 202B rec=41 dig=-   enc/base n_live=None orph+0 ttl=0 rs=0 +[6, 7, 8, 14, 15, 20, 21, 22, 24, 26, 27, 57] -[10, 12, 17, 19, 28, 29, 31, 66]
+#473 seq= 19 kind=0 198B rec=37 dig=ok  enc/base n_live=(25, 25) orph+0 ttl=0 rs=0 +[10, 12, 17, 19, 23, 28, 29, 30, 31] -[4, 8, 11, 14, 22, 24, 26]
+#474 seq= 20 kind=0 200B rec=37 dig=ok  enc/base n_live=(24, 24) orph+0 ttl=0 rs=0 +[4, 8, 11, 14, 22, 24] -[6, 7, 15, 17, 20, 29, 31]
+#475 seq= 21 kind=0 202B rec=36 dig=ok  enc/base n_live=(26, 26) orph+0 ttl=0 rs=0 +[6, 7, 15, 17, 20, 26, 29, 61, 65] -[8, 10, 11, 12, 22, 24, 57]
+#476 seq= 22 kind=0 197B rec=38 dig=ok  enc/base n_live=(25, 25) orph+0 ttl=0 rs=0 +[31, 67, 68, 78] -[7, 17, 20, 21, 29]
+#477 seq= 23 kind=0 203B rec=35 dig=ok  enc/base n_live=(31, 31) orph+0 ttl=0 rs=0 +[7, 8, 10, 11, 12, 17, 20, 22, 24] -[14, 27, 31]
+#478 seq= 24 kind=0 194B rec=37 dig=ok  enc/base n_live=(27, 27) orph+0 ttl=0 rs=0 +[14, 21, 29] -[7, 8, 9, 15, 20, 22, 24]
+#479 seq= 25 kind=0 203B rec=37 dig=ok  enc/base n_live=(31, 31) orph+0 ttl=0 rs=0 +[7, 8, 9, 15, 20, 22, 24, 27, 31] -[10, 11, 14, 29, 67]
+#480 seq= 26 kind=0 198B rec=38 dig=ok  enc/base n_live=(25, 25) orph+0 ttl=0 rs=0 +[10, 11, 14, 29, 69] -[6, 7, 8, 9, 12, 15, 20, 27, 28, 31, 78]
+#481 seq= 27 kind=0 203B rec=36 dig=ok  enc/base n_live=(27, 27) orph+0 ttl=0 rs=0 +[6, 7, 8, 9, 12, 15, 20] -[14, 17, 22, 26, 69]
+#482 seq= 28 kind=0 201B rec=39 dig=-   enc/base n_live=None orph+0 ttl=0 rs=0 +[14, 17, 27, 28, 31] -[7, 8, 9, 10, 11, 12, 15, 21, 24]
+#483 seq= 29 kind=0 203B rec=40 dig=ok  enc/base n_live=(27, 27) orph+0 ttl=0 rs=0 +[7, 8, 9, 10, 11, 12, 22, 26, 73, 76] -[6, 14, 20, 27, 29, 30]
+#484 seq= 30 kind=0 202B rec=34 dig=ok  enc/base n_live=(30, 30) orph+0 ttl=0 rs=0 +[6, 14, 15, 20, 21, 24, 27, 29, 30] -[7, 8, 12, 17, 18, 76]
+#485 seq= 31 kind=0 203B rec=36 dig=ok  enc/base n_live=(27, 27) orph+0 ttl=0 rs=0 +[7, 8, 12, 17, 18] -[6, 10, 11, 14, 21, 26, 27, 30]
+
+A16 confirmation over 1 capture(s) (2b_f2): 2 episode(s); loss-opened 1 -- THIN: fewer than 3; pool the Round B VECTOR legs with seq-gap loss <= 10 %; isolated and scored 1: 1 PASS, 0 FAIL -> PASS

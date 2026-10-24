@@ -1,0 +1,15 @@
+== rs13_digest_trace: leg2b_f3_base.jsonl (leg 2b_f3, profile image_bw250, 5 rows, 5 vector; horizon 25 rows) ==
+capture seq gaps (leg2b_f3_base.jsonl): lost 91/96 = 94.8%  (received 5, 3 gaps, longest 52; 1 codec run)
+  first frame heard at seq 8: the 7 frame(s) numbered before it are not in the figure above (the camera numbers from seq 1 at start-up — an acquisition delay or a late capture, RS-13.1 A7); counting from seq 1: 98/103 = 95.1%
+  !! jumps 1 (jumps = a counter restart or a reorder; none of these is counted as loss)
+seq gaps (row, frames lost): [(1, 28), (2, 52), (3, 11)]; 1 jump(s) not counted
+store: ttl_dropped 0, orphans 72, digest 5 checked / 5 mismatched; final digest_ok False; last DIGEST checked (row, result): (4, 'BAD')
+resync: 1 episode(s), 5 frame(s): #0-end (5)
+DIGEST mismatch runs: 4 (each starts within the horizon after a seq gap, or at the join)
+
+| leg | loss at row | episode (start-end, frames, s) | ended by | back in step (digest_trace, frames after the loss) | isolated? | pass? |
+|---|---|---|---|---|---|---|
+| 2b_f3 | - | #0-end (5, open) | open | - | - | join (not scored): starts before the first epoch start in the capture (none: the base joining mid-epoch) |
+
+
+A16 confirmation over 1 capture(s) (2b_f3): 1 episode(s); loss-opened 0 -- THIN: fewer than 3; pool the Round B VECTOR legs with seq-gap loss <= 10 %; isolated and scored 0: 0 PASS, 0 FAIL -> NO SCORED EPISODE
