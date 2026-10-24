@@ -9,14 +9,30 @@ Pins, for the three helpers RS13_RANGE_EDGE_LEG.md scores legs with:
   `docker logs`) fail closed (exit 2, pooled verdict withheld); a leg with
   no probe exits 1; a dead reverse link scores 0 and says so; the pooled
   VECTOR / mono_g4 verdict and the two-sided Fisher exact p (checked against
-  the textbook tea-tasting table).
+  the textbook tea-tasting table); pools per (reg_profile, codec): DTS legs
+  get the 8.6 verdict, FHSS legs the same comparison labelled FHSS, and only
+  a mix of profiles (or an unknown one, or echo on) withholds it; the
+  ``tail:`` line lists the base seqs sent after the tractor's last logged
+  PROBE without changing the delivered count. Since 2026-10-22: legs whose
+  params log_window differ (absent = read while running) do not pool, and a
+  leg that is not after_stop says so; a -ReactiveFire 1 leg tallies the
+  base's other opcodes in a ``!!`` line (0x63 noted as expected on a 2d
+  switch leg) without withholding; the --margin rule's Newcombe hybrid score
+  bound (checked against Newcombe 1998's worked examples and a bisection of
+  the Wilson score test), the 390/400 vs 396/400 example at 2 and 3 pp (Fisher
+  passes, the margin rule does not), the probes-per-arm estimate, and the
+  Fisher lines unchanged beside it; from the review, a shortfall of exactly
+  the margin decided on the counts, a `!!` under a margin verdict over legs
+  that are not after_stop, and RS13_RESULTS_TEMPLATE.md's P3 bound one-liner.
 * rs13_rf_extract.py: the median of the 10-s ``rx_rf:`` window medians, the
   minimums and n; ``None`` axes; garbled or self-contradicting lines fail
   closed; a crashed or stopped stats thread and frames with no window give
   no level (exit 1); R0 over legs with its range check and the mixed-profile
   refusal; the FRF readback at the pick (a 915 MHz read-back under a 927.5
   pick, one board off, MISMATCH, a failed force-write); the leakage check;
-  the RSSI tracking rule in both regions and the closing check.
+  the RSSI tracking rule in both regions and the closing check; --path
+  antenna prints the level with no R0 verdict and refuses the conducted-only
+  checks.
 * rs13_digest_trace.py: strict capture loading (meta profile, garbled
   lines); seq-gap rows that sum to rs12_leg_report's loss of record (wrap,
   codec switch, duplicate); the A16 rule on hand-built rows (PASS, late or
@@ -32,13 +48,15 @@ from __future__ import annotations
 
 import io
 import json
+import math
 import os
 import sys
 import tempfile
 import unittest
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 from datetime import datetime, timedelta
 from pathlib import Path
+from statistics import NormalDist
 from unittest import mock
 
 _BS = Path(__file__).resolve().parents[1]
@@ -265,6 +283,337 @@ class ProbeScoreTests(unittest.TestCase):
         # A leg that fired no probe needs no tractor log: still exit 1, not 2.
         res = ps.score_leg(f"{_ts(0)} INFO x: started\n", "")
         self.assertEqual(res["sent"], 0)
+
+    def test_tail_lists_probes_after_the_tractors_last(self) -> None:
+        # 2026-10-19 A2c / A2c2's shape: seq 210 sent after the tractor's log was taken.
+        res = ps.score_leg(_base_log(range(1, 211)), _tractor_log(range(1, 210)))
+        self.assertEqual((res["sent"], res["delivered"], res["tail"], res["tail_after"]),
+                         (210, 209, [210], 209))
+        text = "\n".join(ps.format_leg("A2c2", {"reg_profile": "2"}, res))
+        self.assertIn("delivered 209/210 = 99.5 %", text)              # unchanged by the tail
+        self.assertIn("tail: 1 base PROBE seq(s) sent after seq 209, the tractor's last logged: "
+                      "[210] (counted undelivered;", text)
+        # Misses inside the leg are not tail; only the seqs after the last logged one are.
+        res = ps.score_leg(_base_log(range(1, 11)), _tractor_log([1, 3, 6]))
+        self.assertEqual((res["delivered"], res["tail"], res["tail_after"]), (3, [7, 8, 9, 10], 6))
+        res = ps.score_leg(_base_log(range(1, 11)), _tractor_log(range(1, 11)))
+        self.assertEqual(res["tail"], [])
+        self.assertIn("tail: none (the tractor logged the base's last PROBE, seq 10)",
+                      "\n".join(ps.format_leg("x", {}, res)))
+        # A long tail is shortened; a dead link has no tail line (its !! line says it).
+        res = ps.score_leg(_base_log(range(1, 51)), _tractor_log([1]))
+        text = "\n".join(ps.format_leg("x", {}, res))
+        self.assertIn("tail: 49 base PROBE seq(s) sent after seq 1", text)
+        self.assertIn("[2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, ...]",
+                      text)
+        res = ps.score_leg(_base_log(range(1, 87)), _tractor_log([]))
+        self.assertIsNone(res["tail"])
+        self.assertNotIn("tail:", "\n".join(ps.format_leg("x", {}, res)))
+
+    def test_fhss_legs_pool_and_compare_labelled_fhss(self) -> None:
+        vec = {"reg_profile": 1, "reactive_fire": 1, "probe_echo": 0,
+               "cam_extra_env": "-e LIFETRAC_ENCODE_MODE=9"}
+        mono = dict(vec, cam_extra_env="-e LIFETRAC_ENCODE_MODE=6")
+        with tempfile.TemporaryDirectory() as root:
+            a = _archive(root, "Fv", vec, _base_log(range(1, 11)), _tractor_log(range(1, 10)))
+            b = _archive(root, "Fm", mono, _base_log(range(1, 11)), _tractor_log(range(1, 9)))
+            rc, out = _run(ps.main, [a, b])
+        self.assertEqual(rc, 0, out)
+        self.assertIn("pooled FHSS VECTOR 9/10 = 90.0 %; pooled FHSS mono_g4 8/10 = 80.0 %", out)
+        self.assertIn("command delivery, FHSS legs (the VECTOR_SCENE 8.6 comparison; the procedure "
+                      "scores 8.6 on DTS): NOT WORSE (VECTOR >= mono_g4)", out)
+        self.assertNotIn("command delivery (VECTOR_SCENE 8.6)", out)
+        self.assertNotIn("not a DTS leg", out)
+        self.assertNotIn("withheld", out)
+        last = ps.pooled_verdict((50, 100), (90, 100), "1")[-1]
+        self.assertTrue(last.startswith("command delivery, FHSS legs"), last)
+        self.assertIn(": WORSE (VECTOR below", last)
+        self.assertNotIn("NOT", last)
+        self.assertEqual(ps.pooled_verdict((90, 100), (85, 100)),
+                         ps.pooled_verdict((90, 100), (85, 100), "2"))
+
+    def test_only_a_mix_of_profiles_withholds(self) -> None:
+        dts = {"reg_profile": 2, "reactive_fire": 1, "probe_echo": 0,
+               "cam_extra_env": "-e LIFETRAC_ENCODE_MODE=9"}
+        fhss = dict(dts, reg_profile=1)
+        mono = "-e LIFETRAC_ENCODE_MODE=6"
+        with tempfile.TemporaryDirectory() as root:
+            legs = [_archive(root, "Dv", dts, _base_log(range(1, 11)), _tractor_log(range(1, 10))),
+                    _archive(root, "Dm", dict(dts, cam_extra_env=mono), _base_log(range(1, 11)),
+                             _tractor_log(range(1, 10))),
+                    _archive(root, "Fv", fhss, _base_log(range(1, 11)), _tractor_log(range(1, 10))),
+                    _archive(root, "Fm", dict(fhss, cam_extra_env=mono), _base_log(range(1, 11)),
+                             _tractor_log(range(1, 10)))]
+            rc, out = _run(ps.main, legs)
+            self.assertEqual(rc, 1, out)
+            self.assertIn("pooled verdict withheld: the legs mix reg_profile 1 and 2 (Dv "
+                          "(reg_profile=2, probe_echo=0); Dm", out)
+            self.assertNotIn("NOT WORSE", out)
+            # One codec only: per (profile, codec) figures, no comparison and no refusal.
+            rc, out = _run(ps.main, [legs[0], legs[2]])
+            self.assertEqual(rc, 0, out)
+            self.assertIn("pooled: DTS vector 9/10 = 90.0 %; FHSS vector 9/10 = 90.0 % -- no "
+                          "VECTOR_SCENE 8.6 comparison", out)
+            # reg_profile 0 (bench-only fixed 915 MHz) pools with nothing.
+            zero = dict(dts, reg_profile=0)
+            z = [_archive(root, "Zv", zero, _base_log(range(1, 11)), _tractor_log(range(1, 10))),
+                 _archive(root, "Zm", dict(zero, cam_extra_env=mono), _base_log(range(1, 11)),
+                          _tractor_log(range(1, 10)))]
+            rc, out = _run(ps.main, z)
+        self.assertEqual(rc, 1, out)
+        self.assertIn("note: reg_profile=0 is neither FHSS (1) nor DTS (2)", out)
+        self.assertIn("are not shown to be: Zv (reg_profile=0, probe_echo=0); Zm", out)
+        self.assertNotIn("NOT WORSE", out)
+
+    # 2026-10-22 readiness review: log window, other opcodes, the margin rule.
+
+    def test_legs_of_different_log_windows_do_not_pool(self) -> None:
+        vec = {"reg_profile": 2, "reactive_fire": 1, "probe_echo": 0,
+               "cam_extra_env": "-e LIFETRAC_ENCODE_MODE=9", "log_window": "after_stop"}
+        mono = dict(vec, cam_extra_env="-e LIFETRAC_ENCODE_MODE=6")
+        older = {k: v for k, v in mono.items() if k != "log_window"}
+        for name, other, why in (
+                ("absent", older, "log_window=after_stop: A2a; no log_window (read while "
+                                  "running): A2c)"),
+                ("another value", dict(mono, log_window="after_stop_unverified",
+                                       log_window_detail="tx_smoke stop not confirmed"),
+                 "log_window=after_stop: A2a; log_window=after_stop_unverified: A2c)")):
+            with tempfile.TemporaryDirectory() as root:
+                a = _archive(root, "A2a", vec, _base_log(range(1, 11)), _tractor_log(range(1, 10)))
+                b = _archive(root, "A2c", other, _base_log(range(1, 11)), _tractor_log(range(1, 9)))
+                rc, out = _run(ps.main, [a, b, "--margin", "2"])
+            self.assertEqual(rc, 1, (name, out))
+            self.assertIn("pooled verdict withheld: the legs mix log windows (" + why, out)
+            self.assertNotIn("NOT WORSE", out)
+            self.assertNotIn("margin rule", out)
+            self.assertIn("delivered 8/10 = 80.0 %", out)       # the per-leg figures still print
+            self.assertIn("  log window: ", out)                # the odd leg says so in its block
+        self.assertIn("  log window: log_window=after_stop_unverified, not after_stop "
+                      "(log_window_detail: tx_smoke stop not confirmed): pools only with legs of "
+                      "the same log_window", out)
+        with tempfile.TemporaryDirectory() as root:
+            # One window throughout pools as before; an after_stop leg has no window note.
+            legs = [_archive(root, "A2a", vec, _base_log(range(1, 11)), _tractor_log(range(1, 10))),
+                    _archive(root, "A2c", mono, _base_log(range(1, 11)), _tractor_log(range(1, 9)))]
+            rc, out = _run(ps.main, legs)
+            self.assertEqual(rc, 0, out)
+            self.assertIn("command delivery (VECTOR_SCENE 8.6): NOT WORSE (VECTOR >= mono_g4)", out)
+            self.assertNotIn("log window", out)
+            # Legs of an older harness (no log_window) pool with each other, each noted.
+            old = [_archive(root, "O2a", {k: v for k, v in vec.items() if k != "log_window"},
+                            _base_log(range(1, 11)), _tractor_log(range(1, 10))),
+                   _archive(root, "O2c", older, _base_log(range(1, 11)), _tractor_log(range(1, 9)))]
+            rc, out = _run(ps.main, old)
+            self.assertEqual(rc, 0, out)
+            self.assertIn("NOT WORSE (VECTOR >= mono_g4)", out)
+            self.assertEqual(out.count("  log window: params.txt has no log_window, so an older "
+                                       "harness read the tractor's log, then the base's, while "
+                                       "both daemons still ran"), 2, out)
+            self.assertNotIn("!! the margin verdict", out)     # no --margin: output as before
+            # With --margin they still pool, but the margin verdict is flagged: a pass
+            # rule needs log_window=after_stop on every leg (2026-10-22 review).
+            rc, out = _run(ps.main, ["--margin", "2"] + old)
+            self.assertEqual(rc, 0, out)
+            self.assertIn("margin rule, 2 pp: ", out)
+            self.assertTrue(out.splitlines()[-1].startswith(
+                "!! the margin verdict above pools legs with no log_window (read while "
+                "running), not after_stop: "), out)
+            unver = [_archive(root, n, dict(p, log_window="after_stop_unverified"),
+                              _base_log(range(1, 11)), _tractor_log(range(1, k)))
+                     for n, p, k in (("U2a", vec, 10), ("U2c", mono, 9))]
+            rc, out = _run(ps.main, ["--margin", "2"] + unver)
+            self.assertEqual(rc, 0, out)
+            self.assertIn("!! the margin verdict above pools legs with "
+                          "log_window=after_stop_unverified, not after_stop: ", out)
+            rc, out = _run(ps.main, ["--margin", "2"] + legs)   # after_stop throughout: no flag
+            self.assertEqual(rc, 0, out)
+            self.assertNotIn("!!", out)
+            # One codec over mixed windows: no verdict to withhold, but no pooled figures either.
+            rc, out = _run(ps.main, [legs[0], old[0]])
+        self.assertEqual(rc, 1, out)
+        self.assertIn("pooled figures withheld: the legs mix log windows (log_window=after_stop: "
+                      "A2a; no log_window (read while running): O2a)", out)
+        self.assertNotIn("pooled: ", out)
+
+    def test_other_opcodes_on_a_reactive_fire_leg_are_flagged(self) -> None:
+        extra = "".join([
+            f"{_ts(20)} INFO image_rx_daemon: command TX opcode=0x63 copy=1/2 OK (on air)\n",
+            f"{_ts(21)} WARNING image_rx_daemon: command TX opcode=0x63: extra copy dropped "
+            "(command queue full)\n",                           # not an attempt: not counted
+            f"{_ts(22)} INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)\n",
+            f"{_ts(23)} WARNING image_rx_daemon: command TX opcode=0x63 copy=1/2 FAILED: timeout\n",
+            f"{_ts(24)} INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)\n"])
+        rx = _base_log(range(1, 11)) + extra
+        res = ps.score_leg(rx, _tractor_log(range(1, 10)))
+        self.assertEqual(res["other_ops"], {0x60: (1, 1), 0x63: (3, 2)})
+        # The PROBE figures do not change.
+        self.assertEqual((res["sent"], res["delivered"], res["on_air"], res["failed"]),
+                         (10, 9, 10, 0))
+        text = "\n".join(ps.format_leg("D2d", {"reactive_fire": "1"}, res))
+        self.assertIn("  !! base command TX attempts other than PROBE (0x69) on this -ReactiveFire "
+                      "1 leg: 0x60 REQ_KEYFRAME 1 (1 on air), 0x63 ENCODE_MODE 3 (2 on air): "
+                      "control or profile traffic shared the command channel with the probes "
+                      "(0x63 is expected only on a 2d switch leg, where leg2d_switch.sh sends it "
+                      "on purpose; on any other leg it is unplanned traffic)", text)
+        # Only on a -ReactiveFire 1 leg; no 2d note without a 0x63; an unnamed opcode in hex.
+        self.assertNotIn("!!", "\n".join(ps.format_leg("x", {"reactive_fire": "0"}, res)))
+        res = ps.score_leg(_base_log(range(1, 11)) + extra.replace("0x63", "0x7f"),
+                           _tractor_log(range(1, 10)))
+        text = "\n".join(ps.format_leg("x", {"reactive_fire": "1"}, res))
+        self.assertIn("leg: 0x60 REQ_KEYFRAME 1 (1 on air), 0x7f 3 (2 on air): control", text)
+        self.assertNotIn("2d switch", text)
+        res = ps.score_leg(_base_log(range(1, 11)), _tractor_log(range(1, 10)))
+        self.assertEqual(res["other_ops"], {})
+        self.assertNotIn("!!", "\n".join(ps.format_leg("x", {"reactive_fire": "1"}, res)))
+        # It withholds nothing: the pooled verdict still prints.
+        vec = {"reg_profile": 2, "reactive_fire": 1, "probe_echo": 0,
+               "cam_extra_env": "-e LIFETRAC_ENCODE_MODE=9"}
+        mono = dict(vec, cam_extra_env="-e LIFETRAC_ENCODE_MODE=6")
+        with tempfile.TemporaryDirectory() as root:
+            a = _archive(root, "A2a", vec, rx, _tractor_log(range(1, 10)))
+            b = _archive(root, "A2c", mono, _base_log(range(1, 11)), _tractor_log(range(1, 9)))
+            rc, out = _run(ps.main, [a, b])
+        self.assertEqual(rc, 0, out)
+        self.assertEqual(out.count("!! base command TX attempts other than PROBE"), 1, out)
+        self.assertIn("command delivery (VECTOR_SCENE 8.6): NOT WORSE (VECTOR >= mono_g4)", out)
+
+    def test_newcombe_interval_matches_the_published_examples(self) -> None:
+        # Newcombe (1998), Stat Med 17:873-890, Table II, method 10, 95 % (z = 1.96).
+        z = NormalDist().inv_cdf(0.975)
+        for counts, (lo, hi) in (((56, 70, 48, 80), (0.0524, 0.3339)),
+                                 ((9, 10, 3, 10), (0.1705, 0.8090)),
+                                 ((10, 10, 0, 20), (0.6791, 1.0000)),
+                                 ((0, 10, 0, 20), (-0.1611, 0.2775))):
+            got = ps.newcombe_interval(*counts, z)
+            self.assertAlmostEqual(got[0], lo, delta=5e-5, msg=counts)
+            self.assertAlmostEqual(got[1], hi, delta=5e-5, msg=counts)
+
+    def test_wilson_limits_match_a_bisection_of_the_score_test(self) -> None:
+        # Independent of the closed form: the Wilson limits are the p0 where
+        # |x/n - p0| = z sqrt(p0 (1 - p0) / n); find each side by bisection.
+        def score_limit(x, n, z, upper):
+            p = x / n
+            if (x == n) if upper else (x == 0):
+                return 1.0 if upper else 0.0
+            a, b = (p, 1.0) if upper else (0.0, p)        # the root lies between
+            for _ in range(200):
+                m = (a + b) / 2
+                outside = abs(p - m) > z * math.sqrt(m * (1 - m) / n)
+                if outside == upper:
+                    b = m
+                else:
+                    a = m
+            return (a + b) / 2
+        for z in (ps.Z_ONE_SIDED_95, NormalDist().inv_cdf(0.975)):
+            for x, n in ((390, 400), (396, 400), (433, 433), (418, 420), (0, 20), (3, 10)):
+                lo, hi = ps.wilson_interval(x, n, z)
+                self.assertAlmostEqual(lo, score_limit(x, n, z, False), places=12, msg=(x, n))
+                self.assertAlmostEqual(hi, score_limit(x, n, z, True), places=12, msg=(x, n))
+
+    def test_margin_rule_390_of_400_against_396_of_400(self) -> None:
+        # The readiness review's example: the Fisher rule passes (p = 0.176), and the
+        # one-sided 95 % lower bound of 97.5 % - 99.0 % is -3.23 pp, so neither a 2 pp
+        # nor a 3 pp margin is shown; 4 pp is.
+        plain = ps.pooled_verdict((390, 400), (396, 400))
+        self.assertEqual(plain[1], "two-sided Fisher exact on delivered / undelivered: p = 0.176")
+        self.assertEqual(plain[2], "command delivery (VECTOR_SCENE 8.6): NOT WORSE (VECTOR below "
+                                   "mono_g4, Fisher p = 0.176 >= 0.05)")
+        self.assertAlmostEqual(ps.newcombe_interval(390, 400, 396, 400, ps.Z_ONE_SIDED_95)[0],
+                               -0.032280, places=5)
+        for margin in (2, 3):
+            out = ps.pooled_verdict((390, 400), (396, 400), "2", margin)
+            self.assertEqual(out[:3], plain)                   # the Fisher lines do not change
+            self.assertEqual(out[3], f"margin rule, {margin} pp: VECTOR minus mono_g4 delivery "
+                                     f"-1.50 pp, one-sided 95 % lower bound -3.23 pp (Newcombe "
+                                     f"hybrid score interval, method 10)")
+            self.assertEqual(out[4], f"command delivery (VECTOR_SCENE 8.6), margin {margin} pp: "
+                                     f"not shown at this margin: the lower bound -3.23 pp is not "
+                                     f"above -{margin} pp")
+            self.assertNotIn("NOT WORSE (margin rule)", "\n".join(out))
+        self.assertIn("  probes per arm for the bound to clear -2 pp if these rates held: ~3920 "
+                      "(approximate:", ps.pooled_verdict((390, 400), (396, 400), "2", 2)[5])
+        self.assertIn("  probes per arm for the bound to clear -3 pp if these rates held: ~511 ",
+                      ps.pooled_verdict((390, 400), (396, 400), "2", 3)[5])
+        out = ps.pooled_verdict((390, 400), (396, 400), "2", 4)
+        self.assertEqual(out[4], "command delivery (VECTOR_SCENE 8.6), margin 4 pp: NOT WORSE "
+                                 "(margin rule): the lower bound -3.23 pp is above -4 pp")
+        # FHSS keeps its label; a shortfall at least the margin needs no probe count.
+        out = ps.pooled_verdict((380, 400), (396, 400), "1", 2)
+        self.assertTrue(out[4].startswith("command delivery, FHSS legs (the VECTOR_SCENE 8.6 "
+                                          "comparison; the procedure scores 8.6 on DTS), margin "
+                                          "2 pp: not shown at this margin"), out[4])
+        self.assertIn("no number would do: VECTOR's observed shortfall, 4.00 pp, is not smaller "
+                      "than the margin", out[5])
+
+    def test_a_shortfall_of_exactly_the_margin_needs_no_probe_count(self) -> None:
+        # 2026-10-22 review: 0.92 - 0.94 is a hair above -0.02 in floats, so a float
+        # test searched to 10^9 and printed "more than 10^9"; the counts decide it.
+        for vec, mono, margin in (((184, 200), (188, 200), 2), ((185, 200), (189, 200), 2),
+                                  ((182, 200), (188, 200), 3), ((386, 400), (396, 400), 2.5)):
+            out = ps.margin_rule(vec, mono, margin, "head")
+            self.assertIn("not shown at this margin", out[1], (vec, mono, margin))
+            self.assertEqual(out[2], f"  probes per arm for the bound to clear -{margin:g} pp at "
+                                     f"these rates: no number would do: VECTOR's observed "
+                                     f"shortfall, {margin:.2f} pp, is not smaller than the "
+                                     f"margin", (vec, mono, margin))
+        # One probe better than the margin still gets a count.
+        self.assertIn("if these rates held: ~", ps.margin_rule((185, 200), (188, 200), 2, "h")[2])
+
+    def test_results_template_p3_bound_command_runs(self) -> None:
+        # RS13_RESULTS_TEMPLATE.md's pass rule computes the P3 frame-loss bound with a
+        # one-liner on margin_rule (2026-10-22 review); it must keep working.
+        text = (_BT / "RS13_RESULTS_TEMPLATE.md").read_text(encoding="utf-8")
+        head, sep, rest = text.partition('`py -3 -c "import rs13_probe_score as s; ')
+        self.assertTrue(sep, "the template's P3 bound command is gone")
+        code = "import rs13_probe_score as s; " + rest.partition('"`')[0]
+        for ph, val in (("<rx V>", "1180"), ("<exp V>", "1200"), ("<rx M>", "1186"),
+                        ("<exp M>", "1200"), ("<PP>", "2")):
+            self.assertIn(ph, code)
+            code = code.replace(ph, val)
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            exec(code, {})                      # noqa: S102  (the template's own command)
+        self.assertIn("P3 frame loss, margin 2 pp: NOT WORSE (margin rule): the lower bound "
+                      "-1.33 pp is above -2 pp", buf.getvalue())
+
+    def test_probes_per_arm_is_the_smallest_n_that_clears(self) -> None:
+        z = ps.Z_ONE_SIDED_95
+
+        def clears(p1, p2, m, n):
+            return ps.newcombe_interval(p1 * n, n, p2 * n, n, z)[0] > -m
+        for p1, p2, m in ((0.975, 0.99, 0.02), (0.975, 0.99, 0.03), (1.0, 418 / 420, 0.02),
+                          (0.98, 0.98, 0.02), (0.995, 0.97, 0.01)):
+            n = ps.probes_per_arm_to_clear(p1, p2, m)
+            self.assertTrue(clears(p1, p2, m, n), (p1, p2, m, n))
+            self.assertFalse(n > 1 and clears(p1, p2, m, n - 1), (p1, p2, m, n))
+        # At 100 % the normal approximation has no variance in that arm and asks for
+        # about 21 per arm on 10-19's 433/433 vs 418/420; the score bound needs 109.
+        self.assertEqual(ps.probes_per_arm_to_clear(1.0, 418 / 420, 0.02), 109)
+        self.assertIsNone(ps.probes_per_arm_to_clear(0.95, 0.98, 0.02))
+        self.assertIsNone(ps.probes_per_arm_to_clear(0.95, 0.97, 0.02))  # exactly at -margin
+
+    def test_main_margin_option(self) -> None:
+        vec = {"reg_profile": 2, "reactive_fire": 1, "probe_echo": 0,
+               "cam_extra_env": "-e LIFETRAC_ENCODE_MODE=9", "log_window": "after_stop"}
+        mono = dict(vec, cam_extra_env="-e LIFETRAC_ENCODE_MODE=6")
+        with tempfile.TemporaryDirectory() as root:
+            legs = [_archive(root, "A2a", vec, _base_log(range(1, 11)), _tractor_log(range(1, 10))),
+                    _archive(root, "A2c", mono, _base_log(range(1, 11)), _tractor_log(range(1, 9)))]
+            rc0, plain = _run(ps.main, legs)
+            rc, out = _run(ps.main, ["--margin", "2.5"] + legs)
+            with redirect_stderr(io.StringIO()):
+                for bad in ("0", "-1", "100", "nan"):
+                    with self.assertRaises(SystemExit) as cm:
+                        ps.main(["--margin", bad] + legs)
+                    self.assertEqual(cm.exception.code, 2, bad)
+        self.assertEqual((rc0, rc), (0, 0), out)
+        self.assertNotIn("margin", plain)
+        self.assertTrue(out.startswith(plain), out)            # the same lines, then the rule
+        extra = out[len(plain):].splitlines()
+        self.assertEqual(len(extra), 3, extra)
+        self.assertTrue(extra[0].startswith("margin rule, 2.5 pp: VECTOR minus mono_g4 delivery "
+                                            "+10.00 pp, one-sided 95 % lower bound "), extra[0])
+        self.assertIn("margin 2.5 pp: ", extra[1])
 
 
 # ---------------------------------------------------------------- rf extract
@@ -522,6 +871,54 @@ class RfExtractTests(unittest.TestCase):
                             rf.main([a] + bad)
                         finally:
                             sys.stderr = old
+
+    def test_antenna_path_prints_the_level_only(self) -> None:
+        dts = {"reg_profile": 2, "force_frf_hz": 927500000}
+        ok = "  FRF readback: 0xE7E000 = 927.500 MHz (OK)\n"
+        with tempfile.TemporaryDirectory() as root:
+            # 2026-10-18's shape: hot on the antennas (-61 dBm), which the conducted
+            # window would call OUT OF RANGE with pad advice.
+            a = _archive(root, "V", dts, _rf_log([-61, -60, -61]), ok)
+            b = _archive(root, "W", dts, _rf_log([-62, -61, -62]), ok)
+            rc, out = _run(rf.main, [a, b])                      # default: conducted, as before
+            self.assertEqual(rc, 0, out)
+            self.assertIn("R0 over 2 legs", out)
+            self.assertIn("OUT OF RANGE: above -65 dBm", out)
+            self.assertNotIn("path=antenna", out)
+            rc, out = _run(rf.main, [a, b, "--path", "conducted"])
+            self.assertIn("OUT OF RANGE: above -65 dBm", out)
+            rc, out = _run(rf.main, [a, b, "--path", "antenna"])
+            self.assertEqual(rc, 0, out)
+            self.assertIn("V: reg_profile=2 force_frf_hz=927500000 encode_mode=- duration_s=? "
+                          "path=antenna", out)
+            self.assertIn("row: RSSI med / min -61.0 / -64 dBm", out)
+            self.assertIn("level over 2 legs (median of the legs' medians): RSSI -61.5 dBm / SNR "
+                          "8.0 dB; antenna path: the level only", out)
+            for verdict in ("R0 over", "OUT OF RANGE", "in range", "target -65 to -75",
+                            "fixed middle"):
+                self.assertNotIn(verdict, out)
+            # a single archive: the level lines, no summary
+            rc, out = _run(rf.main, [a, "--path", "antenna", "--lines"])
+            self.assertEqual(rc, 0, out)
+            self.assertNotIn("level over", out)
+            self.assertIn("    rx_rf +   10.0 s", out)
+            # the withheld lines name the level, not R0
+            fhss = _archive(root, "C", {"reg_profile": 1}, _rf_log([-60]), "")
+            rc, out = _run(rf.main, [a, fhss, "--path", "antenna"])
+            self.assertEqual(rc, 2, out)
+            self.assertIn("level withheld: the legs mix reg_profile 1 and 2; the level is per "
+                          "profile", out)
+            stale = _archive(root, "U", dts, _rf_log([-64], pub_until=200.0), ok)
+            rc, out = _run(rf.main, [a, stale, "--path", "antenna"])
+            self.assertEqual(rc, 1, out)
+            self.assertIn("level withheld: an archive above gave no level", out)
+            # the conducted-only checks are refused on the antennas
+            for bad in (["--leak"], ["--r0", "-67", "--closing"], ["--r0", "-67", "--step", "9"],
+                        ["--path", "air"]):
+                with self.assertRaises(SystemExit) as cm, redirect_stdout(io.StringIO()), \
+                        mock.patch("sys.stderr", io.StringIO()):
+                    rf.main([a, "--path", "antenna"] + bad if bad[0] != "--path" else [a] + bad)
+                self.assertEqual(cm.exception.code, 2)
 
 
 # ---------------------------------------------------------------- digest trace

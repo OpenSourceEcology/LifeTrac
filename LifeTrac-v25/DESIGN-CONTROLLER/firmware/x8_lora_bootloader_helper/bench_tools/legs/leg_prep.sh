@@ -14,11 +14,13 @@
 # Range-edge tags (RS13_RANGE_EDGE_LEG.md "Leg names"; a _suffix such as _r2 may
 # follow): the tag sets the profile, the codec at boot, the probes and, where the
 # procedure fixes it, the length. Every line has -TxBatch 0 -ProbeEcho 0, and every
-# DTS line -ForceFrfHz (the DTS gate below).
+# DTS line -ForceFrfHz (the DTS gate below). Since 2026-10-19 the bench has no
+# attenuators: only the A2* legs are planned, on the antennas; the others need the
+# conducted path and get a NOTE saying so.
 #   leak_dts | leak_fhss  leakage check: VECTOR, 120 s, -ReactiveFire 0, capture
 #                         without --strict (it must stay empty)
-#   A2c A2c2 | A2a A2a2   Round A, the 0 dB step (DTS): mono_g4 | VECTOR, 300 s,
-#                         -ReactiveFire 1
+#   A2c A2c2 | A2a A2a2   Round A on the antennas (DTS): mono_g4 | VECTOR, 300 s,
+#                         -ReactiveFire 1 (the conducted 0 dB step until 2026-10-19)
 #   B<step>m | B<step>v   Round B, the DTS walk: mono_g4 | VECTOR, -ReactiveFire 1
 #   C<step>m | C<step>v   Round C, the FHSS walk: mono_g4 | VECTOR, -ReactiveFire 0
 #                         A walk leg needs --duration 120 (coarse) or 180 (fine), the
@@ -37,6 +39,12 @@
 #                  per received frame, scored tractor-side (default: from a
 #                  range-edge tag, else 0, the harness default)
 #   --fps N        camera rate for the harness -SynthFps (default 2)
+#   --stop-drain S the harness -StopDrainS: seconds between the feed stop and the
+#                  tx_smoke stop at leg end, 0 < S <= 30 (default 4 on image_bw250,
+#                  FHSS profile 1; 2, the harness default, on image_bw500, DTS profile 2).
+#                  Both codecs of a round (its mono_g4 and VECTOR legs) must fly the SAME
+#                  value: a train still on the air at the stop counts as received but not
+#                  sent, so a short drain costs the codec with the longer queue more.
 #   --strict | --no-strict   base capture --strict (default: strict on a VECTOR leg;
 #                  not on 2c*/2d*, a mono_g4 range-edge leg or the leakage check)
 #   --min-frames N base capture --min-frames (default 500 / 300 / 200 for a 300 / 180 /
@@ -47,6 +55,14 @@
 #                  gate); touches no board, starts no capture -- a preview
 #   On a range-edge tag, --duration, --reactive-fire, --fps and --strict/--no-strict
 #   override the procedure's value; the prep then prints a NOTE naming each one.
+#   A range-edge tag expects EVIDENCE_DIR under bench-evidence/RS_13_range_edge_<date>/
+#   (an A2* tag also under RS_13_antenna_<date>/); elsewhere the prep prints a NOTE.
+#   An EVIDENCE_DIR that already holds files tracked by git (a committed evidence
+#   record) is REFUSED (exit 7) before any board action, unless BENCH_EVIDENCE_APPEND=1
+#   is in the environment (lib/bench_env.sh, "Committed evidence"); --print-harness
+#   shows that verdict and still writes the preview. Such a deliberate append needs the
+#   override on EVERY script of the leg (leg2d_switch.sh and link_sample.sh refuse the
+#   folder without it, mid-leg): the follow-up lines the prep prints then carry it.
 # Inputs:  lib/bench_env.sh settings; DTS_CARRIER_HZ / DTS_CARRIER_DATE for profile 2;
 #          PC_HOST (the harness -HostIp; when empty, this PC's only IPv4 address on
 #          BASE_HOST's /24, or its only IPv4 address at all, is used and printed --
@@ -62,11 +78,12 @@
 # Origin:  bench-evidence/RS_13_vector_scene_2026-09-26/scripts/leg_prep.sh
 #          (historical copy, unchanged). New here: DTS carrier gate, UART-holder
 #          abort, defaults by leg name, the printed harness command, the range-edge
-#          tags, --duration and --reactive-fire.
+#          tags, --duration and --reactive-fire; 2026-10-22: --stop-drain (with
+#          the FHSS 4 s default) and the committed-evidence refusal.
 set -u
 . "$(dirname "${BASH_SOURCE[0]}")/../lib/bench_env.sh" || exit 1
 
-LEG=""; PROFILE=""; MODE=""; FPS=""; STRICT=""; MINF=""; SCENE=1; PRINT_ONLY=0; DUR=""; FIRE=""
+LEG=""; PROFILE=""; MODE=""; FPS=""; STRICT=""; MINF=""; SCENE=1; PRINT_ONLY=0; DUR=""; FIRE=""; DRAIN=""
 while [ $# -gt 0 ]; do
   case $1 in
     --print-harness) PRINT_ONLY=1 ;;
@@ -74,6 +91,7 @@ while [ $# -gt 0 ]; do
     --duration) DUR=${2:?--duration S}; shift ;;
     --reactive-fire) FIRE=${2:?--reactive-fire 0|1}; shift ;;
     --fps) FPS=${2:?--fps N}; shift ;;
+    --stop-drain) DRAIN=${2:?--stop-drain S}; shift ;;
     --strict) STRICT="--strict" ;;
     --no-strict) STRICT="none" ;;
     --min-frames) MINF=${2:?--min-frames N}; shift ;;
@@ -107,8 +125,8 @@ if [ -n "$RE" ]; then
       [ $RE = leak_dts ] && re_prof=image_bw500 || re_prof=image_bw250
       re_mode=vector; re_fire=0; re_dur=120; re_strict=none
       re_what="leakage check (${RE#leak_}): jack pads terminated, the base must decode NO frame (the capture stays empty; its min_frames fails by design)" ;;
-    A2c|A2c2) re_prof=image_bw500; re_mode=mono_g4; re_fire=1; re_dur=300; re_what="Round A, 0 dB step, mono_g4 (fly 2c, 2a, 2c', 2a' in that order)" ;;
-    A2a|A2a2) re_prof=image_bw500; re_mode=vector; re_fire=1; re_dur=300; re_what="Round A, 0 dB step, VECTOR (fly 2c, 2a, 2c', 2a' in that order)" ;;
+    A2c|A2c2) re_prof=image_bw500; re_mode=mono_g4; re_fire=1; re_dur=300; re_what="Round A on the antennas (no attenuators since 2026-10-19), mono_g4 (fly A2c, A2a, A2c2, A2a2 in that order)" ;;
+    A2a|A2a2) re_prof=image_bw500; re_mode=vector; re_fire=1; re_dur=300; re_what="Round A on the antennas (no attenuators since 2026-10-19), VECTOR (fly A2c, A2a, A2c2, A2a2 in that order)" ;;
     B0close) re_prof=image_bw500; re_mode=vector; re_fire=1; re_dur=120; re_what="Round B closing check: step chain back at 0 dB, VECTOR" ;;
     C0close) re_prof=image_bw250; re_mode=vector; re_fire=0; re_dur=120; re_what="Round C closing check: step chain back at 0 dB, VECTOR" ;;
     *) step=${RE:1:${#RE}-2}
@@ -146,6 +164,15 @@ esac
 case $FPS in ''|*[!0-9.]*) die "--fps must be a number" ;; esac
 case $DUR in ''|*[!0-9]*|0*) die "--duration must be a whole number of seconds, not '$DUR'" ;; esac
 case $FIRE in 0|1) ;; *) die "--reactive-fire must be 0 or 1, not '$FIRE'" ;; esac
+# Leg-end drain (2026-10-22). The harness default of 2 s is short for a saturated
+# multi-fragment FHSS leg: a train still on the air at the stop is decoded but missing
+# from 'sent', the last reactive PROBE lands on a stopped daemon, and bracket_deltas
+# marks the FHSS criteria UNVERIFIED -- all of which favour the codec with the shorter
+# queue. FHSS legs get 4 s; DTS legs keep 2 s.
+case $REGP in 1) def_drain=4; DRAIN_WHY="FHSS default" ;; 2) def_drain=2; DRAIN_WHY="DTS default" ;; esac
+if [ -n "$DRAIN" ]; then DRAIN_WHY="--stop-drain; default $def_drain"; else DRAIN=$def_drain; fi
+{ [[ $DRAIN =~ ^[0-9]+(\.[0-9]+)?$ ]] && awk -v s="$DRAIN" 'BEGIN { exit !(s > 0 && s <= 30) }'; } \
+  || die "--stop-drain must be a number of seconds with 0 < S <= 30, not '$DRAIN'"
 if [ -z "$MINF" ]; then
   case $DUR:$FPS in
     300:1) [ $REGP = 1 ] && MINF=200 || MINF=250 ;;
@@ -154,17 +181,41 @@ if [ -z "$MINF" ]; then
   esac
 fi
 CAPDUR=$((DUR + 180))                     # the base capture outlives the leg by 180 s
-PLAN="profile $PROFILE = harness -RegProfile $REGP, boot $MODE, $FPS fps, $DUR s, -ReactiveFire $FIRE, capture $CAPDUR s min-frames $MINF ${STRICT:-no-strict}"
+PLAN="profile $PROFILE = harness -RegProfile $REGP, boot $MODE, $FPS fps, $DUR s, -ReactiveFire $FIRE, -StopDrainS $DRAIN ($DRAIN_WHY), capture $CAPDUR s min-frames $MINF ${STRICT:-no-strict}"
 plan_notes() {
+  local want
   [ -z "$RE" ] || echo "range edge: $re_what"
   [ -z "$RE_NOTE" ] || echo "NOTE: overrides RS13_RANGE_EDGE_LEG.md for $RE:${RE_NOTE%;}"
+  [ "$DRAIN" = "$def_drain" ] || echo "NOTE: --stop-drain $DRAIN (default $def_drain): fly the other codec of this round with the same --stop-drain $DRAIN"
+  case $RE in
+    A2*|'') ;;
+    *) echo "NOTE: $RE needs the conducted attenuator path, which the bench does not have since 2026-10-19 (RS13_RANGE_EDGE_LEG.md, Status): only the A2* legs are planned, on the antennas" ;;
+  esac
   if [ -n "$RE" ]; then
+    case $RE in A2*) want="RS_13_antenna_<date>/legs or RS_13_range_edge_<date>/legs" ;; *) want="RS_13_range_edge_<date>/legs" ;; esac
     case $EVIDENCE_DIR in
       */RS_13_range_edge_*) ;;
-      *) echo "NOTE: EVIDENCE_DIR is $EVIDENCE_DIR; the range edge's evidence goes to bench-evidence/RS_13_range_edge_<date>/legs (set EVIDENCE_DIR in bench.env)" ;;
+      */RS_13_antenna_*) case $RE in A2*) ;; *) echo "NOTE: EVIDENCE_DIR is $EVIDENCE_DIR; a conducted-path leg's evidence goes to bench-evidence/$want (set EVIDENCE_DIR in bench.env)" ;; esac ;;
+      *) echo "NOTE: EVIDENCE_DIR is $EVIDENCE_DIR; this leg's evidence goes to bench-evidence/$want (set EVIDENCE_DIR in bench.env)" ;;
     esac
   fi
 }
+
+# Committed-evidence guard (2026-10-22), BEFORE the first board action: the probes below
+# wake both L072s (RXCONT) and the capture starts on the base, so a refusal must come
+# before any of that. Called directly (not in $(...)) so BENCH_EVIDENCE_MSG survives for
+# the prep record; a preview (--print-harness) shows the verdict and still writes itself.
+EV_OK=1
+bench_evidence_guard 2>/dev/null || EV_OK=0
+if [ $EV_OK = 0 ] && [ $PRINT_ONLY = 0 ]; then printf '%s\n' "$BENCH_EVIDENCE_MSG" >&2; exit 7; fi
+# A deliberate append (BENCH_EVIDENCE_APPEND=1 on a committed folder, 2026-10-22): the
+# follow-up scripts run in new shells and would refuse that folder while the harness is
+# already transmitting (a 2d leg without its switch, no link stats), so print_next puts
+# the same override in front of each of them.
+APX=""
+if [ $EV_OK = 1 ] && [ "${BENCH_EVIDENCE_APPEND:-}" = 1 ] && [ "$(bench_evidence_tracked "$EVIDENCE_DIR")" != 0 ]; then
+  APX="BENCH_EVIDENCE_APPEND=1 "
+fi
 
 # DTS gate: never fly profile 2 on an unchecked carrier (RS-13.1 A19)
 if [ $REGP = 2 ]; then bench_require_dts_carrier || exit 5; fi
@@ -212,7 +263,7 @@ HIP=" -HostIp $PC_HOST"
 LOGW=$(win_path "$BENCH_SCRATCH/leg${LEG}_harness.txt")
 ARCW=$(win_path "$BENCH_SCRATCH/leg${LEG}_archive.txt")
 PS1="$BENCH_SCRATCH/leg${LEG}_harness.ps1"
-HARNESS=".\\run_live_radio_monitor.ps1 -TxAdbSerial $TRACTOR_SERIAL -RxAdbSerial $BASE_SERIAL$HIP -TxFeed camera -RegProfile $REGP$FRF -DurationS $DUR -SynthFps $FPS -KfRequestDisable 1 -ReactiveFire $FIRE -ProbeEcho 0 -LogFragArrivals 1 -TxBatch 0 -CamExtraEnv \"$CAM_ENV\" -Archive"
+HARNESS=".\\run_live_radio_monitor.ps1 -TxAdbSerial $TRACTOR_SERIAL -RxAdbSerial $BASE_SERIAL$HIP -TxFeed camera -RegProfile $REGP$FRF -DurationS $DUR -StopDrainS $DRAIN -SynthFps $FPS -KfRequestDisable 1 -ReactiveFire $FIRE -ProbeEcho 0 -LogFragArrivals 1 -TxBatch 0 -CamExtraEnv \"$CAM_ENV\" -Archive"
 write_harness() {
   # Tee-Object (Windows PowerShell 5.1) writes UTF-16; leg_post.sh converts the
   # transcript. The archive the harness creates is written to leg<leg>_archive.txt,
@@ -232,9 +283,10 @@ print_next() {
   echo "   & \"$(win_path "$PS1")\""
   echo "   which runs, from $(win_path "$HELPER_DIR"):"
   echo "   $HARNESS"
-  case $LEG in 2d*) echo "   then, right after the launch, in Git Bash: bash \"$(win_path "$LEGS_DIR/leg2d_switch.sh")\" $LEG";; esac
-  echo "   while frames flow:            bash \"$(win_path "$LEGS_DIR/link_sample.sh")\" $LEG"
-  echo "   after '[EVIDENCE] archived to':  bash \"$(win_path "$LEGS_DIR/leg_post.sh")\" $LEG"
+  case $LEG in 2d*) echo "   then, right after the launch, in Git Bash: ${APX}bash \"$(win_path "$LEGS_DIR/leg2d_switch.sh")\" $LEG";; esac
+  echo "   while frames flow:            ${APX}bash \"$(win_path "$LEGS_DIR/link_sample.sh")\" $LEG"
+  echo "   after '[EVIDENCE] archived to':  ${APX}bash \"$(win_path "$LEGS_DIR/leg_post.sh")\" $LEG"
+  [ -z "$APX" ] || echo "   (each line keeps BENCH_EVIDENCE_APPEND=1: this leg appends to a committed EVIDENCE_DIR on purpose)"
   if [ "${1:-}" = probed ]; then
     echo "   NOT flying after all (no GO, harness refused, round aborted)? The probes left both L072s"
     echo "   listening (RXCONT) and rs13_cap_base is running. Stop the capture and park both radios:"
@@ -245,16 +297,19 @@ if [ $PRINT_ONLY = 1 ]; then
   write_harness
   echo "leg $LEG: $PLAN"
   plan_notes
+  [ -z "$BENCH_EVIDENCE_MSG" ] || printf '%s\n' "$BENCH_EVIDENCE_MSG"
+  [ $EV_OK = 1 ] || echo "NOTE: the prep itself (without --print-harness) stops at that REFUSED line, exit 7, before any board action"
   echo "harness wrapper for leg $LEG written (preview only; no board was touched, no capture is running):"
   print_next
   exit 0
 fi
 
-E=$(bench_evidence_dir) || die "cannot create $EVIDENCE_DIR"
+E=$(bench_evidence_dir) || die "no evidence folder: $EVIDENCE_DIR (see above)"
 exec > >(tee -a "$E/leg${LEG}_prep.txt") 2>&1
 hdr() { echo "# leg $LEG $1, $(date -u +%Y-%m-%dT%H:%M:%SZ) PC clock"; }
 
 stamp "== leg $LEG prep ($PLAN) from $(bench_git_desc)"
+[ -z "$BENCH_EVIDENCE_MSG" ] || printf '%s\n' "$BENCH_EVIDENCE_MSG"      # the guard's NOTE / WARNING, into the record
 plan_notes
 for who in tractor base; do board_present "$who" || { stamp "ABORT: $who ($(board_serial $who)) not reachable via $(board_via $who)"; exit 3; }; done
 

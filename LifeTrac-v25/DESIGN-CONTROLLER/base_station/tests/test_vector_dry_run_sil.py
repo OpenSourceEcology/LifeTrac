@@ -1,7 +1,8 @@
 """tools/vector_dry_run.py — SIL tests for the RS-13 bench tool.
 
 Pins: the one-fragment limits match the real packers (203 / 243 B for a
-0xFE delta, one byte less for a 0xFD epoch start); a clean capture passes
+0xFE delta, one byte less for a 0xFD VECTOR epoch start; a key frame of
+another codec keeps the full limit, 2026-10-19); a clean capture passes
 every check; oversize, foreign and unparseable payloads fail the right
 checks; a DIGEST mismatch fails the digest check; the VS header peek reads
 the codec's own bits; camera_service's ``vector_stats`` line round-trips
@@ -32,17 +33,32 @@ from lora_proto import (  # noqa: E402
     PHY_IMAGE_BW250, PHY_IMAGE_BW500, pack_image_fragments, pack_image_fragments_v2,
 )
 from image_pipeline.frame_format import (  # noqa: E402
-    CODEC_VECTOR, CODEC_WEBP, FRAME_KIND_DELTA, FRAME_KIND_KEY, TileDeltaFrame,
-    encode_tile_delta_frame,
+    CODEC_MONO_G4, CODEC_VECTOR, CODEC_WEBP, FRAME_KIND_DELTA, FRAME_KIND_KEY, TileBlob,
+    TileDeltaFrame, encode_tile_delta_frame,
 )
 from image_pipeline.vector_scene import codec as vs  # noqa: E402
 from tests.test_vector_codec import worked_scene  # noqa: E402
+
+# 2026-10-19 RS-13 range-edge leg A2c (mono_g4 control at BW500), base capture
+_A2C = (_REPO / "bench-evidence" / "RS_13_range_edge_2026-10-19" / "legs"
+        / "legA2c_base.jsonl")
 
 
 def _wire(body: bytes, key: bool, seq: int) -> bytes:
     return encode_tile_delta_frame(TileDeltaFrame(
         frame_kind=FRAME_KIND_KEY if key else FRAME_KIND_DELTA, base_seq=seq,
         grid_w=12, grid_h=8, tile_px=32, codec=CODEC_VECTOR, vector_body=body))
+
+
+def _tile_frame(codec: int, key: bool, wire: int) -> bytes:
+    """A tile-codec frame of exactly ``wire`` bytes: the 6 B header, the
+    12 B bitmap of a 12 x 8 grid, and one tile (1 B size + blob)."""
+    out = encode_tile_delta_frame(TileDeltaFrame(
+        frame_kind=FRAME_KIND_KEY if key else FRAME_KIND_DELTA, base_seq=1,
+        grid_w=12, grid_h=8, tile_px=32, codec=codec,
+        tiles=[TileBlob(0, 0, 0, b"\x00" * (wire - 6 - 12 - 1))]))
+    assert len(out) == wire
+    return out
 
 
 def _scene() -> list:
@@ -85,6 +101,44 @@ class LimitTests(unittest.TestCase):
     def test_unknown_profile_is_refused(self) -> None:
         with self.assertRaises(ValueError):
             vdr.DryRun("telemetry_bw999")
+
+    def test_only_a_vector_epoch_start_is_trimmed(self) -> None:
+        # 2026-10-19 leg A2c: the 1-byte trim is VS1's own epoch-start cap
+        # (VECTOR_SCENE.md §3.1). A mono_g4 key frame at the full 243 B goes
+        # out as one 0xFE fragment and must not count over the limit.
+        dr = vdr.DryRun("image_bw500")
+        rows = {
+            "g4_key_243": dr.feed(_tile_frame(CODEC_MONO_G4, True, 243), 1000.0),
+            "g4_delta_243": dr.feed(_tile_frame(CODEC_MONO_G4, False, 243), 1000.5),
+            "g4_key_244": dr.feed(_tile_frame(CODEC_MONO_G4, True, 244), 1001.0),
+            "vec_key_243": dr.feed(_wire(b"\x00" * 237, True, 4), 1001.5),
+            "vec_key_242": dr.feed(_wire(b"\x00" * 236, True, 5), 1002.0),
+        }
+        self.assertEqual({k: (r.wire, r.limit, r.fits) for k, r in rows.items()}, {
+            "g4_key_243": (243, 243, True), "g4_delta_243": (243, 243, True),
+            "g4_key_244": (244, 243, False), "vec_key_243": (243, 242, False),
+            "vec_key_242": (242, 242, True)})
+        self.assertNotIn("OVER", vdr.format_row(rows["g4_key_243"]))
+        self.assertIn("OVER 243B", vdr.format_row(rows["g4_key_244"]))
+        self.assertIn("243B/242 OVER", vdr.format_row(rows["vec_key_243"]))
+        self.assertEqual(dr.summary()["wire"]["over_limit"], 2)
+        # the packer agrees: 243 B in one v1 fragment at BW500, 244 B in two
+        self.assertEqual(len(pack_image_fragments(_tile_frame(CODEC_MONO_G4, True, 243),
+                                                  0, PHY_IMAGE_BW500)), 1)
+        self.assertEqual(len(pack_image_fragments(_tile_frame(CODEC_MONO_G4, True, 244),
+                                                  0, PHY_IMAGE_BW500)), 2)
+
+    @unittest.skipUnless(_A2C.is_file(), "leg A2c capture not in this tree")
+    def test_leg_a2c_mono_g4_key_frames_fit(self) -> None:
+        dr = vdr.DryRun("image_bw500")
+        rows = [dr.feed(p, ts) for ts, _t, p in vdr.iter_capture(_A2C)]
+        for i in (490, 572):
+            r = rows[i]
+            self.assertEqual((r.codec, r.frame_kind, r.wire, r.limit, r.fits),
+                             (CODEC_MONO_G4, FRAME_KIND_KEY, 243, 243, True))
+        s = dr.summary()
+        self.assertEqual(s["wire"]["over_limit"], 0)
+        self.assertTrue(dict((n, ok) for n, ok, _ in s["checks"])["one_fragment"])
 
 
 class PeekTests(unittest.TestCase):

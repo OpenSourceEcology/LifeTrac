@@ -1,9 +1,11 @@
 """rs12_leg_report.py — one-command leg analysis for the RS-12 campaign.
 
-Reports, for a radio-monitor archive: raw loss, the per-index loss
-histogram with the penultimate share, the corrupt-capture index
-distribution (read out of the crc_dump payload headers), and — when given
-bracketing stats-probe snapshots — the radio-counter deltas and the
+Reports, for a radio-monitor archive: raw loss over the whole logs, the
+fragment loss over the window both logs cover (``txdone_arrival`` trains
+matched to ``frag_arrival`` trains, RS-12.15 09-14 ERRATA §3), the
+per-index loss histogram with the penultimate share, the corrupt-capture
+index distribution (read out of the crc_dump payload headers), and — when
+given bracketing stats-probe snapshots — the radio-counter deltas and the
 firmware-drop count (drx_ok - host URCs). With ``--capture`` (the base-side
 ``vector_dry_run.py capture`` JSONL of an RS-13 leg) it also prints the
 frame loss read from the TileDeltaFrame sequence numbers, which no
@@ -22,9 +24,34 @@ import pathlib
 import re
 import statistics
 import sys
+from datetime import datetime, timezone
 
 # TileDeltaFrame header byte 1 (LORA_PROTOCOL.md § TileDeltaFrame) is a u8.
+# The fragment seq both daemons log (txdone_arrival / frag_arrival) wraps at
+# 256 too.
 SEQ_MOD = 256
+
+# Per-fragment events, both behind the harness's -LogFragArrivals 1: the TX
+# daemon logs one txdone_arrival per TX_DONE URC (status 0 = on air), the RX
+# daemon one frag_arrival per fragment the base decoded.
+TXDONE_RE = re.compile(r"txdone_arrival: seq=(\d+) idx=(\d+) status=(\d+)")
+# total = the header's fragment count (image_rx_daemon: raw[3] + 1). Parity
+# frames (magic 0xFC) are not logged; a copies=2 key frame logs each copy
+# with the same idx.
+FRAG_RE = re.compile(r"frag_arrival: seq=(\d+) idx=(\d+)(?: total=(\d+))?")
+LOG_TS_RE = re.compile(r"^\ufeff?(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d),(\d{3}) ")
+# How many RX trains ahead a TX train may find its match (ERRATA §3 step 2).
+SHARED_LOOKAHEAD = 4
+# A train never spans this long, so two runs of one seq further apart than
+# this are separate trains (the u8 seq came round again).
+TRAIN_SPLIT_S = 10.0
+# How far apart the matched trains' RX-minus-TX log times may spread before
+# one of them is taken to be matched a u8 seq wrap off. The boards' clocks
+# differ by days (the tractor has no time sync) but tick together: over the
+# 55 committed archives with per-fragment events the spread is at most
+# 2.1 s (a 15-fragment train whose first fragments the base lost), and one
+# wrap is 256 frames, 25.6 s even at 10 frames/s.
+ALIGN_TOL_S = 10.0
 
 
 def parse_stats(path: pathlib.Path) -> dict[str, int]:
@@ -38,6 +65,186 @@ def parse_stats(path: pathlib.Path) -> dict[str, int]:
 def _last_int(pattern: str, text: str, default: int = 0) -> int:
     found = re.findall(pattern, text)
     return int(found[-1]) if found else default
+
+
+def _log_time(line: str) -> float | None:
+    """Seconds (epoch, board clock) of a daemon log line, or None."""
+    m = LOG_TS_RE.match(line)
+    if not m:
+        return None
+    return (datetime.strptime(m.group(1), "%Y-%m-%d %H:%M:%S")
+            .replace(tzinfo=timezone.utc).timestamp()
+            + int(m.group(2)) / 1000.0)
+
+
+def fragment_events(text: str, rx: bool) -> list[tuple]:
+    """``(t, seq mod 256, idx, total)`` per per-fragment event, in log order:
+    ``frag_arrival`` lines when ``rx``, else ``txdone_arrival ... status=0``
+    lines (on air). ``t`` is None on a line without a timestamp, ``total``
+    None on the TX side and on old RX lines without it."""
+    out = []
+    for line in text.splitlines():
+        m = (FRAG_RE if rx else TXDONE_RE).search(line)
+        if not m:
+            continue
+        if not rx and int(m.group(3)) != 0:
+            continue
+        total = int(m.group(3)) if rx and m.group(3) else None
+        out.append((_log_time(line), int(m.group(1)) % SEQ_MOD,
+                    int(m.group(2)), total))
+    return out
+
+
+def fragment_trains(events) -> list[dict]:
+    """Trains: consecutive events with the same seq (mod 256), in log order,
+    split where two of them are more than TRAIN_SPLIT_S apart (the seq came
+    round again). Each train: ``seq``, ``idxs`` (set), ``idx_list`` (as
+    logged, duplicates kept), ``totals`` (set), ``t`` (first event's time)."""
+    trains: list[dict] = []
+    last_t = None
+    for t, seq, idx, total in events:
+        same = (trains and trains[-1]["seq"] == seq
+                and not (t is not None and last_t is not None
+                         and t - last_t > TRAIN_SPLIT_S))
+        if not same:
+            trains.append({"seq": seq, "idxs": set(), "idx_list": [],
+                           "totals": set(), "t": t})
+        tr = trains[-1]
+        tr["idxs"].add(idx)
+        tr["idx_list"].append(idx)
+        if total is not None:
+            tr["totals"].add(total)
+        if t is not None:
+            last_t = t
+    return trains
+
+
+def _misaligned(pairs, tx_trains) -> str | None:
+    """Why the matched trains are not one alignment, or None. The boards'
+    clocks differ by days but tick together, so every correct match has
+    the same RX-minus-TX log time to within a train's span; a train
+    matched one u8 seq wrap off (after an outage of about 256 frames, or
+    of a little less with the lookahead) is a wrap's time off the rest."""
+    offs = [(rx["t"] - tx["t"], rx["seq"]) for tx, rx in pairs
+            if tx["t"] is not None and rx["t"] is not None]
+    if len(offs) < len(pairs):
+        span = sum((b["seq"] - a["seq"]) % SEQ_MOD
+                   for a, b in zip(tx_trains, tx_trains[1:]))
+        if span >= SEQ_MOD // 2:
+            return (f"matched trains without log timestamps over {span} "
+                    f"seqs: the alignment cannot be checked")
+        return None
+    if not offs:
+        return None
+    lo, hi = min(offs), max(offs)
+    if hi[0] - lo[0] > ALIGN_TOL_S:
+        return (f"the matched trains' RX-minus-TX log times spread "
+                f"{hi[0] - lo[0]:.0f} s (seq {lo[1]} vs seq {hi[1]}): a train "
+                f"was matched a u8 seq wrap off after an outage, so the "
+                f"trains cannot be aligned")
+    return None
+
+
+def _redundant(tx_train: dict, rx_train: dict) -> str | None:
+    """Why a matched train cannot be scored idx by idx, or None. The TX
+    daemon logs each transmission's place in its list; the RX daemon logs
+    the header's fragment index. With key-frame copies (one idx received
+    twice) or parity (a TX idx at or past the header's fragment count, the
+    parity frame itself not logged) the two do not name the same thing."""
+    rx_list = rx_train["idx_list"]
+    if len(rx_list) != len(set(rx_list)):
+        return (f"seq {rx_train['seq']}: the base logged idx "
+                f"{sorted(rx_list)} (a fragment twice: key-frame copies, or a "
+                f"fragment re-sent after a TX_DONE timeout)")
+    if len(rx_train["totals"]) > 1:
+        return (f"seq {rx_train['seq']}: fragment counts "
+                f"{sorted(rx_train['totals'])} in one train")
+    if rx_train["totals"]:
+        total = next(iter(rx_train["totals"]))
+        over = sorted(i for i in tx_train["idxs"] if i >= total)
+        if over:
+            return (f"seq {rx_train['seq']}: TX idx {over} at or past the "
+                    f"header's {total} fragment(s) (copies or parity)")
+    return None
+
+
+def shared_window_loss(tx: str, rx: str,
+                       lookahead: int = SHARED_LOOKAHEAD) -> dict | None:
+    """Fragment loss over the window both logs cover (RS-12.15 09-14
+    ERRATA.md §3, 2026-10-18), or None when either log lacks the events.
+
+    Up to the 10-19 legs the harness read the TX log before the RX log, and
+    both before it stopped the daemons, so the RX log runs on past the TX
+    log's last line: the base goes on decoding fragments the TX log never
+    saw (the TX daemon's TX_DONE lines can also stop short of the base's
+    last fragment for other reasons). A whole-log comparison
+    counts those against a denominator that has already stopped, which
+    understates the loss and can make it negative (09-14 leg R: -1.4 %
+    whole-log, 0.4 % here). Steps, as in ERRATA §3:
+
+    1. group each log's fragment events by seq, in order: ``txdone_arrival
+       ... status=0`` in tx_daemon.log, ``frag_arrival`` in rx_daemon.log;
+    2. match each TX train to the next RX train with the same seq, looking
+       at most ``lookahead`` trains ahead; a TX train with no match is lost;
+    3. count the overlap of the two trains' idx sets as decoded;
+    4. leave out the RX trains after the last matched one (outside the
+       window).
+
+    Fails closed: ``withheld`` carries the reason, and the report gives no
+    figure, when a train was matched a u8 seq wrap off (its RX-minus-TX log
+    time differs from the other matches' by more than ALIGN_TOL_S: an
+    outage of about 256 frames) or when a matched train carries key-frame
+    copies or parity (the two logs number its fragments differently).
+    """
+    tx_trains = fragment_trains(fragment_events(tx, rx=False))
+    rx_trains = fragment_trains(fragment_events(rx, rx=True))
+    if not tx_trains or not rx_trains:
+        return None
+    nxt, last, decoded, unheard, extra = 0, -1, 0, 0, 0
+    withheld = None
+    pairs = []
+    for tr in tx_trains:
+        for k in range(nxt, min(nxt + lookahead, len(rx_trains))):
+            if rx_trains[k]["seq"] == tr["seq"]:
+                withheld = withheld or _redundant(tr, rx_trains[k])
+                decoded += len(tr["idxs"] & rx_trains[k]["idxs"])
+                extra += len(rx_trains[k]["idxs"] - tr["idxs"])
+                pairs.append((tr, rx_trains[k]))
+                last, nxt = k, k + 1
+                break
+        else:
+            unheard += 1
+    withheld = _misaligned(pairs, tx_trains) or withheld
+    sent = sum(len(tr["idxs"]) for tr in tx_trains)
+    return {"sent": sent, "decoded": decoded, "lost": sent - decoded,
+            "trains": len(tx_trains), "unheard": unheard,
+            "late": sum(len(tr["idxs"]) for tr in rx_trains[last + 1:]),
+            "extra": extra, "withheld": withheld}
+
+
+def format_shared_loss(res: dict | None) -> list[str]:
+    """Report lines for :func:`shared_window_loss`."""
+    if res is None:
+        return ["shared-window loss: n/a (needs txdone_arrival lines in "
+                "tx_daemon.log and frag_arrival lines in rx_daemon.log: "
+                "harness -LogFragArrivals 1)"]
+    if res.get("withheld"):
+        return [f"shared-window loss: n/a, withheld ({res['withheld']})"]
+    sent, lost = res["sent"], res["lost"]
+    out = [f"shared-window loss {lost}/{sent} = {100 * lost / sent:.1f}%   "
+           f"[txdone_arrival vs frag_arrival, train by train over the window "
+           f"both logs cover; {res['unheard']} of {res['trains']} trains "
+           f"not heard]"]
+    left = []
+    if res["late"]:
+        left.append(f"{res['late']} fragment(s) the base decoded after the "
+                    f"TX log's last train (outside the window)")
+    if res["extra"]:
+        left.append(f"{res['extra']} decoded in a matched train with no "
+                    f"TX_DONE status=0 line for their idx")
+    if left:
+        out.append("  left out: " + "; ".join(left))
+    return out
 
 
 def seq_gap_loss(frames) -> dict:
@@ -184,11 +391,68 @@ def main(argv: list[str] | None = None) -> int:
                                                      errors="replace")
 
     for key in ("train_gap_ms", "tx_pipeline_depth", "synth_budget_b",
-                "force_frf_hz", "git_sha"):
+                "force_frf_hz", "git_sha", "log_window"):
         m = re.search(rf"{key}=(\S+)", params)
         if m:
             print(f"{key}={m.group(1)}", end="  ")
     print()
+    # 2026-10-19: every harness up to the 10-19 legs read the daemon logs
+    # BEFORE it stopped the daemons (TX log first, then RX), while the post
+    # brackets are read after; a harness that reads them after the stop says
+    # so with log_window=after_stop in params.txt.
+    # 2026-10-22: the harness writes after_stop only when both daemon stops
+    # worked and both logs hold their SIGTERM shutdown line; otherwise it
+    # writes log_window=after_stop_unverified and the reason in
+    # log_window_detail=. Only the exact after_stop drops the note; any other
+    # value, or none (every archive before 10-22), keeps the old note.
+    # The unverified note is printed after the loss block (whole-log,
+    # shared-window and capture seq-gap lines), not here: leg_post.sh shows
+    # only the report's first 8 lines on the console, and the capture line
+    # (the loss of record) must stay among them (2026-10-22 review). Its
+    # wording follows the reason: a docker stop the harness could not
+    # confirm leaves the old artefact possible (a daemon still ran when its
+    # log was read); a missing SIGTERM shutdown line after both stops
+    # worked is the opposite case, a daemon that died (or a log that did
+    # not come back whole) before the stop, so that log ends early.
+    m = re.search(r"log_window=(\S+)", params)
+    log_window = m.group(1) if m else None
+    logs_after_stop = log_window == "after_stop"
+    logs_unverified = log_window == "after_stop_unverified"
+    unverified_note = None
+    if logs_unverified:
+        md = re.search(r"^log_window_detail=(.*?)\s*$", params, re.M)
+        detail = (md.group(1) if md and md.group(1)
+                  else "params.txt has no log_window_detail")
+        stop_failed = re.search(r"\b(?:tx|rx)_smoke stop:", detail)
+        no_shutdown = re.search(r"\b(?:tx|rx)_smoke log has no shutdown line",
+                                detail)
+        if stop_failed:
+            why = ("a daemon stop was not confirmed, so that daemon may "
+                   "still have run when its log was read and the logs may "
+                   "not cover the post-stop window — a 'received > sent' "
+                   "line above or a small positive FIRMWARE DROP below can "
+                   "carry the old log-window artefact (logs read while a "
+                   "daemon ran), not the link or the firmware")
+            if no_shutdown:
+                why += ("; a log without its shutdown line can also mean "
+                        "that daemon died before the stop, so its log ends "
+                        "early")
+        elif no_shutdown:
+            why = ("both daemon stops were confirmed, but a daemon log has "
+                   "no SIGTERM shutdown line — that daemon may have died "
+                   "before the stop (look for a traceback in its log) or "
+                   "its log did not come back whole, so the log can end "
+                   "before the leg did and the log-derived figures above "
+                   "cover less than the leg (an RX log that ends early "
+                   "inflates the whole-log loss and the FIRMWARE DROP "
+                   "below); this is not the old read-while-running artefact")
+        else:
+            why = ("the harness could not confirm that each daemon ran until "
+                   "its stop and had stopped before its log was read, so the "
+                   "log-derived figures above and a FIRMWARE DROP below may "
+                   "not cover the leg's window")
+        unverified_note = (f"  !! LOG WINDOW UNVERIFIED (log_window_detail: "
+                           f"{detail}): {why}")
 
     # PR #125 review round 6 (2026-09-15): `frags_ok=` is the TX daemon's LAST
     # periodic stats line and can be stale independently of the RX stats
@@ -264,22 +528,49 @@ def main(argv: list[str] | None = None) -> int:
         print(f"  (rx rx_frames counter {rcvd} is stale; using {floor} "
               f"{floor_src})")
         rcvd = floor
+    # 2026-10-19: the clamp below is for the whole-log loss line only. It
+    # used to overwrite rcvd itself, so the FIRMWARE DROP line further down
+    # subtracted the TX count, not the base's own (A2c: 617 - 611 = 6
+    # instead of 617 - 612 = 5). Keep the base's count for that line.
+    rcvd_host = rcvd
+    shared = shared_window_loss(tx, rx)
+    shared_ok = shared is not None and not shared.get("withheld")
     if rcvd > sent:
-        # More received than sent: the logs or counters disagree (a capture
-        # window longer than the TX log, a restarted daemon). Never print a
-        # negative loss; say so instead.
+        # More received than sent: the logs or counters disagree (the RX log
+        # runs on past the TX log's last line, a restarted daemon). Never
+        # print a negative loss; say so instead. With --capture the capture
+        # seq-gap line is the loss of record (RS-13), so point there first.
+        if args.capture:
+            hint = ("check the capture seq-gap line (the loss of record)"
+                    + (" and the shared-window line" if shared_ok else ""))
+        else:
+            hint = ("read the shared-window line" if shared_ok else
+                    "re-run with --capture <leg>_base.jsonl for the seq-gap "
+                    "figure (no shared-window figure here)")
+        if logs_unverified:
+            # 2026-10-22 (review): the note is printed below the loss block.
+            hint += ("; the log window is unverified, see the LOG WINDOW "
+                     "UNVERIFIED note below")
         print(f"  !! received {rcvd} > sent {sent}: the TX and RX logs disagree "
-              f"on the window; loss shown as 0 — check the seq-gap figure")
+              f"on the window; whole-log loss shown as 0 — {hint}")
         rcvd = sent
     published = max(published, pub_log)
+    # The whole-log line is kept exactly as before (only the label is new),
+    # so a report on old evidence reads the same; the shared-window line
+    # below it is the fragment loss without the log-window artefact.
     print(f"loss {sent - rcvd}/{sent} = {100 * (sent - rcvd) / sent:.1f}%   "
           f"crc_dumps={crc}  timeouts={timeouts}  published={published}"
-          + ("   [STALE — see above]" if counters_stale else ""))
+          + ("   [STALE — see above]" if counters_stale else "")
+          + "   [whole logs]")
+    for line in format_shared_loss(shared):
+        print(line)
     if args.capture:
         frames, names = capture_frames(args.capture)
         for line in format_seq_loss(seq_gap_loss(frames), args.capture.name,
                                     names):
             print(line)
+    if unverified_note:
+        print(unverified_note)
 
     # per-index loss histogram (attribution instrument)
     idx: collections.Counter = collections.Counter()
@@ -370,9 +661,35 @@ def main(argv: list[str] | None = None) -> int:
              ("radio_dio0", "radio_rx_ok", "radio_crc_err", "radio_tx_ok")
              if k in pre and k in post}
         print(f"radio deltas: {d}")
-        fw_drop = d.get("radio_rx_ok", 0) - rcvd
+        fw_drop = d.get("radio_rx_ok", 0) - rcvd_host
         print(f"FIRMWARE DROP (drx_ok - host URCs): "
-              f"{d.get('radio_rx_ok', 0)} - {rcvd} = {fw_drop}")
+              f"{d.get('radio_rx_ok', 0)} - {rcvd_host} = {fw_drop}")
+        if logs_unverified:
+            # 2026-10-22: the stop or a shutdown line was not confirmed (the
+            # LOG WINDOW UNVERIFIED note above says which). Worded for both
+            # causes: a daemon read while it ran, or an RX daemon that died
+            # before its stop (its log ends early, the bracket does not).
+            print("  (log window: after_stop_unverified, see the LOG WINDOW "
+                  "UNVERIFIED note above — if a daemon still ran when its "
+                  "log was read, or the RX daemon died before its stop, "
+                  "fragments the base received after its log ended count in "
+                  "drx_ok but not in the log: a positive drop can be that "
+                  "window, not the firmware; rx_urc_lost on the URC-path "
+                  "line counts the URCs the L072 really lost)")
+        elif not logs_after_stop:
+            # Every 10-18/10-19 leg read 4-5 here (4-6 with the old clamp):
+            # mostly the fragments the base decoded between the RX log read
+            # and the daemon stop, which are in the post bracket's
+            # radio_rx_ok but not in the log (the harness reads and stops
+            # the feed's container, camera_svc or synth_pub, in between);
+            # rx_urc_lost (0-2 on those legs) is the rest.
+            print("  (log window: params.txt has no log_window=after_stop — "
+                  "this harness read the daemon logs BEFORE it stopped the "
+                  "daemons, and the post bracket was read after, so "
+                  "fragments the base received in between count in drx_ok "
+                  "but not in the log: a small positive drop can be that "
+                  "window, not the firmware; rx_urc_lost on the URC-path "
+                  "line counts the URCs the L072 really lost)")
         resid = d.get("radio_dio0", 0) - sum(
             d.get(k, 0) for k in ("radio_rx_ok", "radio_crc_err",
                                   "radio_tx_ok"))

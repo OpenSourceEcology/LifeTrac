@@ -33,7 +33,7 @@ for a in "$@"; do
 done
 ROLE=$(board_role "$WHO")
 board_present "$WHO" || die "$WHO ($(board_serial "$WHO")) is not reachable via $(board_via "$WHO")"
-E=$(bench_evidence_dir) || die "cannot create $EVIDENCE_DIR"
+E=$(bench_evidence_dir) || die "no evidence folder: $EVIDENCE_DIR (see above)"
 REC="$E/staging_$ROLE.txt"
 
 stamp "== push code tree to $WHO $BOARD_STAGE ($(bench_git_desc))"

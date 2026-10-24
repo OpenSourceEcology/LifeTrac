@@ -29,6 +29,23 @@
     At the end every leg prints and archives TRACTOR_L072_RESET
     landed|failed|unknown (from the openocd log of the leg-start SWD reset)
     and BASE_L072_RESET unverified (the gpio163 pulse is not checked).
+
+    Bench kit (2026-10-19): at leg end the frame source stops first, then
+    tx_smoke (after -StopDrainS s), then rx_smoke, and only then are the
+    daemon logs read, so both logs cover the same window as the post
+    brackets. Since 2026-10-22 that is checked, not assumed: params.txt says
+    log_window=after_stop only when both docker stops worked (container name
+    printed, exit 0) and both daemon logs hold their SIGTERM shutdown line;
+    otherwise log_window=after_stop_unverified with the reason in
+    log_window_detail=, and LEG CHECKS prints the same verdict as LOG_WINDOW.
+    The frame source's stop is recorded too (feed_stop=), as a detail only.
+
+    Also 2026-10-19: the tractor reset runs from the pushed
+    bench_tools/ocd_reset.sh, which ignores SIGHUP before it forks
+    (the 10-19 A2c2 miss, OCD_EXIT=129). Every adb push is checked (output,
+    exit status, then md5 against the PC copy) and a failure stops the leg
+    before any daemon starts. params.txt records each board's clock offset
+    from the PC (tractor_clock_offset_s, base_clock_offset_s; read only).
 #>
 [CmdletBinding()]
 param(
@@ -227,6 +244,12 @@ param(
     #                          RX_SCAN_FAILED that enters FAILED: fault:0x0D:final
     #                          is RS-12.15 leg X). Polled from the PC every ~2 s.
     [string]$InjectOn     = "",
+    # Bench kit (2026-10-19): seconds between stopping the frame source and
+    # stopping tx_smoke at leg end, so the frames already queued go on air and
+    # into the TX log. 2 s covers the DTS / BENCH single-fragment legs; give a
+    # saturated multi-fragment FHSS leg more.
+    [ValidateRange(0, 60)]
+    [double]$StopDrainS   = 2,
     # Archive final logs + parameters under bench-evidence/ with the git
     # SHA in the folder name (evidence discipline per CODE REVIEWS docs).
     [switch]$Archive
@@ -367,7 +390,8 @@ function Get-TractorResetVerdict {
     # of the end-of-leg read. Returns @{ Verdict = landed|failed|unknown; Reason }.
     # "landed" = openocd drove H7 PF4 (the L072 NRST net) low for 250 ms and
     # read it back low, then high (Phase D of the cfg). It is not a readback
-    # from the L072 itself; the counter brackets (deltas.py) stay the final word.
+    # from the L072 itself; the counter brackets (bench_tools/bracket_deltas.py)
+    # stay the final word.
     # -Tag is this leg's OCD_LEG=<stamp>, the log's first line: a log without
     # it is an earlier leg's (only this harness writes ocd_reset.log, and each
     # spawn truncates it). -SpawnOutput is what the leg-start spawn printed.
@@ -428,12 +452,21 @@ function Get-TractorResetVerdict {
     }
     # The shell reports a job killed by signal N as 128+N. 129 (SIGHUP) is the
     # likely one here: the adb/sudo session hangup reaching nohup before nohup
-    # ignored HUP (the subshell's `trap :` is reset in its children). Without
-    # the openocd banner, openocd itself never started.
+    # ignored HUP (the old inline subshell's `trap :` was reset in its
+    # children; 2026-10-19 A2c2). bench_tools/ocd_reset.sh (bench kit
+    # 2026-10-19) ignores HUP before it forks, which closes that window.
+    # openocd installs its own SIGHUP handler once it starts (server_preinit,
+    # after its banner), so a 129 WITH the banner is a hangup that reached
+    # openocd later; only a 129 WITHOUT the banner from ocd_reset.sh would
+    # point to a different cause. Without the openocd banner, openocd never
+    # started.
     if ($null -ne $exit -and $exit -ge 128) {
         $sig = $exit - 128
         $what = "killed by signal $sig"
-        if ($sig -eq 1) { $what = "killed by SIGHUP (likely the adb/sudo session hangup reaching nohup before nohup ignored HUP)" }
+        if ($sig -eq 1) {
+            if ($banner) { $what = "killed by SIGHUP after openocd started (openocd catches SIGHUP itself once running)" }
+            else { $what = "killed by SIGHUP (likely the adb/sudo session hangup reaching nohup before nohup ignored HUP)" }
+        }
         elseif ($sig -eq 9) { $what = "killed by SIGKILL" }
         elseif ($sig -eq 15) { $what = "killed by SIGTERM" }
         if (-not $banner) { $what += "; openocd never started (no banner in its log)" }
@@ -448,6 +481,321 @@ function Get-TractorResetVerdict {
         return @{ Verdict = "failed"; Reason = "no NRST pulse in the openocd log: $firstErr$cfgNote" }
     }
     return @{ Verdict = "unknown"; Reason = "the openocd log has no NRST pulse and no error$exitNote$cfgNote" }
+}
+
+# --- Helpers (bench kit, 2026-10-19) -----------------------------------------
+# Checked adb pushes and the board clock read. Test-AdbPushOutput,
+# Get-PushedFileList, Test-PushedMd5 and Get-ClockOffset are pure; the others
+# call adb (the offline tests give them a stub adb).
+
+function Test-AdbPushOutput {
+    # Judges one `adb push` from its output (stdout and stderr merged) and its
+    # exit status. Returns @{ Ok; Files; Reason }. A push that worked prints
+    # "<src>: N file(s) pushed, M skipped. <rate> (<bytes> bytes in <t>s)" (on
+    # stderr) and exits 0; a failure prints "adb: error: ..." or "error: device
+    # '...' not found" and exits non-zero. Ok needs exit 0 AND N >= 1.
+    param([object]$Output, [int]$ExitCode)
+    $lines = @(ConvertFrom-AdbOutput $Output)
+    $files = -1; $errLine = $null
+    foreach ($l in $lines) {
+        if ($l -match '\b(\d+) files? pushed\b') { $files = [int]$Matches[1] }
+        elseif ($null -eq $errLine -and $l -match '(?i)\berror\b|\bfailed\b|not found|no such file|denied|offline|unauthorized|cannot') { $errLine = $l }
+    }
+    $text = "no output"
+    if ($null -ne $errLine) { $text = $errLine } elseif ($lines.Count -gt 0) { $text = $lines[-1] }
+    if ($ExitCode -ne 0) { return @{ Ok = $false; Files = $files; Reason = "adb exit ${ExitCode}: $text" } }
+    if ($files -lt 0) { return @{ Ok = $false; Files = $files; Reason = "adb printed no 'file(s) pushed' line: $text" } }
+    if ($files -eq 0) { return @{ Ok = $false; Files = 0; Reason = "adb pushed 0 files: $text" } }
+    return @{ Ok = $true; Files = $files; Reason = "$files file(s) pushed" }
+}
+
+function Get-PushedFileList {
+    # The files one `adb push <Local> <Remote>` writes, as @{ Local; Remote }.
+    # A directory pushed to an existing remote directory (Remote ends in /)
+    # lands in Remote/<its name>/, as every directory push here does;
+    # __pycache__ content is pushed too but not listed (not code under test,
+    # and a container may rewrite it). A file pushed to a path ending in /
+    # keeps its name.
+    param([string]$Local, [string]$Remote)
+    if (Test-Path -LiteralPath $Local -PathType Container) {
+        $root = (Resolve-Path -LiteralPath $Local).Path.TrimEnd('\', '/')
+        $dest = $Remote.TrimEnd('/') + "/" + (Split-Path -Leaf $root)
+        foreach ($f in @(Get-ChildItem -LiteralPath $root -Recurse -File -Force | Sort-Object FullName)) {
+            $rel = $f.FullName.Substring($root.Length + 1).Replace('\', '/')
+            if ($rel -match '(^|/)__pycache__/' -or $rel -like '*.pyc') { continue }
+            @{ Local = $f.FullName; Remote = "$dest/$rel" }
+        }
+    } else {
+        $dest = $Remote
+        if ($Remote.EndsWith('/')) { $dest = $Remote + (Split-Path -Leaf $Local) }
+        @{ Local = $Local; Remote = $dest }
+    }
+}
+
+function Get-CleanPushSource {
+    # The path to push for -Local. A directory goes up from a temp copy under
+    # -StageRoot without __pycache__ / *.pyc: the PC's bytecode is of no use on
+    # the board, and the board's own __pycache__ directories are root-owned
+    # (the containers write them), so pushing a PC __pycache__ into one fails,
+    # which the checked push would turn into an aborted leg (the old unchecked
+    # push could stop there silently and skip the files after it). A file is
+    # pushed as it is.
+    param([string]$Local, [string]$StageRoot)
+    if (-not (Test-Path -LiteralPath $Local -PathType Container)) { return $Local }
+    $root = (Resolve-Path -LiteralPath $Local).Path.TrimEnd('\', '/')
+    $dest = Join-Path $StageRoot (Split-Path -Leaf $root)
+    if (Test-Path -LiteralPath $dest) { Remove-Item -LiteralPath $dest -Recurse -Force }
+    New-Item -ItemType Directory -Force -Path $dest | Out-Null
+    foreach ($f in @(Get-ChildItem -LiteralPath $root -Recurse -File -Force)) {
+        $rel = $f.FullName.Substring($root.Length + 1)
+        if ($rel -match '(^|\\)__pycache__\\' -or $rel -like '*.pyc') { continue }
+        $d = Join-Path $dest $rel
+        $pd = Split-Path -Parent $d
+        if (-not (Test-Path -LiteralPath $pd)) { New-Item -ItemType Directory -Force -Path $pd | Out-Null }
+        Copy-Item -LiteralPath $f.FullName -Destination $d -Force
+    }
+    return $dest
+}
+
+function Test-PushedMd5 {
+    # Compares a board's `md5sum <remote paths>` output with the PC copies.
+    # -Files: @{ Remote; Md5 (lower-case hex) }. Returns @{ Checked; Mismatch;
+    # Missing; Rows }: Mismatch / Missing are remote paths, Rows one line per
+    # file, "ok|MISMATCH|missing <remote> pc=<md5> board=<md5|->".
+    param([object]$Output, [object[]]$Files)
+    $board = @{}
+    foreach ($l in @(ConvertFrom-AdbOutput $Output)) {
+        if ($l -match '^([0-9a-fA-F]{32})\s+\*?(\S.*)$') { $board[$Matches[2]] = $Matches[1].ToLower() }
+    }
+    $mis = @(); $miss = @(); $rows = @(); $n = 0
+    foreach ($f in @($Files)) {
+        if ($board.ContainsKey($f.Remote)) {
+            $n++
+            if ($board[$f.Remote] -eq $f.Md5) { $rows += "ok $($f.Remote) pc=$($f.Md5) board=$($board[$f.Remote])" }
+            else { $mis += $f.Remote; $rows += "MISMATCH $($f.Remote) pc=$($f.Md5) board=$($board[$f.Remote])" }
+        } else {
+            $miss += $f.Remote; $rows += "missing $($f.Remote) pc=$($f.Md5) board=-"
+        }
+    }
+    return @{ Checked = $n; Mismatch = $mis; Missing = $miss; Rows = $rows }
+}
+
+function Get-ClockOffset {
+    # Board clock minus PC clock from one `date +%s.%N` on the board, between
+    # PC UTC epoch reads taken just before and after the adb call. Returns
+    # @{ Ok; OffsetS; RttS; ErrS; Text }. The offset is taken at the round
+    # trip's midpoint, so ErrS = RttS/2 (+1 s when the board's date has no %N
+    # and prints a literal N: whole seconds).
+    param([object]$Output, [double]$PcBeforeS, [double]$PcAfterS)
+    $inv = [System.Globalization.CultureInfo]::InvariantCulture
+    $rtt = $PcAfterS - $PcBeforeS
+    $lines = @(ConvertFrom-AdbOutput $Output)
+    $boardS = $null; $coarse = $false
+    foreach ($l in $lines) {
+        if ($l -match '^(\d{9,11})\.(\d{1,9})$') {
+            $boardS = [double]::Parse("$($Matches[1]).$($Matches[2])", $inv); break
+        } elseif ($l -match '^(\d{9,11})(\.%?N)?$') {
+            $boardS = [double]::Parse($Matches[1], $inv); $coarse = $true; break
+        }
+    }
+    if ($null -eq $boardS) {
+        $got = "nothing"
+        if ($lines.Count -gt 0) { $got = "'" + ($lines -join ' | ') + "'" }
+        return @{ Ok = $false; OffsetS = $null; RttS = $rtt; ErrS = $null; Text = "unknown (date +%s.%N printed $got)" }
+    }
+    $off = $boardS - (($PcBeforeS + $PcAfterS) / 2.0)
+    $err = $rtt / 2.0
+    if ($coarse) { $err += 1.0 }
+    $sign = ""; if ($off -ge 0) { $sign = "+" }
+    $text = $sign + $off.ToString("F3", $inv) + " s (" + $sign + ($off / 86400.0).ToString("F2", $inv) + " d) +-" + $err.ToString("F3", $inv) + " s"
+    if ($coarse) { $text += " (whole seconds: no %N)" }
+    return @{ Ok = $true; OffsetS = $off; RttS = $rtt; ErrS = $err; Text = $text }
+}
+
+function Get-PcEpochS {
+    # The PC clock as UTC epoch seconds (the clock-offset reference).
+    return ([DateTime]::UtcNow.Ticks - 621355968000000000) / 1e7
+}
+
+function Read-BoardClock {
+    # Reads a board's clock (read only: no clock is ever set) and returns
+    # Get-ClockOffset's result. `%s.%N` passes cmd unchanged (cmd would expand
+    # only a defined environment variable named "s.").
+    param([string]$Adb, [string]$Serial)
+    $t0 = Get-PcEpochS
+    $o = cmd /c "`"$Adb`" -s $Serial shell `"date +%s.%N 2>&1`"" 2>$null
+    $t1 = Get-PcEpochS
+    return (Get-ClockOffset -Output $o -PcBeforeS $t0 -PcAfterS $t1)
+}
+
+function Invoke-AdbPush {
+    # One `adb push`, checked (Test-AdbPushOutput); throws on a failure, which
+    # stops the leg before any daemon starts. stderr is merged INSIDE the cmd
+    # string: adb writes its "N file(s) pushed" summary on stderr, which
+    # PowerShell 5.1 turned into one RemoteException / NativeCommandError block
+    # per push in every transcript (25 per leg on 2026-10-19), and the old
+    # `| Out-Null` hid real failures. Returns the Test-AdbPushOutput result.
+    # The reason is also written with Write-Host first, so the leg transcript
+    # (*>&1 | Tee-Object) keeps it: a throw ends that pipeline unrecorded.
+    param([string]$Adb, [string]$Serial, [string]$Local, [string]$Remote)
+    if (-not (Test-Path -LiteralPath $Local)) {
+        $msg = "[DEPLOY] $Local does not exist on this PC (push to ${Serial}:$Remote). No daemon was started."
+        Write-Host $msg -ForegroundColor Red
+        throw $msg
+    }
+    $out = cmd /c "`"$Adb`" -s $Serial push `"$Local`" $Remote 2>&1"
+    $rc = $LASTEXITCODE
+    $v = Test-AdbPushOutput -Output $out -ExitCode $rc
+    if (-not $v.Ok) {
+        $msg = "[DEPLOY] adb push FAILED: $Local -> ${Serial}:$Remote ($($v.Reason)). No daemon was started."
+        Write-Host $msg -ForegroundColor Red
+        throw $msg
+    }
+    return $v
+}
+
+function Confirm-AdbPushedFiles {
+    # md5sum on the board of every file the pushes wrote, against the PC copy
+    # (one adb call per ~1500 characters of paths). Throws on a mismatch (the
+    # board holds something other than this tree; no daemon has started yet);
+    # a file md5sum did not report is a warning only. Returns @{ Checked;
+    # Total; Mismatch; Missing; Rows; Summary }.
+    param([string]$Adb, [string]$Serial, [object[]]$Files)
+    $list = @(foreach ($f in @($Files)) {
+        @{ Local = $f.Local; Remote = $f.Remote; Md5 = (Get-FileHash -Algorithm MD5 -LiteralPath $f.Local).Hash.ToLower() }
+    })
+    # Only plain path characters go into the remote shell; a file with any
+    # other character is left out (and so reported missing).
+    $batches = New-Object System.Collections.Generic.List[object]
+    $cur = New-Object System.Collections.Generic.List[string]
+    $len = 0
+    foreach ($f in $list) {
+        if ($f.Remote -notmatch '^[A-Za-z0-9_./+-]+$') { continue }
+        if ($cur.Count -gt 0 -and ($len + $f.Remote.Length) -gt 1500) {
+            $batches.Add($cur.ToArray()); $cur.Clear(); $len = 0
+        }
+        $cur.Add($f.Remote); $len += $f.Remote.Length + 1
+    }
+    if ($cur.Count -gt 0) { $batches.Add($cur.ToArray()) }
+    $out = New-Object System.Collections.Generic.List[string]
+    foreach ($b in $batches) {
+        foreach ($l in @(ConvertFrom-AdbOutput (cmd /c "`"$Adb`" -s $Serial shell `"md5sum $($b -join ' ') 2>&1`"" 2>$null))) { $out.Add($l) }
+    }
+    $r = Test-PushedMd5 -Output $out.ToArray() -Files $list
+    if ($r.Mismatch.Count -gt 0) {
+        $msg = "[DEPLOY] md5 MISMATCH on $Serial after the push: $($r.Mismatch -join ', '). No daemon was started."
+        Write-Host $msg -ForegroundColor Red
+        throw $msg
+    }
+    $summary = "md5 $($r.Checked)/$($list.Count) match"
+    if ($r.Missing.Count -gt 0) {
+        $summary += " ($($r.Missing.Count) not reported by md5sum)"
+        Write-Warning "[DEPLOY] md5sum on $Serial did not report $($r.Missing.Count) pushed file(s): $(@($r.Missing | Select-Object -First 5) -join ', '). The pushes themselves reported success."
+    }
+    return @{ Checked = $r.Checked; Total = $list.Count; Mismatch = $r.Mismatch; Missing = $r.Missing; Rows = $r.Rows; Summary = $summary }
+}
+
+# --- Helpers (bench kit, 2026-10-22) -----------------------------------------
+# The leg-end log window, checked. Up to 2026-10-22 every leg-end docker stop
+# went to Out-Null and params.txt said log_window=after_stop whatever happened,
+# so a stop that failed (the daemon still running while its log was read, the
+# pre-10-19 artefact) looked the same as one that worked. Get-DockerStopResult,
+# Test-DaemonShutdownLine and Get-LogWindowVerdict are pure; Invoke-DockerStop
+# calls adb (the offline tests give it a stub adb).
+
+function Invoke-DockerStop {
+    # One leg-end `docker stop -t 1 <Name>` on a board, its output and exit
+    # status kept: the board shell appends __STOP_RC=<docker's exit status>
+    # (the sudo pipeline's status is docker's), and adb's own stderr is merged
+    # INSIDE the cmd string (as in Invoke-AdbPush), so a failed adb call comes
+    # back as its error line with no __STOP_RC. Returns the cleaned lines, for
+    # Get-DockerStopResult / Get-LogWindowVerdict.
+    param([string]$Adb, [string]$Serial, [string]$Name)
+    return @(ConvertFrom-AdbOutput (cmd /c "`"$Adb`" -s $Serial shell `"echo fio | sudo -S -p '' docker stop -t 1 $Name 2>&1; echo __STOP_RC=`$?`" 2>&1"))
+}
+
+function Get-DockerStopResult {
+    # Judges one Invoke-DockerStop. docker prints the container's name and
+    # exits 0 when the stop worked, also for a container that had already
+    # exited (the daemon's shutdown line tells those apart, see
+    # Get-LogWindowVerdict); a failure prints "Error response from daemon: ..."
+    # and exits 1. No __STOP_RC line = the adb call failed (device gone, adb
+    # error), so nothing says the container stopped. Returns @{ Ok; Rc; Text },
+    # Text one line (it goes into params.txt).
+    param([object]$Output, [string]$Name)
+    $rc = $null
+    $rest = New-Object System.Collections.Generic.List[string]
+    foreach ($l in @(ConvertFrom-AdbOutput $Output)) {
+        if ($l -match '^__STOP_RC=(\d+)$') { $rc = [int]$Matches[1] }
+        else { $rest.Add($l) }
+    }
+    $text = "no output"
+    if ($rest.Count -gt 0) { $text = $rest -join ' | ' }
+    if ($text.Length -gt 200) { $text = $text.Substring(0, 200) + "..." }
+    if ($null -eq $rc) { return @{ Ok = $false; Rc = $null; Text = "no exit status came back (adb failed?): $text" } }
+    if ($rc -ne 0) { return @{ Ok = $false; Rc = $rc; Text = "docker stop exit ${rc}: $text" } }
+    if (-not $rest.Contains($Name)) { return @{ Ok = $false; Rc = 0; Text = "docker stop exit 0 without the container name: $text" } }
+    return @{ Ok = $true; Rc = 0; Text = "stopped" }
+}
+
+function Test-DaemonShutdownLine {
+    # True when a daemon log (`docker logs` output) holds the line the
+    # daemon's SIGTERM handler writes, "<Daemon>: signal received; shutting
+    # down" (_handle_signal in image_tx_daemon.py and image_rx_daemon.py,
+    # logged as the signal lands, so it is there even when docker stop's 1 s
+    # grace runs out and SIGKILL follows).
+    param([object]$Log, [string]$Daemon)
+    $needle = "${Daemon}: signal received; shutting down"
+    foreach ($l in @(ConvertFrom-AdbOutput $Log)) {
+        if ($l.Contains($needle)) { return $true }
+    }
+    return $false
+}
+
+function Get-LogWindowVerdict {
+    # The window the archived daemon logs cover. after_stop only when both
+    # daemon stops worked (Get-DockerStopResult) AND both logs, read after the
+    # stops, hold their daemon's SIGTERM shutdown line; anything else is
+    # after_stop_unverified with the reasons in Detail (one line, for
+    # params.txt log_window_detail=). Color for LEG CHECKS: Red when a stop
+    # failed (the daemon may still have been running when its log was read),
+    # Yellow when only a shutdown line is missing (the daemon had already
+    # exited, a crash, or its log did not come back). The frame-source stop
+    # is not part of the verdict. Hint is the LEG CHECKS line printed under
+    # an unverified LOG_WINDOW, worded by reason (2026-10-22 review): a stop
+    # that failed leaves the old artefact possible (a daemon still ran while
+    # its log was read), while a missing shutdown line after a stop that
+    # worked is the opposite case, a daemon that died (or a log that did not
+    # come back whole) BEFORE the stop, so its log ends early.
+    # Returns @{ Value; Verified; Detail; Color; Hint }.
+    param([object]$TxStopOutput, [object]$RxStopOutput, [object]$TxLog, [object]$RxLog)
+    $why = New-Object System.Collections.Generic.List[string]
+    $color = "Green"
+    $noShut = $false
+    $txStop = Get-DockerStopResult -Output $TxStopOutput -Name "tx_smoke"
+    $rxStop = Get-DockerStopResult -Output $RxStopOutput -Name "rx_smoke"
+    if (-not $txStop.Ok) { $why.Add("tx_smoke stop: $($txStop.Text)"); $color = "Red" }
+    if (-not $rxStop.Ok) { $why.Add("rx_smoke stop: $($rxStop.Text)"); $color = "Red" }
+    if (-not (Test-DaemonShutdownLine -Log $TxLog -Daemon "image_tx_daemon")) {
+        $why.Add("tx_smoke log has no shutdown line")
+        $noShut = $true
+        if ($color -eq "Green") { $color = "Yellow" }
+    }
+    if (-not (Test-DaemonShutdownLine -Log $RxLog -Daemon "image_rx_daemon")) {
+        $why.Add("rx_smoke log has no shutdown line")
+        $noShut = $true
+        if ($color -eq "Green") { $color = "Yellow" }
+    }
+    if ($why.Count -eq 0) {
+        return @{ Value = "after_stop"; Verified = $true; Detail = "both stops ok, both daemon logs hold their SIGTERM shutdown line"; Color = "Green"; Hint = "" }
+    }
+    if ($color -eq "Red") {
+        $hint = "A daemon stop was not confirmed: that daemon may still have run when its log was read, so the logs may not cover the post-stop window and rs12_leg_report.py's 'received > sent' and FIRMWARE DROP figures can carry the old log-window artefact (logs read while a daemon ran)."
+        if ($noShut) { $hint += " A log without its shutdown line can also mean that daemon died before the stop (look for a traceback in its final log above)." }
+    } else {
+        $hint = "Both daemon stops worked, but a daemon log has no SIGTERM shutdown line: that daemon may have died before the stop (look for a traceback in its final log above) or its log did not come back whole, so the log can end before the leg did and rs12_leg_report.py's figures can cover less than the leg."
+    }
+    return @{ Value = "after_stop_unverified"; Verified = $false; Detail = ($why -join '; '); Color = $color; Hint = $hint }
 }
 
 # Bench kit (2026-10-10): refuse a DTS leg on the default carrier BEFORE
@@ -582,30 +930,47 @@ foreach ($s in @($TxAdbSerial, $RxAdbSerial)) {
 }
 
 # 3. Deploy code
+# Bench kit (2026-10-19): every push is checked (Invoke-AdbPush: adb's output
+# and exit status) and then every file it wrote is md5-compared with the PC copy
+# (Confirm-AdbPushedFiles); a failure throws here, before any daemon starts.
 Write-Host "[DEPLOY] Syncing code to both boards..."
-foreach ($s in @($TxAdbSerial, $RxAdbSerial)) {
-    cmd /c "`"$adbExe`" -s $s shell `"echo fio | sudo -S -p '' mkdir -p /tmp/lifetrac_strict ; echo fio | sudo -S -p '' chmod 0777 /tmp/lifetrac_strict`"" | Out-Null
-    cmd /c "`"$adbExe`" -s $s push `"$(Join-Path $helperDir 'method_g_stage1_probe.py')`" /tmp/lifetrac_strict/" | Out-Null
-    cmd /c "`"$adbExe`" -s $s push `"$(Join-Path $helperDir 'method_h_stage2_tx_probe_v2.py')`" /tmp/lifetrac_strict/" | Out-Null
-    cmd /c "`"$adbExe`" -s $s push `"$(Join-Path $baseStation 'lora_proto.py')`" /tmp/lifetrac_strict/" | Out-Null
-    cmd /c "`"$adbExe`" -s $s push `"$(Join-Path $baseStation 'image_rx_daemon.py')`" /tmp/lifetrac_strict/" | Out-Null
-    cmd /c "`"$adbExe`" -s $s push `"$(Join-Path $baseStation 'cmd_timing.py')`" /tmp/lifetrac_strict/" | Out-Null
-    cmd /c "`"$adbExe`" -s $s push `"$(Join-Path $tractorX8 'image_tx_daemon.py')`" /tmp/lifetrac_strict/" | Out-Null
-    cmd /c "`"$adbExe`" -s $s push `"$(Join-Path $tractorX8 'camera_service.py')`" /tmp/lifetrac_strict/" | Out-Null
-    cmd /c "`"$adbExe`" -s $s push `"$(Join-Path $repoRoot 'publish_synthetic_frames.py')`" /tmp/lifetrac_strict/" | Out-Null
-    cmd /c "`"$adbExe`" -s $s push `"$(Join-Path $helperDir 'bench_mqtt.conf')`" /tmp/lifetrac_strict/" | Out-Null
-    cmd /c "`"$adbExe`" -s $s push `"$(Join-Path $baseStation 'image_pipeline')`" /tmp/lifetrac_strict/" | Out-Null
+$deployMd5 = New-Object System.Collections.Generic.List[string]   # -> deploy_md5.txt
+$deployMd5Note = @{}                                                # serial -> summary, for params.txt
+# Directories go up from clean temp copies (no __pycache__; Get-CleanPushSource).
+$pushStage = Join-Path ([System.IO.Path]::GetTempPath()) "lifetrac_push"
+$deploySrc = @(
+    (Join-Path $helperDir 'method_g_stage1_probe.py'),
+    (Join-Path $helperDir 'method_h_stage2_tx_probe_v2.py'),
+    (Join-Path $baseStation 'lora_proto.py'),
+    (Join-Path $baseStation 'image_rx_daemon.py'),
+    (Join-Path $baseStation 'cmd_timing.py'),
+    (Join-Path $tractorX8 'image_tx_daemon.py'),
+    (Join-Path $tractorX8 'camera_service.py'),
+    (Join-Path $repoRoot 'publish_synthetic_frames.py'),
+    (Join-Path $helperDir 'bench_mqtt.conf'),
+    (Join-Path $baseStation 'image_pipeline'),
     # 2026-07-30 RS-3.3: the TRACTOR's pipeline package too — image_tx_daemon
     # needs frame_format from the base copy while camera_service needs
     # ipc_to_h747/tile_cache from this one, so the tractor genuinely requires
     # both. (Until RS-5.7 landed 2026-08-16 both packages were named
     # `image_pipeline` and MERGED into one on-device directory; the X8-side
     # package is now `x8_image_pipeline`, so they simply coexist.)
-    cmd /c "`"$adbExe`" -s $s push `"$(Join-Path $tractorX8 'x8_image_pipeline')`" /tmp/lifetrac_strict/" | Out-Null
-    $pahoLocal = Join-Path $repoRoot "_paho_pull\paho"
-    if (Test-Path $pahoLocal) {
-        cmd /c "`"$adbExe`" -s $s push `"$pahoLocal`" /tmp/lifetrac_strict/" | Out-Null
+    (Join-Path $tractorX8 'x8_image_pipeline')
+)
+$pahoLocal = Join-Path $repoRoot "_paho_pull\paho"
+if (Test-Path $pahoLocal) { $deploySrc += $pahoLocal }
+$deployUp = @(foreach ($src in $deploySrc) { Get-CleanPushSource -Local $src -StageRoot $pushStage })
+foreach ($s in @($TxAdbSerial, $RxAdbSerial)) {
+    cmd /c "`"$adbExe`" -s $s shell `"echo fio | sudo -S -p '' mkdir -p /tmp/lifetrac_strict ; echo fio | sudo -S -p '' chmod 0777 /tmp/lifetrac_strict`"" | Out-Null
+    $pushed = New-Object System.Collections.Generic.List[object]
+    foreach ($up in $deployUp) {
+        Invoke-AdbPush -Adb $adbExe -Serial $s -Local $up -Remote "/tmp/lifetrac_strict/" | Out-Null
+        foreach ($f in @(Get-PushedFileList -Local $up -Remote "/tmp/lifetrac_strict/")) { $pushed.Add($f) }
     }
+    $md5 = Confirm-AdbPushedFiles -Adb $adbExe -Serial $s -Files $pushed.ToArray()
+    foreach ($row in $md5.Rows) { $deployMd5.Add("$s $row") }
+    $deployMd5Note[$s] = $md5.Summary
+    Write-Host "  [DEPLOY $s] $($deployUp.Count) pushes OK, $($md5.Summary)"
 }
 # 3a. -InjectCmd (2026-10-18): the base needs bench_tools/inject_watch.sh and the
 # injector script in /tmp/lifetrac_strict. The watcher goes up LF-only (a CRLF
@@ -615,11 +980,16 @@ if ($injectSpec) {
     $injWatchSrc = Join-Path $helperDir "bench_tools\inject_watch.sh"
     $injWatchTmp = Join-Path ([System.IO.Path]::GetTempPath()) "lifetrac_inject_watch.sh"
     [System.IO.File]::WriteAllText($injWatchTmp, ((Get-Content -Raw -LiteralPath $injWatchSrc) -replace "`r", ""))
-    cmd /c "`"$adbExe`" -s $RxAdbSerial push `"$injWatchTmp`" /tmp/lifetrac_strict/inject_watch.sh" | Out-Null
+    Invoke-AdbPush -Adb $adbExe -Serial $RxAdbSerial -Local $injWatchTmp -Remote "/tmp/lifetrac_strict/inject_watch.sh" | Out-Null
+    $injPushed = @(Get-PushedFileList -Local $injWatchTmp -Remote "/tmp/lifetrac_strict/inject_watch.sh")
     $injScriptLocal = Join-Path $helperDir "bench_tools\$($injectSpec.Script)"
     if (Test-Path -LiteralPath $injScriptLocal) {
-        cmd /c "`"$adbExe`" -s $RxAdbSerial push `"$injScriptLocal`" /tmp/lifetrac_strict/" | Out-Null
+        Invoke-AdbPush -Adb $adbExe -Serial $RxAdbSerial -Local $injScriptLocal -Remote "/tmp/lifetrac_strict/" | Out-Null
+        $injPushed += @(Get-PushedFileList -Local $injScriptLocal -Remote "/tmp/lifetrac_strict/")
     }
+    $injMd5 = Confirm-AdbPushedFiles -Adb $adbExe -Serial $RxAdbSerial -Files $injPushed
+    foreach ($row in $injMd5.Rows) { $deployMd5.Add("$RxAdbSerial $row") }
+    $deployMd5Note[$RxAdbSerial] = "$($deployMd5Note[$RxAdbSerial]); injector $($injMd5.Summary)"
     $injCheck = @(ConvertFrom-AdbOutput (cmd /c "`"$adbExe`" -s $RxAdbSerial shell `"test -s /tmp/lifetrac_strict/inject_watch.sh && test -s /tmp/lifetrac_strict/$($injectSpec.Script) && echo INJ-STAGED || echo INJ-MISSING`"" 2>$null))
     if ($injCheck -notcontains "INJ-STAGED") {
         throw "-InjectCmd: /tmp/lifetrac_strict/inject_watch.sh or /tmp/lifetrac_strict/$($injectSpec.Script) is not on the base ($RxAdbSerial). Stage it (legs/stage_boards.sh) or put the script in bench_tools. No daemon was started."
@@ -695,12 +1065,33 @@ if ($nrstOut.Count -gt 0) {
 # 5 d) and the flash pipeline may have left /tmp/lifetrac_p0c root-owned, so
 # make the directory writable before the push and check the cfg landed -- the
 # SWD reset below needs it and its push used to fail silently.
+# 2026-10-19: bench_tools/ocd_reset.sh (the background reset of step 5) goes
+# up next to the cfg, LF-only like inject_watch.sh; both pushes are checked and
+# md5-compared, and a failure stops the leg here (no daemon has started).
 cmd /c "`"$adbExe`" -s $TxAdbSerial shell `"echo fio | sudo -S -p '' mkdir -p /tmp/lifetrac_p0c ; echo fio | sudo -S -p '' chmod 0777 /tmp/lifetrac_p0c`"" | Out-Null
-cmd /c "`"$adbExe`" -s $TxAdbSerial push `"$(Join-Path $helperDir '08_boot_user_app.cfg')`" /tmp/lifetrac_p0c/08_boot_user_app.cfg" | Out-Null
-$cfgCheck = cmd /c "`"$adbExe`" -s $TxAdbSerial shell `"test -s /tmp/lifetrac_p0c/08_boot_user_app.cfg && echo CFG-OK || echo CFG-MISSING`"" 2>$null
+$cfgLocal = Join-Path $helperDir '08_boot_user_app.cfg'
+$ocdShSrc = Join-Path $helperDir "bench_tools\ocd_reset.sh"
+$ocdShTmp = Join-Path ([System.IO.Path]::GetTempPath()) "lifetrac_ocd_reset.sh"
+if (-not (Test-Path -LiteralPath $ocdShSrc)) {
+    $msg = "[DEPLOY] $ocdShSrc is missing from this checkout (the leg-start SWD reset runs from it). No daemon was started."
+    Write-Host $msg -ForegroundColor Red
+    throw $msg
+}
+[System.IO.File]::WriteAllText($ocdShTmp, ([System.IO.File]::ReadAllText($ocdShSrc) -replace "`r", ""))
+Invoke-AdbPush -Adb $adbExe -Serial $TxAdbSerial -Local $cfgLocal -Remote "/tmp/lifetrac_p0c/08_boot_user_app.cfg" | Out-Null
+Invoke-AdbPush -Adb $adbExe -Serial $TxAdbSerial -Local $ocdShTmp -Remote "/tmp/lifetrac_p0c/ocd_reset.sh" | Out-Null
+$p0cFiles = @(Get-PushedFileList -Local $cfgLocal -Remote "/tmp/lifetrac_p0c/08_boot_user_app.cfg") +
+    @(Get-PushedFileList -Local $ocdShTmp -Remote "/tmp/lifetrac_p0c/ocd_reset.sh")
+$p0cMd5 = Confirm-AdbPushedFiles -Adb $adbExe -Serial $TxAdbSerial -Files $p0cFiles
+foreach ($row in $p0cMd5.Rows) { $deployMd5.Add("$TxAdbSerial $row") }
+$deployMd5Note[$TxAdbSerial] = "$($deployMd5Note[$TxAdbSerial]); reset files $($p0cMd5.Summary)"
+$cfgCheck = cmd /c "`"$adbExe`" -s $TxAdbSerial shell `"test -s /tmp/lifetrac_p0c/08_boot_user_app.cfg && echo CFG-OK || echo CFG-MISSING; test -s /tmp/lifetrac_p0c/ocd_reset.sh && echo OCDSH-OK || echo OCDSH-MISSING`"" 2>$null
 $cfgOk = ("$cfgCheck" -match "CFG-OK")
 if (-not $cfgOk) {
     Write-Warning "/tmp/lifetrac_p0c/08_boot_user_app.cfg is not on the tractor ($TxAdbSerial); the SWD reset of the TX L072 will fail."
+}
+if ("$cfgCheck" -notmatch "OCDSH-OK") {
+    Write-Warning "/tmp/lifetrac_p0c/ocd_reset.sh is not on the tractor ($TxAdbSerial); the SWD reset of the TX L072 will not be spawned."
 }
 
 # 5. Fire the tractor SWD reset in the BACKGROUND, then launch the TX daemon
@@ -723,10 +1114,23 @@ if (-not $cfgOk) {
 # ERRATA.md section 1), and
 # the archives cannot say why -- the only witness, this log, stayed on the
 # tractor's tmpfs and the next leg's reset overwrote it.
+# 2026-10-19: the reset runs from the pushed bench_tools/ocd_reset.sh (same
+# steps, same cfgs, same OCD_LEG tag / OCD_EXIT lines and swd_reset_spawned
+# reply). Leg A2c2 that day logged only its tag and OCD_EXIT=129, no openocd
+# banner: the hangup reached nohup before nohup ignored HUP, because the
+# inline subshell's caught `trap :` is reset on exec. The script sets an
+# IGNORED disposition (`trap '' HUP`, which cannot be written inside the
+# single-quoted sh -c this used to be) before it forks, and an ignored
+# disposition survives fork and exec into nohup and openocd, which closes the
+# A2c2 window. openocd then installs its own SIGHUP handler once it starts
+# (server_preinit, after its banner), so a later hangup can still end it with
+# 129; the verdict tells the two apart by the banner.
 Write-Host "[RESET] TX L072 via OpenOCD SWD (background, BOOT0 low + NRST)..."
-# [A-Z0-9=] only: it passes cmd, adb and the single-quoted sh -c unchanged.
+# [A-Z0-9=] only: it passes cmd, adb and sh unchanged.
 $ocdTag = "OCD_LEG=" + (Get-Date).ToUniversalTime().ToString("yyyyMMddTHHmmssZ")
-$swdReset = "echo fio | sudo -S -p '' sh -c 'mkdir -p /tmp/lifetrac_p0c; pkill -9 openocd 2>/dev/null; sleep 0.5; for g in 8 10 15; do [ -d /sys/class/gpio/gpio`$g ] || echo `$g > /sys/class/gpio/export 2>/dev/null; done; echo out > /sys/class/gpio/gpio10/direction 2>/dev/null; echo 1 > /sys/class/gpio/gpio10/value 2>/dev/null; sleep 1; for g in 8 10 15; do echo `$g > /sys/class/gpio/unexport 2>/dev/null; done; ( trap : HUP; echo $ocdTag; nohup openocd -f /usr/arduino/extra/openocd_script-imx_gpio.cfg -f /tmp/lifetrac_p0c/08_boot_user_app.cfg; echo OCD_EXIT=`$? ) >/tmp/lifetrac_p0c/ocd_reset.log 2>&1 & echo swd_reset_spawned'"
+# stderr joins stdout on the board, so a sudo or sh error lands in $swdOut
+# (and in the verdict when swd_reset_spawned is missing).
+$swdReset = "echo fio | sudo -S -p '' sh /tmp/lifetrac_p0c/ocd_reset.sh $ocdTag 2>&1"
 # Kept for the leg-end verdict (it used to go straight to the console).
 $swdOut = @(ConvertFrom-AdbOutput (cmd /c "`"$adbExe`" -s $TxAdbSerial shell `"$swdReset`""))
 if ($swdOut.Count -gt 0) { Write-Host ($swdOut -join "`n") }
@@ -917,13 +1321,47 @@ while (((Get-Date) - $startT).TotalSeconds -lt $DurationS) {
     }
 }
 
-# 8. Clean up publisher & containers
-if ($pubProc -and -not $pubProc.HasExited) {
-    try { $pubProc.Kill() } catch {}
+# 8. End of leg (bench kit, 2026-10-19): stop the frame source, let the TX
+# queue drain (-StopDrainS), stop tx_smoke, then rx_smoke 0.5 s later, and
+# only THEN read the daemon logs. Up to the 10-19 legs the harness read both
+# logs while the daemons still ran (TX first, then RX) and stopped them
+# afterwards, so each log ended at a different moment, both before the post
+# brackets (read after the stop): the base sent one command more than its log
+# showed (10-19 A2c 211/210, A2a 217/216, A2a2 218/217, A2c2 211/210) and
+# rs12_leg_report.py saw "received > sent" (A2c 612 > 611, A2a 609 > 607). A
+# stopped container keeps its log until it is removed (the next launch's
+# rm -f), so reading after the stop loses nothing.
+# 2026-10-22: each stop's output and exit status are kept (Invoke-DockerStop;
+# they went to Out-Null before) and judged in 8c with the SIGTERM shutdown
+# line of each daemon's log (Get-LogWindowVerdict): params.txt says
+# log_window=after_stop only when both stops worked and both lines are there,
+# else log_window=after_stop_unverified and log_window_detail=<reason>. The
+# frame source's stop is recorded as feed_stop= only (not in the verdict).
+Write-Host "[STOP] frame source, then tx_smoke after a $StopDrainS s drain, then rx_smoke; the logs are read after the stop..." -ForegroundColor Cyan
+$feedStopNote = "none"
+if ($pubProc) {
+    if ($pubProc.HasExited) {
+        $feedStopNote = "host publisher on the PC had already exited"
+    } else {
+        try { $pubProc.Kill(); $feedStopNote = "host publisher on the PC killed" } catch { $feedStopNote = "host publisher on the PC: kill failed: " + ($_.Exception.Message -replace '[\r\n]+', ' ') }
+    }
 }
+if ($TxFeed -eq "camera") {
+    # Stopped, not removed: its log is read below (the next launch rm -f's it),
+    # and the camera is free for the next leg.
+    $feedStopOut = Invoke-DockerStop -Adb $adbExe -Serial $TxAdbSerial -Name "camera_svc"
+    $feedStopNote = "camera_svc " + (Get-DockerStopResult -Output $feedStopOut -Name "camera_svc").Text
+} elseif ($TxFeed -eq "local") {
+    # Stopped, not removed: its OFFERED line is read below, then it is removed.
+    $feedStopOut = Invoke-DockerStop -Adb $adbExe -Serial $TxAdbSerial -Name "synth_pub"
+    $feedStopNote = "synth_pub " + (Get-DockerStopResult -Output $feedStopOut -Name "synth_pub").Text
+}
+$feedStoppedAt = Get-Date
 
 # 8a. -InjectCmd (2026-10-18): the leg is over, so stop the injector (or the
-# watcher still waiting for its trigger) and collect the base log.
+# watcher still waiting for its trigger) and collect the base log. Before
+# tx_smoke stops (2026-10-19), so every command it made the base send can
+# still reach the tractor's log; it counts toward the drain.
 $injLog = @()
 $injSum = $null
 if ($injectSpec) {
@@ -934,6 +1372,20 @@ if ($injectSpec) {
     }
 }
 
+$drainLeftMs = [int][math]::Round(($StopDrainS * 1000.0) - ((Get-Date) - $feedStoppedAt).TotalMilliseconds)
+if ($drainLeftMs -gt 0) { Start-Sleep -Milliseconds $drainLeftMs }
+$txStopOut = Invoke-DockerStop -Adb $adbExe -Serial $TxAdbSerial -Name "tx_smoke"
+# The base keeps listening a moment longer, for a frame still on air.
+Start-Sleep -Milliseconds 500
+$rxStopOut = Invoke-DockerStop -Adb $adbExe -Serial $RxAdbSerial -Name "rx_smoke"
+Write-Host "  [STOP] feed: $feedStopNote; tx_smoke: $((Get-DockerStopResult -Output $txStopOut -Name 'tx_smoke').Text); rx_smoke: $((Get-DockerStopResult -Output $rxStopOut -Name 'rx_smoke').Text)"
+
+# 8b0. Board clocks (2026-10-19), read only: each board's `date +%s.%N` minus
+# the PC's UTC epoch at the adb call's midpoint. The tractor clock runs ~19 days
+# behind (its logs read 2026-09-30 on 10-19); it is never set, so cross-board
+# timing uses these offsets (or matched events).
+$clkTractor = Read-BoardClock -Adb $adbExe -Serial $TxAdbSerial
+$clkBase = Read-BoardClock -Adb $adbExe -Serial $RxAdbSerial
 
 Write-Host "`n=== FINAL LOG SUMMARY ===" -ForegroundColor Cyan
 $txFinal = cmd /c "`"$adbExe`" -s $TxAdbSerial shell `"echo fio | sudo -S -p '' docker logs tx_smoke 2>&1`""
@@ -942,10 +1394,8 @@ $synthFinal = ""
 $camFinal = $null
 if ($TxFeed -eq "camera") {
     # RS-13.1: keep camera_service's log (encoder `vector_stats` lines, mode
-    # acks) in the evidence bundle and stop the container like tx_smoke, so
-    # the camera is free for the next leg's launch (which rm -f's it anyway).
+    # acks) in the evidence bundle (the container was stopped above).
     $camFinal = cmd /c "`"$adbExe`" -s $TxAdbSerial shell `"echo fio | sudo -S -p '' docker logs camera_svc 2>&1`""
-    cmd /c "`"$adbExe`" -s $TxAdbSerial shell `"echo fio | sudo -S -p '' docker stop -t 1 camera_svc 2>&1`"" | Out-Null
     Write-Host "--- CAMERA SERVICE LOGS (last 8) ---" -ForegroundColor Yellow
     # adb's \r\r\n puts an empty element after every line (ConvertFrom-AdbOutput),
     # so a plain -Last 8 showed only 4 lines (leg V, 2026-10-18).
@@ -953,16 +1403,12 @@ if ($TxFeed -eq "camera") {
 }
 if ($TxFeed -eq "local") {
     # Capture the publisher's OFFERED line for the evidence bundle, then
-    # remove it (it self-exits after DurationS+10). bench_mqtt stays up
-    # for reuse across runs.
+    # remove it (stopped above). bench_mqtt stays up for reuse across runs.
     $synthFinal = cmd /c "`"$adbExe`" -s $TxAdbSerial shell `"echo fio | sudo -S -p '' docker logs synth_pub 2>&1`""
     cmd /c "`"$adbExe`" -s $TxAdbSerial shell `"echo fio | sudo -S -p '' docker rm -f synth_pub 2>/dev/null`"" | Out-Null
     Write-Host "--- SYNTH PUBLISHER LOGS ---" -ForegroundColor Yellow
     Write-Host $synthFinal
 }
-
-cmd /c "`"$adbExe`" -s $TxAdbSerial shell `"echo fio | sudo -S -p '' docker stop -t 1 tx_smoke 2>&1`"" | Out-Null
-cmd /c "`"$adbExe`" -s $RxAdbSerial shell `"echo fio | sudo -S -p '' docker stop -t 1 rx_smoke 2>&1`"" | Out-Null
 
 # 8b. Tractor L072 reset check (2026-10-18): read back the openocd log of the
 # leg-start SWD reset (read-only; nothing is reset or re-run here). After the
@@ -977,7 +1423,11 @@ Write-Host "--- RX DAEMON FINAL LOGS ---" -ForegroundColor Yellow
 Write-Host $rxFinal
 
 # 8c. Leg checks (2026-10-18), printed before the [EVIDENCE] line that
-# legs/leg_post.sh looks for, and repeated in params.txt.
+# legs/leg_post.sh looks for, and repeated in params.txt. LOG_WINDOW
+# (2026-10-22) is judged here, from the 8. stop outputs and the final logs
+# read above: green after_stop, or after_stop_unverified (red when a daemon
+# stop failed, yellow when only a shutdown line is missing) with the reason.
+$logWin = Get-LogWindowVerdict -TxStopOutput $txStopOut -RxStopOutput $rxStopOut -TxLog $txFinal -RxLog $rxFinal
 $baseResetLine = "BASE_L072_RESET unverified (gpio163 pulse sent; nothing checks that the base L072 rebooted, and it has not since 2026-08: score base brackets as post - pre)"
 $nrstNote = "none"
 if ($nrstOut.Count -gt 0) { $nrstNote = $nrstOut -join ' | ' }
@@ -987,10 +1437,25 @@ $resetColor = "Yellow"
 if ($resetV.Verdict -eq "landed") { $resetColor = "Green" } elseif ($resetV.Verdict -eq "failed") { $resetColor = "Red" }
 Write-Host $tractorResetLine -ForegroundColor $resetColor
 if ($resetV.Verdict -ne "landed") {
-    Write-Host "  The tractor's L072 counters may carry over from before this leg: score its brackets with deltas.py (reset-aware)." -ForegroundColor Yellow
+    Write-Host "  The tractor's L072 counters may carry over from before this leg: score its brackets with bench_tools/bracket_deltas.py (reset-aware: py -3 bracket_deltas.py <legs dir> <leg>)." -ForegroundColor Yellow
 }
 Write-Host $baseResetLine -ForegroundColor Yellow
 Write-Host "  gpio163 pulse output: $nrstNote"
+# 2026-10-19: board clocks (read after the stop, never set) and the window the
+# daemon logs cover.
+$clockLine = "CLOCKS board minus PC: tractor $($clkTractor.Text); base $($clkBase.Text) (read only)"
+Write-Host $clockLine
+# The feed's own stop result speaks for itself (feed: ...), since it is not
+# part of the verdict and can have failed on a verified window.
+if ($logWin.Verified) {
+    $logWinLine = "LOG_WINDOW after_stop (feed: $feedStopNote; $StopDrainS s drain, tx_smoke stopped, rx_smoke stopped 0.5 s later, then the logs were read; $($logWin.Detail))"
+} else {
+    $logWinLine = "LOG_WINDOW after_stop_unverified ($($logWin.Detail); feed: $feedStopNote)"
+}
+Write-Host $logWinLine -ForegroundColor $logWin.Color
+if (-not $logWin.Verified) {
+    Write-Host "  $($logWin.Hint)" -ForegroundColor Yellow
+}
 $injectLine = ""
 if ($injectSpec) {
     $injTrigTxt = "-"; if ($injSum.Trigger -ne "") { $injTrigTxt = $injSum.Trigger }
@@ -1021,6 +1486,9 @@ if ($Archive) {
     # witness of whether it landed), and the -InjectCmd records: the base
     # watcher log (trigger, injector output, exit) and the PC-side timeline.
     $ocdLines | Out-File -FilePath (Join-Path $dir "tractor_ocd_reset.log") -Encoding utf8
+    # 2026-10-19: the md5 of every file this leg pushed, board against PC
+    # ("<serial> ok|MISMATCH|missing <remote path> pc=<md5> board=<md5|->").
+    $deployMd5 | Out-File -FilePath (Join-Path $dir "deploy_md5.txt") -Encoding utf8
     if ($injectSpec) {
         $injLog | Out-File -FilePath (Join-Path $dir "inject.log") -Encoding utf8
         @($injPc) + @($injectLine) | Out-File -FilePath (Join-Path $dir "inject_trigger.txt") -Encoding utf8
@@ -1028,6 +1496,17 @@ if ($Archive) {
     $injStatus = ""; $injTrigger = ""; $injOnLabel = ""
     if ($injSum) { $injStatus = $injSum.Status; $injTrigger = $injSum.Trigger }
     if ($injectSpec) { $injOnLabel = $injectSpec.Label }
+    # 2026-10-19: clock offsets as plain numbers (seconds, board minus PC).
+    $inv = [System.Globalization.CultureInfo]::InvariantCulture
+    $tOff = "unknown"; $tRtt = "unknown"; $bOff = "unknown"; $bRtt = "unknown"
+    if ($clkTractor.Ok) { $tOff = $clkTractor.OffsetS.ToString("F3", $inv) }
+    if ($null -ne $clkTractor.RttS) { $tRtt = $clkTractor.RttS.ToString("F3", $inv) }
+    if ($clkBase.Ok) { $bOff = $clkBase.OffsetS.ToString("F3", $inv) }
+    if ($null -ne $clkBase.RttS) { $bRtt = $clkBase.RttS.ToString("F3", $inv) }
+    # 2026-10-22: log_window_detail= only on an unverified window; the empty
+    # placeholder is dropped below (every other line starts with its key).
+    $logWinDetailLine = ""
+    if (-not $logWin.Verified) { $logWinDetailLine = "log_window_detail=$($logWin.Detail)" }
     @(
         "git_sha=$sha",
         "duration_s=$DurationS",
@@ -1076,8 +1555,19 @@ if ($Archive) {
         "tractor_ocd_tag=$ocdTag",
         "base_l072_reset=unverified",
         "base_gpio163_output=$nrstNote",
+        "log_window=$($logWin.Value)",
+        $logWinDetailLine,
+        "feed_stop=$feedStopNote",
+        "stop_drain_s=$StopDrainS",
+        "tractor_clock_offset_s=$tOff",
+        "base_clock_offset_s=$bOff",
+        "tractor_clock_rtt_s=$tRtt",
+        "base_clock_rtt_s=$bRtt",
+        "clock_offset_rule=board date +%s.%N minus the PC UTC epoch at the midpoint of the adb read (error at most rtt/2, +1 s if the CLOCKS line says whole seconds), read after the daemons stopped; no clock was set",
+        "tractor_deploy_md5=$($deployMd5Note[$TxAdbSerial])",
+        "base_deploy_md5=$($deployMd5Note[$RxAdbSerial])",
         "timestamp=$stamp"
-    ) | Out-File -FilePath (Join-Path $dir "params.txt") -Encoding utf8
+    ) | Where-Object { $_ -ne "" } | Out-File -FilePath (Join-Path $dir "params.txt") -Encoding utf8
     Write-Host "[EVIDENCE] archived to $dir" -ForegroundColor Green
 }
 

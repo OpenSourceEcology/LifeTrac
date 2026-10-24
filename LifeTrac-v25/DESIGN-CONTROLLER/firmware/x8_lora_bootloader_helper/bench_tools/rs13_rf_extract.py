@@ -9,10 +9,18 @@ and n, for RSSI and for SNR, plus the crc_dump count with its RSSI/SNR. R0
 is the median over the 0 dB legs' medians (Round A: 2c, 2a, 2c', 2a';
 Round C: C0v, C0m) and must sit in -65 to -75 dBm.
 
-    py -3 rs13_rf_extract.py <archive_dir> [<archive_dir> ...] [--lines]
+    py -3 rs13_rf_extract.py <archive_dir> [<archive_dir> ...] [--lines] [--path antenna]
     py -3 rs13_rf_extract.py <archive_dir> --r0 -67 --step 9 [--floor -114]
                              [--prev-snr 5.0 --prev-step 36]
     py -3 rs13_rf_extract.py --leak <archive_dir> [...]
+
+--path conducted (the default) is the attenuator path the procedure was
+written for. --path antenna is for legs flown on the antennas (2026-10-18
+RS-12.15, 2026-10-19 Round A): the level prints, and over several archives
+their median, but not the R0 verdict -- the -65 to -75 dBm window and its
+pad advice belong to the conducted path. The tracking rule, the closing
+check and the leakage check need the conducted path, so --path antenna
+refuses --r0, --step, --closing and --leak.
 
 Per archive: the window count and the frames in them, RSSI and SNR (median
 of the window medians, minimum of the window medians, minimum of the window
@@ -306,14 +314,16 @@ def _fmt(x: float, unit: str, nd: int = 1) -> str:
 
 
 def format_leg(name: str, params: dict, log: dict, s: dict, rx_text: str,
-               tx_text: str | None, usable: bool = True) -> list[str]:
+               tx_text: str | None, usable: bool = True, path: str = "conducted") -> list[str]:
     """The per-archive block. ``usable`` False (the windows do not stand for
-    the leg) drops the one-line table row, so a stale figure is not copied."""
+    the leg) drops the one-line table row, so a stale figure is not copied.
+    ``path`` antenna labels the header (the conducted header is unchanged)."""
     mode = re.search(r"LIFETRAC_ENCODE_MODE=(\d+)", params.get("cam_extra_env", ""))
     out = [f"{name}: reg_profile={params.get('reg_profile', '?')} "
            f"force_frf_hz={params.get('force_frf_hz', '?')} "
            f"encode_mode={mode.group(1) if mode else '-'} "
-           f"duration_s={params.get('duration_s', '?')}"]
+           f"duration_s={params.get('duration_s', '?')}"
+           + (" path=antenna" if path == "antenna" else "")]
     w = log["windows"]
     if w:
         out.append(f"  rx_rf windows: {len(w)}, +{w[0]['t'] - log['t_first']:.0f}..+"
@@ -386,7 +396,13 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--prev-step", type=float, help="the previous step in dB (SNR region)")
     ap.add_argument("--closing", action="store_true",
                     help="the closing check (B0close / C0close): median RSSI within 2 dB of --r0")
+    ap.add_argument("--path", choices=("conducted", "antenna"), default="conducted",
+                    help="the RF path the legs flew: conducted (default; R0's -65 to -75 dBm "
+                         "verdict) or antenna (the level only)")
     a = ap.parse_args(argv)
+    if a.path == "antenna" and (a.leak or a.closing or a.r0 is not None or a.step is not None):
+        ap.error("--path antenna gives the level only: the leakage check, the tracking rule "
+                 "(--r0 / --step) and the closing check need the conducted path")
     if a.closing and (a.r0 is None or a.step is not None):
         ap.error("--closing takes --r0 and no --step (the chain is back at 0 dB)")
     if not a.closing and (a.r0 is None) != (a.step is None):
@@ -414,7 +430,8 @@ def main(argv: list[str] | None = None) -> int:
             continue
         s = summarize(log)
         why = None if a.leak else unusable(log)
-        for line in format_leg(name, params, log, s, rx_text, tx_text, usable=why is None):
+        for line in format_leg(name, params, log, s, rx_text, tx_text, usable=why is None,
+                               path=a.path):
             print(line)
         if a.leak:
             decoded = (len(log["published"]), log["frags"], len(log["windows"]),
@@ -472,21 +489,28 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"    crc_dump +{d['t'] - log['t_first']:7.1f} s rx_len={d['rx_len']} "
                       f"rssi={d['rssi']} snr={d['snr']:.1f}")
     if not a.leak and len(a.archive) > 1:
+        what = "R0" if a.path == "conducted" else "level"
         if rc:
-            print("R0 withheld: an archive above gave no level")
+            print(f"{what} withheld: an archive above gave no level")
         elif len(profiles) > 1:
-            print(f"R0 withheld: the legs mix reg_profile {' and '.join(sorted(profiles))}; R0 is "
-                  f"per profile (DTS from Round A, FHSS from C0v/C0m)")
+            print(f"{what} withheld: the legs mix reg_profile {' and '.join(sorted(profiles))}; "
+                  + ("R0 is per profile (DTS from Round A, FHSS from C0v/C0m)"
+                     if a.path == "conducted" else "the level is per profile"))
             rc = 2
         else:
             r0 = statistics.median(medians)
+            snr = f" / SNR {statistics.median(snr_meds):.1f} dB" if snr_meds else ""
+            if a.path == "antenna":
+                print(f"level over {len(medians)} legs (median of the legs' medians): RSSI "
+                      f"{r0:.1f} dBm{snr}; antenna path: the level only (R0's -65 to -75 dBm "
+                      f"window and its pad advice belong to the conducted path)")
+                return rc
             lo, hi = R0_WINDOW
             where = ("in range" if lo <= r0 <= hi else
                      "OUT OF RANGE: above -65 dBm (add 10 dB to the fixed middle, radios "
                      "parked, and re-measure)" if r0 > hi else
                      "OUT OF RANGE: below -75 dBm (take loss out of the fixed middle, radios "
                      "parked, and re-measure)")
-            snr = f" / SNR {statistics.median(snr_meds):.1f} dB" if snr_meds else ""
             print(f"R0 over {len(medians)} legs (median of the legs' medians): RSSI {r0:.1f} dBm"
                   f"{snr}; target -65 to -75 dBm: {where}")
     return rc

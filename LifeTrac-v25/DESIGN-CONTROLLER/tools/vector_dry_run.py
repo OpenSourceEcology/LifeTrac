@@ -36,8 +36,11 @@ Exit status: 0; 1 when ``--strict`` and a check fails; 2 on a usage error.
 
 The one-fragment limits are derived from ``lora_proto`` (the same sizer the
 tx daemon uses), never typed in: 203 B / 243 B for a delta at BW250 / BW500
-and one byte less for an epoch start, whose 0xFD copies header is 5 B
-instead of the 0xFE header's 4 B (VECTOR_SCENE.md §3.1).
+and one byte less for a VECTOR epoch start, whose 0xFD copies header is 5 B
+instead of the 0xFE header's 4 B (VECTOR_SCENE.md §3.1). A key frame of
+another codec is held to the full limit: the tx daemon's default copies=1
+path (it switches every key frame to the 0xFD copies path, F - 1, only with
+LIFETRAC_KEYFRAME_COPIES > 1 or a TX-failure rate above 0.5 %).
 """
 from __future__ import annotations
 
@@ -169,7 +172,14 @@ class DryRun:
         row.parsed = True
         row.codec, row.frame_kind, row.seq = frame.codec, frame.frame_kind, frame.base_seq
         self.codec_counts[frame.codec] += 1
-        row.limit = self.limit - (KEY_COPIES_EXTRA if frame.frame_kind == FRAME_KIND_KEY else 0)
+        # The 1-byte epoch-start trim is VS1's own cap (VECTOR_SCENE.md §3.1),
+        # so only a VECTOR key frame is held to F - 1. Another codec's key
+        # frame goes out under the default copies=1 as one 0xFE fragment at
+        # the full F (copies=2, F - 1, only with LIFETRAC_KEYFRAME_COPIES > 1
+        # or a TX-failure rate above 0.5 %): 2026-10-19 leg A2c's two 243 B mono_g4 key frames
+        # (rows 490, 572) fit at BW500 and were wrongly counted over.
+        is_epoch_start = frame.codec == CODEC_VECTOR and frame.frame_kind == FRAME_KIND_KEY
+        row.limit = self.limit - (KEY_COPIES_EXTRA if is_epoch_start else 0)
         row.fits = row.wire <= row.limit
         if frame.codec != CODEC_VECTOR:
             self.rows.append(row)

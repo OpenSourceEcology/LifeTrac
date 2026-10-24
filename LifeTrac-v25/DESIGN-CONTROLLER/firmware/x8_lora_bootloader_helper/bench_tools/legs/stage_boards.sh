@@ -16,7 +16,10 @@
 # Writes:  board: /tmp/lifetrac_strict/{probes,bench tools,channel_survey_sniff.py,paho,
 #          code tree,legs/},
 #          /tmp/lifetrac_p0c/08_boot_user_app.cfg (tractor; LF-clean);
-#          PC: md5 record appended to $EVIDENCE_DIR/staging_<role>.txt.
+#          PC: md5 record appended to $EVIDENCE_DIR/staging_<role>.txt. An EVIDENCE_DIR
+#          that already holds files tracked by git (a committed record) is REFUSED
+#          (exit 7) before any board is touched, unless BENCH_EVIDENCE_APPEND=1 is in
+#          the environment (lib/bench_env.sh, "Committed evidence").
 # Boards:  copies files and creates the two staging folders (mode 0777); runs an
 #          import smoke in a container WITHOUT any device (push_fix_to_board.sh).
 # Radio:   nothing here opens /dev/ttymxc3 or talks to the L072. Never transmits.
@@ -51,7 +54,11 @@ TOOLS=("$BT_DIR/clear_retained.py" "$BT_DIR/clear_retained_host.py" "$BT_DIR/fra
 PAHO="$REPO_ROOT/_paho_pull/paho"
 [ -d "$PAHO" ] || die "missing $PAHO (repo-root _paho_pull/paho, tracked in git)"
 
-E=$(bench_evidence_dir) || die "cannot create $EVIDENCE_DIR"
+# Committed-evidence guard (2026-10-22): keep it BEFORE the board loop, so a refusal
+# never leaves a board half-staged. The direct call also marks its warnings as shown,
+# so push_fix_to_board.sh (called per board below) does not repeat them.
+bench_evidence_guard || exit 7
+E=$(bench_evidence_dir) || die "no evidence folder: $EVIDENCE_DIR (see above)"
 rc_all=0
 for who in "${WHO[@]}"; do
   ser=$(board_serial "$who"); via=$(board_via "$who")

@@ -17,7 +17,7 @@ set -u
 LEG=${1:-}
 case $LEG in -h|--help|'') bench_usage; exit 0 ;; esac
 bench_check_name "leg tag" "$LEG"
-E=$(bench_evidence_dir) || die "cannot create $EVIDENCE_DIR"
+E=$(bench_evidence_dir) || die "no evidence folder: $EVIDENCE_DIR (see above)"
 
 { echo "# leg $LEG link_stats (base broker): first message with frames; sampler started $(date -u +%Y-%m-%dT%H:%M:%SZ) PC clock"
   for i in $(seq 1 40); do

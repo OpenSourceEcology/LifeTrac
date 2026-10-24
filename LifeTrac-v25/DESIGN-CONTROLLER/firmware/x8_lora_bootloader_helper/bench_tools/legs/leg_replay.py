@@ -9,8 +9,12 @@ Usage (PC, any working directory):
                      which lib/bench_env.sh exports)
     --capture        a capture file directly (overrides --evidence-dir)
 
-Reads only the capture; touches no board and no radio. leg_post.sh prints its
-first line as the "seq-gap loss (per codec run)" row of leg<leg>_p2p4.txt.
+Reads only the capture; touches no board and no radio. leg_post.sh saves its
+output as leg<leg>_replay.txt and prints its first line as the "seq-gap loss
+(per codec run)" row of leg<leg>_p2p4.txt. On a capture with no VECTOR frame
+(a mono_g4 leg) the digest cell reads "digest_ok n/a (no VECTOR frame)".
+Exit 0; 1 when the capture holds no frame (or the replay raises); 2 on a bad
+argument or a missing capture.
 Origin: bench-evidence/RS_13_vector_scene_2026-09-26/scripts/leg_replay.py
 (historical copy, unchanged; it hardcoded the RS-13.1 legs folder and had to run
 from DESIGN-CONTROLLER).
@@ -65,7 +69,13 @@ switches = sum(1 for ca, cb in zip(codecs, codecs[1:]) if ca != cb)
 lost = sum(g for _, g in gaps)
 print(f"leg {leg}: {len(seqs)} frames received; seq gaps within same-codec runs (row, lost): {gaps} -> {lost} lost of {len(seqs) + lost} = {100.0 * lost / (len(seqs) + lost):.1f} % after the first received frame ({switches} codec switch(es) not counted)")
 print(f"  resync episodes (start, end, ended by key): {episodes}")
-print(f"  all ended by an epoch start: {all(e[2] for e in episodes)}; final resync {dr.store.stats['resync']}, digest_ok {dr.store.snapshot(int(dr.last_ts * 1000) + 100)['digest_ok']}")
+# DryRun.last_ts is the last VECTOR frame's time: None on a capture without one (a
+# mono_g4 leg such as 2c or A2c), where the store never saw a frame to snapshot.
+if dr.last_ts is None:
+    digest_ok = "digest_ok n/a (no VECTOR frame)"
+else:
+    digest_ok = f"digest_ok {dr.store.snapshot(int(dr.last_ts * 1000) + 100)['digest_ok']}"
+print(f"  all ended by an epoch start: {all(e[2] for e in episodes)}; final resync {dr.store.stats['resync']}, {digest_ok}")
 print(f"  last DIGEST checked (row, result): {lastd}; last epoch start row {keys[-1] if keys else None}, {len(seqs) - 1 - keys[-1] if keys else None} frame(s) before the end (no DIGEST inside TTL_FRAMES+3 of a range-1/2 start, encode_vector.py)")
 print(f"  key rows ({len(keys)}): {keys[:50]}")
 print(f"  BAD rows ({len(bad)}): {bad[:80]}")

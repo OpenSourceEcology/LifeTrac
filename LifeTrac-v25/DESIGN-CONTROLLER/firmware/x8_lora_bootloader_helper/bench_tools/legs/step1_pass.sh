@@ -28,7 +28,9 @@
 # Writes:  tractor /tmp/lifetrac_strict/legs/step1_*_<tag>.*; PC $EVIDENCE_DIR/
 #          step1_<tag>_scene.{txt,jpg}, step1_bench_mqtt_reset.txt (appended),
 #          step1_tractor_<tag>.{jsonl,json,txt}, step1_camera_service_<tag>.log,
-#          step1_tractor_log_<tag>.txt, step1_<tag>_bootcheck.txt.
+#          step1_tractor_log_<tag>.txt, step1_<tag>_bootcheck.txt,
+#          step1_<tag>_transcript.txt (this run's console, appended; its last line
+#          is "step1 exit=<rc>", written by the EXIT trap).
 # Boards:  tractor only: recreates the bench_mqtt container (127.0.0.1:1883, no
 #          persistence), runs the capture (rs13_cap) and camera_svc (/dev/video1)
 #          containers, removes them at the end -- and, through an EXIT trap, also
@@ -75,8 +77,31 @@ case $BW in bw250) REGP=1; BUDGET=203 ;; bw500) REGP=2; BUDGET=243 ;; esac
 if [ -z "$SMIN" ]; then case $SCENE in *moving*|*yt*|*youtube*) SMIN=8 ;; *) SMIN=0 ;; esac; fi
 if [ $FROM_WORK = 1 ]; then WDIR=/work; SCRIPT=/work/camera_service.py; else WDIR=/app; SCRIPT=camera_service.py; fi
 L=$BOARD_STAGE/legs
-E=$(bench_evidence_dir) || die "cannot create $EVIDENCE_DIR"
+E=$(bench_evidence_dir) || die "no evidence folder: $EVIDENCE_DIR (see above)"
 OUT="$BENCH_SCRATCH/step1_$TAG"
+# The run's console into the evidence folder too. tee ignores Ctrl+C, so the EXIT
+# trap's cleanup and its "step1 exit=<rc>" line still reach the transcript.
+exec > >(trap '' INT TERM; exec tee -a "$E/step1_${TAG}_transcript.txt") 2>&1
+
+# On an abort ("never subscribed", an error, Ctrl+C) remove the tractor containers
+# this pass started -- a leftover camera_svc would keep publishing frames that a
+# later tx daemon puts on the air. Names are added just before each launch and
+# dropped once the normal teardown has removed them. The trap is set before the
+# first check, so every exit from here on ends the transcript with its exit code.
+CAP_PID=""; STARTED=""
+step1_cleanup() {
+  local rc=$?
+  if [ -n "$CAP_PID" ]; then kill "$CAP_PID" 2>/dev/null; fi
+  if [ -n "$STARTED" ]; then
+    stamp "cleanup: removing the tractor container(s) this pass started:$STARTED"
+    board_sh tractor "$SUDO docker rm -f$STARTED >/dev/null 2>&1" > /dev/null 2>&1
+    STARTED=""
+  fi
+  echo "step1 exit=$rc"
+}
+trap step1_cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 stamp "== step-1 pass $TAG (profile $PROFILE, LIFETRAC_REG_PROFILE=$REGP, camera_service from $WDIR) from $(bench_git_desc)"
 board_present tractor || die "tractor ($TRACTOR_SERIAL) is not reachable via adb"
@@ -91,23 +116,6 @@ if [ -n "$holders" ] || echo " $running " | grep -qE ' (tx_smoke|rx_smoke|synth_
   exit 3
 fi
 board_sh tractor "$SUDO docker rm -f camera_svc rs13_cap >/dev/null 2>&1" > /dev/null 2>&1
-
-# On an abort ("never subscribed", an error, Ctrl+C) remove the tractor containers
-# this pass started -- a leftover camera_svc would keep publishing frames that a
-# later tx daemon puts on the air. Names are added just before each launch and
-# dropped once the normal teardown has removed them.
-CAP_PID=""; STARTED=""
-step1_cleanup() {
-  if [ -n "$CAP_PID" ]; then kill "$CAP_PID" 2>/dev/null; fi
-  if [ -n "$STARTED" ]; then
-    stamp "cleanup: removing the tractor container(s) this pass started:$STARTED"
-    board_sh tractor "$SUDO docker rm -f$STARTED >/dev/null 2>&1" > /dev/null 2>&1
-    STARTED=""
-  fi
-}
-trap step1_cleanup EXIT
-trap 'exit 130' INT
-trap 'exit 143' TERM
 
 if [ $DO_SCENE = 1 ]; then
   bash "$LEGS_DIR/scene_check.sh" "step1_${TAG}" "$SMIN" || { stamp "ABORT: scene check failed"; exit 4; }
