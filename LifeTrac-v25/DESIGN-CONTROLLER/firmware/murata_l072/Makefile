@@ -149,7 +149,7 @@ LDFLAGS := \
 # --------------------------------------------------------------------------
 # Targets
 # --------------------------------------------------------------------------
-.PHONY: all hello lora_ping_tx lora_ping_rx lora_ping_tx_active lora_ping_rx_active clean size check check-cpp check-asserts check-opmode-owner check-cfg-contract check-cfg-contract-unit check-cfg-contract-wire check-cfg-wire-owner check-rx-counter-owner check-tx-counter-owner check-lbt-owner check-airtime-counter-owner check-airtime-invariant check-fhss-scheduler check-fhss-clock check-fhss-authority check-rx-grid-policy check-rx-reverse-delivery check-legal-dwell check-rfco-pertx check-rfco-summary-counters check-rfco-summary check-rfco-summary-emit check-rfco-summary-integration check-cfg-profile check-cfg-profile-wire check-cfg-clamp-fuzz check-lora-pkt-hdr check-rx-counters check-rx-retune-policy check-rx-retune-counters check-rx-scan-policy check-rx-scan-counters check-rx-scan-fail check-rx-scan-walker check-rx-frame-urc check-reg-write-gate check-rx-urc-lost help check-rx-fifo-track bench check-stats-layout
+.PHONY: all hello lora_ping_tx lora_ping_rx lora_ping_tx_active lora_ping_rx_active clean size check check-cpp check-asserts check-opmode-owner check-cfg-contract check-cfg-contract-unit check-cfg-contract-wire check-cfg-wire-owner check-rx-counter-owner check-tx-counter-owner check-lbt-owner check-airtime-counter-owner check-airtime-invariant check-fhss-scheduler check-fhss-clock check-fhss-authority check-rx-grid-policy check-rx-reverse-delivery check-rx-scan-failed-follower check-legal-dwell check-rfco-pertx check-rfco-summary-counters check-rfco-summary check-rfco-summary-emit check-rfco-summary-integration check-cfg-profile check-cfg-profile-wire check-cfg-clamp-fuzz check-lora-pkt-hdr check-rx-counters check-rx-retune-policy check-rx-retune-counters check-rx-scan-policy check-rx-scan-counters check-rx-scan-fail check-rx-scan-walker check-rx-frame-urc check-reg-write-gate check-rx-urc-lost help check-rx-fifo-track bench check-stats-layout
 
 all: $(BUILD)/$(TARGET).bin $(BUILD)/$(TARGET).hex size
 
@@ -266,8 +266,9 @@ RX_GRID_POLICY_BIN := $(BUILD)/rx_grid_policy_test
 AIRTIME_INVARIANT_BIN := $(BUILD)/airtime_invariant
 TX_LEN_GUARD_BIN   := $(BUILD)/tx_len_guard
 RX_REVERSE_DELIVERY_BIN := $(BUILD)/rx_reverse_delivery
+RX_SCAN_FAILED_FOLLOWER_BIN := $(BUILD)/rx_scan_failed_follower
 
-check: check-cpp check-asserts check-fhss-chantab check-fhss-scheduler check-fhss-clock check-fhss-authority check-rx-grid-policy check-rx-reverse-delivery check-airtime-invariant check-tx-len-guard check-legal-dwell check-frames-per-dwell check-rfco-pertx check-rfco-summary-counters check-rfco-summary check-rfco-summary-emit check-rfco-summary-integration check-cfg-profile check-cfg-profile-wire check-cfg-clamp-fuzz check-lora-pkt-hdr check-rx-counters check-rx-retune-policy check-rx-retune-counters check-rx-scan-policy check-rx-scan-counters check-rx-scan-fail check-rx-scan-walker check-rx-frame-urc check-reg-write-gate check-rx-urc-lost check-rx-fifo-track check-stats-layout
+check: check-cpp check-asserts check-fhss-chantab check-fhss-scheduler check-fhss-clock check-fhss-authority check-rx-grid-policy check-rx-reverse-delivery check-rx-scan-failed-follower check-airtime-invariant check-tx-len-guard check-legal-dwell check-frames-per-dwell check-rfco-pertx check-rfco-summary-counters check-rfco-summary check-rfco-summary-emit check-rfco-summary-integration check-cfg-profile check-cfg-profile-wire check-cfg-clamp-fuzz check-lora-pkt-hdr check-rx-counters check-rx-retune-policy check-rx-retune-counters check-rx-scan-policy check-rx-scan-counters check-rx-scan-fail check-rx-scan-walker check-rx-frame-urc check-reg-write-gate check-rx-urc-lost check-rx-fifo-track check-stats-layout
 	@echo "[OK] memory map invariants hold"
 
 check-cpp: $(BUILD)
@@ -952,6 +953,54 @@ check-rx-reverse-delivery: $(BUILD)
 	    -o $(RX_REVERSE_DELIVERY_BIN)
 	@echo "[RXREV] Running rx-reverse-delivery SIL test ..."
 	@$(RX_REVERSE_DELIVERY_BIN)
+
+# RS-12.21 / FHSS leg 6 (2b_f3, 2026-10-24): CHARACTERISATION OF KNOWN
+# DEFECTS in the absorbing scan FAILED state. Reuses
+# check-rx-reverse-delivery's simulated SX1276, clock, air and main loop
+# (rx_reverse_delivery.c is #included with RX_REVERSE_DELIVERY_SIM_ONLY)
+# against the same REAL sx1276_rx.c / sx1276_tx.c / scan / grid / clock
+# TUs. (1) The base, a follower on profile 1: no frame for the 4 x 30 s
+# scan budget (assumed, as hypothesis H1 has it), then a 2 fps originator
+# stream and a reactive PROBE after each frame heard. Pinned: FAILED
+# absorbs and a valid frame never LOCKs; the grid is adopted but never
+# followed; the receiver stays on the walker's last channel, then re-arms
+# on each PROBE's channel; consider_remote SNAPs or rejects against a
+# scheduler epoch frozen at the last own TX or SNAP. (2) The tractor:
+# scenario 8 (its scan runs out into FAILED) with camera stalls and the
+# idle drain. Pinned: a command heard in a stall's decay window is adopted,
+# nothing in FAILED undoes the adoption, and the tractor never holds
+# originator authority or self-follows again. A failure means that
+# behaviour changed: a firmware fix for RS-12.21 (its PR replaces these
+# checks with the fix's acceptance checks; `rx_scan_failed_follower -e`
+# prints the recovery measures) or an unrelated change to the scan
+# constants, the walker, the TX path or the shared sim. Firmware path
+# only: a host-side watchdog never flips it.
+check-rx-scan-failed-follower: $(BUILD)
+	@echo "[RXSFF] Building rx-scan-failed-follower SIL characterisation (real sx1276_rx.c/sx1276_tx.c) ..."
+	@$(HOST_CC) -std=gnu11 -Wall -Wextra -Werror -Iinclude -I. -Ibench/host_proto \
+	    -DLIFETRAC_FHSS_TX_ROUTED=1 \
+	    bench/host_proto/rx_scan_failed_follower.c \
+	    radio/sx1276_rx.c \
+	    radio/sx1276_tx.c \
+	    radio/sx1276_airtime.c \
+	    radio/lora_pkt_hdr.c \
+	    radio/sx1276_legal_dwell.c \
+	    host/host_rfco.c \
+	    radio/sx1276_rx_counters.c \
+	    radio/sx1276_rx_retune_policy.c \
+	    radio/sx1276_rx_retune_counters.c \
+	    radio/sx1276_rx_scan_policy.c \
+	    radio/sx1276_rx_scan_fail.c \
+	    radio/sx1276_rx_scan_walker.c \
+	    radio/sx1276_rx_fifo_track.c \
+	    radio/sx1276_rx_grid_policy.c \
+	    radio/sx1276_fhss_authority.c \
+	    radio/sx1276_fhss_clock.c \
+	    radio/sx1276_fhss.c \
+	    radio/sx1276_fhss_chantab.c \
+	    -o $(RX_SCAN_FAILED_FOLLOWER_BIN)
+	@echo "[RXSFF] Running rx-scan-failed-follower SIL characterisation (known defects) ..."
+	@$(RX_SCAN_FAILED_FOLLOWER_BIN)
 
 $(BUILD):
 	@$(call MKDIR_P,$(BUILD))
