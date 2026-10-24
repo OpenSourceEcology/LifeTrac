@@ -45,11 +45,13 @@ Pins, for the three helpers RS13_RANGE_EDGE_LEG.md scores legs with:
   TTL_FRAMES.
 * 2026-10-24 (the FHSS round's leg 6, where the base never locked):
   rs13_probe_score.py reports each FHSS leg's base acquisition by
-  rs12_leg_report.py's rule and flags a failed one, pools it by default, and
+  rs12_leg_report.py's rule (the same dict; PR #166 review: ACQUIRED / NOT
+  DETERMINED / FAILED on positive evidence, a reception within the budget
+  alone NOT DETERMINED) and flags a failed one, pools it by default, and
   with --void-unlocked leaves it out and lists it (a leg that caught nothing
   then no longer withholds the verdict; a voided leg's log window does not
   split the pool; nothing left to pool exits 1; DTS legs never void, nor
-  do FHSS legs whose acquisition is not determined or n/a);
+  do FHSS legs whose acquisition is NOT DETERMINED or n/a);
   rs13_digest_trace.py times a capture with no clean +1 step by the leg's
   synth_fps and places the head on the TX log of the archive its
   leg<X>_params.txt names (or --archive), AMBIGUOUS without one; on the
@@ -629,18 +631,34 @@ class ProbeScoreTests(unittest.TestCase):
         self.assertIn("margin 2.5 pp: ", extra[1])
 
 
-def _fhss_log(seqs, first_s, span_s=300.0) -> str:
-    """_base_log after a profile-1 activation (its LBT line at 0.5 s), the base's first
-    decoded frame ``first_s`` later (None: no frame), and a log that ends at ``span_s``."""
+def _fhss_log(seqs, first_s, span_s=300.0, stats=True) -> str:
+    """_base_log after a profile-1 activation (its LBT line at 0.5 s) on the 50-channel
+    hop set, the base's first decoded frame ``first_s`` later (None: no frame), its
+    always-on stats counter every 10 s (``stats``), and a log that ends at ``span_s``."""
     head = [f"{_ts(0)} INFO image_rx_daemon: image_rx_daemon started",
+            "  FHSS mask: WIDE (50 channels) [LIFETRAC_FHSS_WIDE_MASK=1]",
             "CFG_SET_REQ(REG_PROFILE=1) OK: 14000100",
             f"{_ts(0.5)} INFO image_rx_daemon: LBT_ENABLE=0"]
     if first_s is not None:
         head.append(f"{_ts(0.5 + first_s)} INFO image_rx_daemon: frag_arrival: seq=8 idx=0 "
                     f"total=1 fw_us=1 len=202")
     body = _base_log(seqs).splitlines()[1:]
+    t = 10.0
+    while stats and t < span_s:
+        n = int(first_s is not None and t >= 0.5 + first_s)
+        body.append(f"{_ts(t)} INFO image_rx_daemon: stats: rx_frames={n} frames_published={n}")
+        t += 10.0
     return "\n".join(head + body + [f"{_ts(span_s)} INFO image_rx_daemon: signal received; "
                                     "shutting down"]) + "\n"
+
+
+def _streamed(tractor_log: str, frags: int = 600) -> str:
+    """A tractor log that also streamed ``frags`` image fragments (one more "K fragments
+    ok" line): a base that caught a frame or two of them followed no hop grid, while one
+    that caught every fragment of _tractor_log's single train looks like it did (review
+    2026-10-24: a lock shown contradicts the host's silence)."""
+    return f"{_ts(0)} INFO image_tx_daemon: frame seq=2 done (pipelined): {frags} fragments ok\n" \
+        + tractor_log
 
 
 class ProbeScoreAcquisitionTests(unittest.TestCase):
@@ -656,18 +674,28 @@ class ProbeScoreAcquisitionTests(unittest.TestCase):
             ok = _archive(root, "Fv", self.FHSS, _fhss_log(range(1, 11), 75.0),
                           _tractor_log(range(1, 10)))
             late = _archive(root, "Fv6", self.FHSS, _fhss_log(range(1, 6), 138.1),
-                            _tractor_log([1, 2, 4, 5]))
+                            _streamed(_tractor_log([1, 2, 4, 5])))
             plain = _archive(root, "Fx", self.FHSS, _base_log(range(1, 11)),
                              _tractor_log(range(1, 10)))
             dts = _archive(root, "Dv", dict(self.FHSS, reg_profile=2),
                            _fhss_log(range(1, 11), 138.1), _tractor_log(range(1, 10)))
             outs = {n: _run(ps.main, [a])[1] for n, a in
                     (("ok", ok), ("late", late), ("plain", plain), ("dts", dts))}
-        self.assertIn("  base acquisition: first frame decoded 75.0 s after the base's "
-                      "profile-1 activation, within the 120 s FHSS scan budget\n", outs["ok"])
-        self.assertIn("  !! base ACQUISITION FAILED: first frame decoded 138.1 s after the "
-                      "base's profile-1 activation, past the 120 s FHSS scan budget: its scan "
-                      "ran out into FAILED and never followed the hop grid", outs["late"])
+        # rs12_leg_report.py's verdict, its evidence, then the first image reception
+        self.assertIn("  base acquisition: ACQUIRED; first image reception 75.0 s after the "
+                      "base's profile-1 activation, within the 120 s FHSS scan budget; evidence: "
+                      "the base decoded 1 of the tractor's 1 fragments on air (100.0 %): on its "
+                      "50-channel hop set a receiver that does not follow the hop grid is on the "
+                      "tractor's channel about one slot in 50, and only a locked scan follows "
+                      "the grid\n", outs["ok"])
+        self.assertIn("  !! base ACQUISITION FAILED; first image reception 138.1 s after the "
+                      "base's profile-1 activation, past the 120 s FHSS scan budget; evidence: "
+                      "the base's stats counter still read rx_frames=0 at +129.5 s (rx_daemon.log "
+                      "line ", outs["late"])
+        self.assertIn("per-fragment logging was on (rx_daemon.log holds frag_arrival lines) and "
+                      "the first came at +138.1 s: no image fragment reached the base within the "
+                      "120 s budget, and its scan locks only on a frame it decodes. Its scan ran "
+                      "out into FAILED and never followed the hop grid", outs["late"])
         self.assertIn("delivered 4/5 = 80.0 %", outs["late"])       # the figure is unchanged
         self.assertIn("  base acquisition: n/a (rx_daemon.log has no REG_PROFILE activation "
                       "line)", outs["plain"])
@@ -676,11 +704,62 @@ class ProbeScoreAcquisitionTests(unittest.TestCase):
         res = ps.score_leg(_fhss_log(range(1, 4), None, span_s=60.0), _tractor_log([1, 2, 3]))
         acq = ps.leg_acquisition({"reg_profile": "1"}, _fhss_log(range(1, 4), None, 60.0), "")
         self.assertEqual(ps.format_leg("x", {"reg_profile": "1"}, res, acq)[-1],
-                         "  base acquisition: no frame decoded in the 59.5 s the base log "
-                         "covers after its profile-1 activation, shorter than the 120 s FHSS "
-                         "scan budget: not determined")
+                         "  base acquisition: NOT DETERMINED; no image reception in the 59.5 s "
+                         "the base log covers after its profile-1 activation, no longer than the "
+                         "120 s FHSS scan budget; evidence: the base's log covers 59.5 s, no more "
+                         "than the budget; no tractor fragment count (tx_daemon.log) to weigh the "
+                         "base's against")
         self.assertIsNone(ps.leg_acquisition({"reg_profile": "2"}, "", ""))
         self.assertEqual(ps.acquisition_lines(None), [])
+
+    def test_the_scorer_shares_the_reports_rule(self) -> None:
+        # review 2026-10-24: one rule. A frame received within the budget is not a
+        # lock (NOT DETERMINED, never voided); silence no instrument shows is NOT
+        # DETERMINED, not FAILED; the verdicts are rs12_leg_report.acquisition's
+        rx_low = _fhss_log(range(1, 6), 30.0)
+        tx_many = "x frame seq=1 done (pipelined): 600 fragments ok\n" + _tractor_log([1, 2, 3])
+        quiet = _fhss_log(range(1, 6), None, stats=False)
+        for rx, tx, want in ((rx_low, tx_many, rep.UNDETERMINED),
+                             (quiet, _tractor_log([1, 2, 3]), rep.UNDETERMINED),
+                             (_fhss_log(range(1, 6), None), _tractor_log([1, 2]), rep.FAILED),
+                             (_fhss_log(range(1, 6), 30.0), _tractor_log([1, 2]), rep.ACQUIRED)):
+            acq = ps.leg_acquisition({"reg_profile": "1"}, rx, tx)
+            self.assertEqual(acq["status"], want)
+            self.assertEqual(acq, rep.acquisition(rx, tx))
+        line = ps.acquisition_lines(ps.leg_acquisition({"reg_profile": "1"}, rx_low, tx_many))[0]
+        self.assertTrue(line.startswith(
+            "  base acquisition: NOT DETERMINED; first image reception 30.0 s after the base's "
+            "profile-1 activation, within the 120 s FHSS scan budget; evidence: a frame "
+            "received is not a lock"), line)
+        with tempfile.TemporaryDirectory() as root:
+            legs = [_archive(root, "Fv", self.FHSS, rx_low, tx_many),
+                    _archive(root, "Fm", self.MONO, _fhss_log(range(1, 11), 30.0),
+                             _tractor_log(range(1, 9))),
+                    _archive(root, "Fq", self.FHSS, quiet, _tractor_log([1, 2, 3]))]
+            rc, out = _run(ps.main, ["--void-unlocked"] + legs)
+        self.assertEqual(rc, 0, out)
+        self.assertNotIn("voided", out)
+        # review 2026-10-24: the host silent past the budget, but the base then decoded
+        # half the tractor's fragments: the scan's FAILED is absorbing, so the silence
+        # was the host's. NOT DETERMINED, and --void-unlocked keeps the leg
+        deaf = _fhss_log(range(1, 6), 138.1).replace("rx_frames=1 frames_published=1",
+                                                       "rx_frames=300 frames_published=300")
+        acq = ps.leg_acquisition({"reg_profile": "1"}, deaf, _streamed(_tractor_log([1, 2])))
+        self.assertEqual(acq["status"], rep.UNDETERMINED)
+        self.assertIn("by the host's count, but the base decoded 300 of the tractor's 601 "
+                      "fragments on air (49.9 %)", acq["basis"])
+        with tempfile.TemporaryDirectory() as root:
+            legs = [_archive(root, "Fv", self.FHSS, deaf, _streamed(_tractor_log([1, 2, 4, 5]))),
+                    _archive(root, "Fm", self.MONO, _fhss_log(range(1, 11), 30.0),
+                             _tractor_log(range(1, 9)))]
+            rc, out = _run(ps.main, ["--void-unlocked"] + legs)
+        self.assertEqual(rc, 0, out)
+        self.assertNotIn("voided", out)
+        self.assertIn("  base acquisition: NOT DETERMINED; first image reception 138.1 s after "
+                      "the base's profile-1 activation, past the 120 s FHSS scan budget; "
+                      "evidence: the base's stats counter still read rx_frames=0 at +129.5 s",
+                      out)
+        self.assertIn("pooled FHSS VECTOR 4/5 = 80.0 %", out)
 
     def _round(self, root, late_log, late_tx):
         return [_archive(root, "Fv", self.FHSS, _fhss_log(range(1, 11), 75.0),
@@ -691,7 +770,8 @@ class ProbeScoreAcquisitionTests(unittest.TestCase):
 
     def test_void_unlocked_leaves_the_failed_leg_out_and_lists_it(self) -> None:
         with tempfile.TemporaryDirectory() as root:
-            legs = self._round(root, _fhss_log(range(1, 6), 138.1), _tractor_log([1, 2, 4, 5]))
+            legs = self._round(root, _fhss_log(range(1, 6), 138.1),
+                               _streamed(_tractor_log([1, 2, 4, 5])))
             rc0, plain = _run(ps.main, ["--margin", "3"] + legs)
             rc1, void = _run(ps.main, ["--margin", "3", "--void-unlocked"] + legs)
         # by default the leg pools, as the 10-24 rule had it
@@ -700,9 +780,9 @@ class ProbeScoreAcquisitionTests(unittest.TestCase):
                       plain)
         self.assertNotIn("voided", plain)
         self.assertEqual(rc1, 0, void)
-        self.assertIn("voided by --void-unlocked (the base's FHSS acquisition failed: no frame "
-                      "within the 120 s scan budget), left out of the pool: Fv6. Valid only "
-                      "under a pass rule written before leg 1 that says so", void)
+        self.assertIn("voided by --void-unlocked (the base's FHSS acquisition FAILED on positive "
+                      "evidence, each block's !! line says which), left out of the pool: Fv6. "
+                      "Valid only under a pass rule written before leg 1 that says so", void)
         self.assertIn("pooled FHSS VECTOR 9/10 = 90.0 %; pooled FHSS mono_g4 8/10 = 80.0 %", void)
         # the per-leg blocks are the same either way; the voided line comes before the pool
         self.assertEqual(plain.split("pooled FHSS")[0], void.split("voided by")[0])
@@ -724,7 +804,9 @@ class ProbeScoreAcquisitionTests(unittest.TestCase):
             rc0, plain = _run(ps.main, legs)
             rc1, void = _run(ps.main, ["--void-unlocked"] + legs)
         self.assertEqual((rc0, rc1), (0, 0), void)
-        self.assertIn("shorter than the 120 s FHSS scan budget: not determined", void)
+        self.assertIn("  base acquisition: NOT DETERMINED; no image reception in the 59.5 s the "
+                      "base log covers after its profile-1 activation, no longer than the 120 s "
+                      "FHSS scan budget", void)
         self.assertIn("  base acquisition: n/a (rx_daemon.log has no REG_PROFILE activation "
                       "line)", void)
         self.assertNotIn("voided", void)
@@ -746,9 +828,10 @@ class ProbeScoreAcquisitionTests(unittest.TestCase):
             rc3, out3 = _run(ps.main, ["--void-unlocked", legs[2], odd])
         self.assertEqual(rc0, 1, plain)
         self.assertIn("Fv6: no PROBE TX line in rx_daemon.log", plain)
-        self.assertIn("  !! base ACQUISITION FAILED: no frame decoded in the 299.5 s the base "
+        self.assertIn("  !! base ACQUISITION FAILED; no image reception in the 299.5 s the base "
                       "log covers after its profile-1 activation, past the 120 s FHSS scan "
-                      "budget", plain)
+                      "budget; evidence: the base's stats counter still read rx_frames=0 at "
+                      "+289.5 s", plain)
         self.assertIn("pooled verdict withheld: a leg above could not be scored", plain)
         self.assertEqual(rc1, 0, void)
         self.assertIn("left out of the pool: Fv6.", void)
@@ -1551,16 +1634,20 @@ def _bench_tree(root: str, *, legs_params: bool = True, archive: bool = True) ->
     legs = os.path.join(ev, "session", "legs")
     os.makedirs(legs)
     params = ("﻿git_sha=0000000\ntimestamp=20260921_120000\nreg_profile=1\nsynth_fps=2\n"
-              "tractor_clock_offset_s=0.000\nbase_clock_offset_s=0.000\n")
+              "tx_batch=0\ntractor_clock_offset_s=0.000\nbase_clock_offset_s=0.000\n")
+
+    def stamp(t):
+        return datetime.fromtimestamp(t, timezone.utc).strftime("%Y-%m-%d %H:%M:%S,%f")[:-3]
     if archive:
         os.makedirs(arch)
-        tx = []
-        for n in range(1, 401):
-            s = datetime.fromtimestamp(T_TX0 + 0.5 * (n - 1), timezone.utc).strftime(
-                "%Y-%m-%d %H:%M:%S,%f")[:-3]
-            tx.append(f"{s} INFO image_tx_daemon: txdone_arrival: seq={n % 256} idx=0 status=0")
+        tx = [f"{stamp(T_TX0 + 0.5 * (n - 1))} INFO image_tx_daemon: txdone_arrival: "
+              f"seq={n % 256} idx=0 status=0" for n in range(1, 401)]
+        # the base publishes each frame it captures (the transport seq the head is
+        # placed by, 2026-10-24 review), 1 ms before the capture's ts
+        rx = [f"{stamp(T_TX0 + 0.5 * (299 + f) + 0.029)} INFO image_rx_daemon: published "
+              f"frame_id=0 seq={(300 + f) % 256} 240 B" for f in range(80)]
         for name, text in (("params.txt", params), ("tx_daemon.log", "\n".join(tx) + "\n"),
-                           ("rx_daemon.log", "")):
+                           ("rx_daemon.log", "\n".join(rx) + "\n")):
             with open(os.path.join(arch, name), "w", encoding="utf-8") as fh:
                 fh.write(text)
     if legs_params:
@@ -1647,8 +1734,15 @@ class Round20261024Tests(unittest.TestCase):
         self.assertEqual([ln for ln in new if "acquisition" not in ln.lower()], old)
         acq = [ln for ln in new if "acquisition" in ln.lower()]
         self.assertEqual(len(acq), 6)
-        self.assertEqual(sum(ln.startswith("  !! base ACQUISITION FAILED: first frame decoded "
-                                           "138.1 s") for ln in acq), 1)
+        # legs 1-5 acquired, a lock shown by the share decoded; leg 6 FAILED on the
+        # evidence it has (the always-on counter, per-fragment logging on)
+        self.assertEqual(sum(ln.startswith("  base acquisition: ACQUIRED; first image reception ")
+                             for ln in acq), 5)
+        self.assertEqual(sum(ln.startswith("  !! base ACQUISITION FAILED; first image reception "
+                                           "138.1 s after the base's profile-1 activation, past "
+                                           "the 120 s FHSS scan budget; evidence: the base's "
+                                           "stats counter still read rx_frames=0 at +130.2 s")
+                             for ln in acq), 1)
         # --void-unlocked: the figures RESULTS.md gives "for information only"
         rc, out = _run(ps.main, ["--margin", "3", "--void-unlocked"] + [str(a) for a in self.ARCH])
         self.assertEqual(rc, 0, out)

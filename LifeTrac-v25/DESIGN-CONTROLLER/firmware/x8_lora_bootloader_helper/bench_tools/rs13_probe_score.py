@@ -78,25 +78,38 @@ still pool, but a `!!` line under the margin verdict says that it does not
 meet a pass rule needing log_window=after_stop on every leg.
 
 Base acquisition (2026-10-24, the FHSS round's leg 6). On an FHSS leg
-(params reg_profile=1) each block says whether the base's cold-start scan
-caught a frame within its budget, by rs12_leg_report.py's acquisition rule:
-the base's first decoded frame more than 120 s (4 scan attempts x 30 s)
-after its profile-1 activation, or none in a log that covers more, is a
-failed acquisition (`!! base ACQUISITION FAILED`). Such a base never follows
-the hop grid: with -ReactiveFire 1 it fires a probe only after a frame it
-happened to catch, from the channel it is parked on, so the leg measures
-the acquisition failure, not command delivery (leg 6: 4/5 pooled; a leg
-that catches nothing fires no probe and withholds the pooled verdict). By
+(params reg_profile=1) each block gives the base's acquisition by
+rs12_leg_report.py's rule (one rule, the archive's logs only) and then its
+first image reception against the 120 s budget (4 scan attempts x 30 s), a
+fact, not the verdict: a frame received is not a lock (the L072 delivers a
+frame whose FHSS header it rejected). The rule reads the base log from its
+profile-1 activation to its next REG_PROFILE activation (a profile switch
+stops the scan). FAILED (`!! base ACQUISITION FAILED`) only on positive
+evidence: a cold, or an early, final RX_SCAN_FAILED FAULT_URC, or an
+instrument known to be on showing no frame within the budget (the
+always-on stats rx_frames counter past it while the RX worker lives, or
+per-fragment logging shown on by a frag_arrival line with none in it) that
+nothing contradicts: a lock shown, or a daemon that logs FAULT_URC lines
+with no RX_SCAN_FAILED one make that silence the host's, and the leg NOT
+DETERMINED. ACQUIRED when a lock shows (the base decoded at least 25 % of
+the tractor's fragments on air on a hop set of 10 or more channels, the
+bench's 50 here, which only a grid follower does); NOT DETERMINED
+otherwise. The block's line
+reads `base acquisition: <verdict>; <first image reception>; evidence:
+<what shows it>`. A failed base never follows the hop grid:
+with -ReactiveFire 1 it fires a probe only after a frame it happened to
+catch, from the channel it is parked on, so the leg measures the
+acquisition failure, not command delivery (leg 6: 4/5 pooled; a leg that
+catches nothing fires no probe and withholds the pooled verdict). By
 default nothing else changes: such a leg pools like any other, and one that
-fired no probe still exits 1. --void-unlocked leaves every leg whose
-acquisition failed out of the pool (and out of the log-window and profile
+fired no probe still exits 1. --void-unlocked leaves every leg FAILED on
+positive evidence out of the pool (and out of the log-window and profile
 checks) and lists them, so a leg that fired no probe for that reason no
-longer withholds the verdict; a leg whose acquisition was not determined (a
-log shorter than the budget) or does not apply stays in. When it leaves no
-leg to pool in a set of two or more, it prints `pooled: no leg left to pool
-after --void-unlocked` and exits 1. Use it only when a pass rule written
-before leg 1 says so: dropping a leg after seeing its numbers is a choice
-made after the data.
+longer withholds the verdict; a leg NOT DETERMINED or n/a stays in. When it
+leaves no leg to pool in a set of two or more, it prints `pooled: no leg
+left to pool after --void-unlocked` and exits 1. Use it only when a pass
+rule written before leg 1 says so: dropping a leg after seeing its numbers
+is a choice made after the data.
 """
 from __future__ import annotations
 
@@ -365,27 +378,21 @@ def leg_acquisition(params: dict[str, str], rx_text: str, tx_text: str) -> dict 
 
 
 def acquisition_lines(acq: dict | None) -> list[str]:
-    """The per-leg base acquisition line (2026-10-24); none off FHSS."""
+    """The per-leg base acquisition line (2026-10-24): rs12_leg_report's verdict,
+    then the first image reception (a fact, not the verdict), then the verdict's
+    evidence; none off FHSS."""
     if acq is None:
         return []
     if not acq["applies"]:
         return [f"  base acquisition: n/a ({acq['why']})"]
-    budget = f"the {rep.SCAN_BUDGET_S:g} s FHSS scan budget"
-    if acq["first"] is not None:
-        when = (f"first frame decoded {acq['first']:.1f} s after the base's profile-1 "
-                f"activation")
-    else:
-        when = (f"no frame decoded in the {acq['span']:.1f} s the base log covers after its "
-                f"profile-1 activation")
-    if acq["failed"] is None:
-        return [f"  base acquisition: {when}, shorter than {budget}: not determined"]
-    if not acq["failed"]:
-        return [f"  base acquisition: {when}, within {budget}"]
-    return [f"  !! base ACQUISITION FAILED: {when}, past {budget}: its scan ran out into "
-            f"FAILED and never followed the hop grid, so any probe it fired went out from the "
-            f"channel it was parked on, after a frame it happened to catch; this leg measures "
-            f"that, not command delivery (--void-unlocked leaves it out of the pool, only "
-            f"under a pass rule written before leg 1)"]
+    seen = rep.reception_phrase(acq)
+    if acq["status"] != rep.FAILED:
+        return [f"  base acquisition: {acq['status']}; {seen}; evidence: {acq['basis']}"]
+    return [f"  !! base ACQUISITION FAILED; {seen}; evidence: {acq['basis']}. Its scan ran out "
+            f"into FAILED and never followed the hop grid, so any probe it fired went out from "
+            f"the channel it was parked on, after a frame it happened to catch; this leg "
+            f"measures that, not command delivery (--void-unlocked leaves it out of the pool, "
+            f"only under a pass rule written before leg 1)"]
 
 
 def format_leg(name: str, params: dict[str, str], res: dict,
@@ -528,9 +535,10 @@ def main(argv: list[str] | None = None) -> int:
                          "(one-sided 95 %% Newcombe lower bound of VECTOR minus mono_g4 "
                          "delivery against -PP) to the pooled comparison")
     ap.add_argument("--void-unlocked", action="store_true",
-                    help="leave the FHSS legs whose base acquisition failed (no frame within "
-                         "the 120 s scan budget) out of the pool and list them; only under a "
-                         "pass rule written before leg 1 that says so")
+                    help="leave the FHSS legs whose base acquisition FAILED on positive "
+                         "evidence (rs12_leg_report.py's rule; not one NOT DETERMINED) out of "
+                         "the pool and list them; only under a pass rule written before leg 1 "
+                         "that says so")
     a = ap.parse_args(argv)
     if a.margin is not None and not 0 < a.margin < 100:
         ap.error(f"--margin {a.margin:g}: give a margin between 0 and 100 percentage points")
@@ -552,9 +560,10 @@ def main(argv: list[str] | None = None) -> int:
             print(f"{name}: CANNOT SCORE: {exc}")
             rc = 2
             continue
-        # 2026-10-24: the base's FHSS acquisition (rs12_leg_report's rule)
+        # 2026-10-24: the base's FHSS acquisition (rs12_leg_report's rule); only a
+        # leg FAILED on positive evidence voids, never one NOT DETERMINED
         acq = leg_acquisition(params, rx_text, tx_text)
-        void = a.void_unlocked and bool(acq and acq.get("failed"))
+        void = a.void_unlocked and bool(acq and acq.get("status") == rep.FAILED)
         if res["sent"] == 0:
             print(f"{name}: no PROBE TX line in rx_daemon.log (reactive_fire="
                   f"{params.get('reactive_fire', '?')}): this leg fired no probe, so it has "
@@ -586,8 +595,8 @@ def main(argv: list[str] | None = None) -> int:
     if voided:
         # 2026-10-24: listed before any pooled line, so the reader sees what the
         # verdict leaves out
-        print(f"voided by --void-unlocked (the base's FHSS acquisition failed: no frame within "
-              f"the {rep.SCAN_BUDGET_S:g} s scan budget), left out of the pool: "
+        print(f"voided by --void-unlocked (the base's FHSS acquisition FAILED on positive "
+              f"evidence, each block's !! line says which), left out of the pool: "
               f"{', '.join(voided)}. Valid only under a pass rule written before leg 1 that "
               f"says so")
     if len(a.archive) > 1:

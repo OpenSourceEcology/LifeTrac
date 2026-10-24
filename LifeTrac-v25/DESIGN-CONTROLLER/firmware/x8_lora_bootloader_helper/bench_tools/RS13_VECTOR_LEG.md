@@ -96,7 +96,7 @@ Each row is spelled out in the step it belongs to; this is the checklist.
 | every profile-2 leg | a same-day receive-only spot-check, then `-ForceFrfHz <spot-checked carrier>` on the harness line; check `FRF readback: … (OK)` at that carrier on both boards in the archive | all nine RS-13.1 DTS legs flew on 915.000 MHz, the RS-11.6 emitter's channel, and their losses fold on its 7.08 s period (A19) |
 | session start | point `EVIDENCE_DIR` in `bench.env` at a new dated folder; since 2026-10-22 the leg scripts refuse one that holds committed files (`BENCH_EVIDENCE_APPEND=1` on every script of the leg for a deliberate append; legs/README.md, "Evidence folder guard") | on 2026-10-22 the flight `bench.env` still pointed at the committed 2026-10-19 record |
 | after every leg | LEG CHECKS `LOG_WINDOW after_stop` (green), i.e. `log_window=after_stop` in `params.txt`; record `log_window` and `stop_drain_s` per leg in RESULTS (Amendment 2026-10-22) | the harness read the logs while the daemons ran up to 2026-10-19 (`received > sent`, one base send more in the brackets than on air); since 2026-10-22 it checks the stops instead of assuming them |
-| after every FHSS leg (2026-10-24) | read the leg report's `acquisition:` line (Step 2). `!! ACQUISITION FAILED`, which also ends the report's first line on the console, means the base's scan ran out into FAILED and the leg measures that, not the link: record it, and void or keep the leg only as the pass rule's "never locks" row says (RS13_RESULTS_TEMPLATE.md; a proposal until the operator agrees it before leg 1). A re-fly is a radio leg like any other | 2026-10-24 leg 6 (2b_f3): the base decoded its first frame 138 s after its profile-1 activation, past the 120 s scan budget, heard 5 of 606 frames and fired 5 probes, and the rule written before leg 1 pooled its 4/5 |
+| after every FHSS leg (2026-10-24) | read the leg report's `acquisition:` line and the verdict line under it (Step 2). `!! ACQUISITION FAILED`, which also ends the report's first line on the console, means positive evidence that the base's scan ran out into FAILED, and the leg measures that, not the link (a first image reception within 120 s alone shows no lock: `confirmed acquisition: NOT DETERMINED`): record it, and void or keep the leg only as the pass rule's "never locks" row says (RS13_RESULTS_TEMPLATE.md; a proposal until the operator agrees it before leg 1). A re-fly is a radio leg like any other | 2026-10-24 leg 6 (2b_f3): the base decoded its first frame 138 s after its profile-1 activation, past the 120 s scan budget, heard 5 of 606 frames and fired 5 probes, and the rule written before leg 1 pooled its 4/5 |
 
 ## Amendments 2026-10-10
 
@@ -541,22 +541,31 @@ loss) and reports any frames numbered before the first one heard on a separate
 Since 2026-10-24 (done in code, tested offline, not yet used on a flown leg)
 the report places that first frame on the tractor's TX log (`txdone_arrival`,
 `-LogFragArrivals 1`), by the params.txt clock offsets (the archives from
-2026-10-24 on) or, in an older archive, by the daemons' start times. The head
-was counted as if the first frame heard sat in the camera's first u8 seq
-cycle; 2026-10-24 leg 6's first frame, seq 8, was the tractor's frame #264,
-and the old line read 98/103. Three forms:
+2026-10-24 on) or, in an older archive, by the daemons' start times. It
+matches the frame's transport seq, read off the base's `published frame_id=N
+seq=S` line at its capture time (the counter `txdone_arrival` logs), not its
+TileDeltaFrame seq, which is the camera's own counter (a 2d switch restarts
+it at 1 under VECTOR). The head was counted as if the first frame heard sat
+in the camera's first u8 seq cycle; 2026-10-24 leg 6's first frame, seq 8,
+was the tractor's frame #264, and the old line read 98/103. Three forms:
 
 - the frame is in the first u8 cycle: the line reads as before;
 - after a wrap: `first frame heard at seq 8 is the tractor's frame #264 on
   air (1 u8 seq wrap before it, by its TX log)`, with the head and the
   `counting from seq 1` figure taken from that frame (leg 6: 489/494, up to
   the last frame heard);
-- it cannot be placed (no clock offsets, and the start times fit several
-  frames): `the head is AMBIGUOUS`, with no figure counting from seq 1.
+- it cannot be placed (no published line at its capture time, or no clock
+  offsets and start times that fit several frames), or its TileDeltaFrame
+  seq is not its transport seq: `the head is AMBIGUOUS`, whatever its seq
+  (seq 1 can be frame #257, seq 0 is #256 at the earliest), with no figure
+  counting from seq 1.
 
 A `tractor TX log:` line under it gives the tractor's frames on air, the
 capture's first and last frames among them, and the share that never reached
-the capture, head and tail included (leg 6: 601/606 = 99.2 %). A capture with
+the capture, head and tail included (leg 6: 601/606 = 99.2 %); it withholds
+the share, and counts trains, when its TX log shows a batched train (a
+`batching:` line; a batched train carries several frames, the capture
+counts frames). A capture with
 no clean +1 seq step now times its gaps by the leg's `synth_fps` (the period
 reads `(the leg's synth_fps: no clean +1 step to time it by)`), so an outage
 of more than 128 frames is counted, not booked as a counter restart (leg 6:
@@ -566,13 +575,22 @@ copies it there), or from `--archive <dir>` for one capture; without either
 the head reads AMBIGUOUS.
 
 On a profile-1 leg the report adds an `acquisition:` line after the loss
-lines (`acquisition: n/a` on other profiles): the base's first decoded frame against the FHSS cold-start scan budget,
+lines (`acquisition: n/a` on other profiles): the base's first image reception against the FHSS cold-start scan budget,
 120 s after its profile-1 activation (4 attempts × 30 s; the fourth failure
 enters scan FAILED, which is absorbing, and a follower there never hops).
-Past it, or with no frame at all in a log that covers more than that, it
-prints `!! ACQUISITION FAILED`, and the report's first line ends with
-`!! ACQUISITION FAILED (see the acquisition line below)`, so `leg_post.sh`'s
-console excerpt shows it. The exit code does not change. The leg's loss and
+A frame received is not a lock (the L072 delivers a frame whose FHSS header
+it rejected), so the verdict line under it rests on positive evidence:
+`confirmed acquisition: ACQUIRED` (a base-bracket LOCKED → SCANNING
+demotion, or at least 25 % of the tractor's fragments decoded on the
+50-channel hop set), `NOT DETERMINED`, or `!! ACQUISITION FAILED` (a cold or
+early final RX_SCAN_FAILED, or no frame within the budget on the stats
+counter while its RX worker lives or with per-fragment logging shown on,
+when no lock shown, FAULT_URC-logging daemon without an RX_SCAN_FAILED line
+or base bracket contradicts that silence; the check stops at a profile
+switch), and then the report's
+first line ends with `!! ACQUISITION FAILED (see the acquisition line
+below)`, so `leg_post.sh`'s console excerpt shows it. The exit code does not
+change. The leg's loss and
 command figures then measure the acquisition failure, not the link
 (BENCH_RUNBOOK, "A leg", Base acquisition, for what to do). Base
 RX_SCAN_FAILED faults (`FAULT_URC:` lines, logged since 2026-10-24) are
@@ -667,10 +685,11 @@ pass rule (Amendment 2026-10-22, item 2). Record `log_window` and
   streak; no base commands on this leg. Its base capture takes
   `--min-frames 200` at 1 fps: after a 57 s acquisition only ~245 frames can
   arrive, and `min_frames 247 < 250` failed both rounds by the letter. At any
-  rate, read the report's `acquisition:` line: a base that decodes no frame
-  within 120 s of its profile-1 activation has run out of scan attempts, and
-  a follower in scan FAILED does not follow the hop grid for the rest of the
-  leg (2026-10-24 leg 6), so the leg then measures that.
+  rate, read the report's `acquisition:` line and the verdict under it: a
+  base that decodes no frame within 120 s of its profile-1 activation has
+  run out of scan attempts, and a follower in scan FAILED does not follow
+  the hop grid for the rest of the leg (2026-10-24 leg 6), so the leg then
+  measures that.
 - **2c — control, DTS, `mono_g4` at boot:** the same as 2a with
   `-CamExtraEnv "-e LIFETRAC_ENCODE_MODE=6"`; base capture without `--strict`
   (its checks are for VECTOR; the `frames:` line and `by codec` still count,

@@ -32,11 +32,21 @@ RX_SCAN_FAILED sub-byte read as the daemons' decoder reads it (the 0x80
 marker, the daemon's name= both ways, AMBIGUOUS on the final line), base
 FAULT lines in the tractor's format and archives without them; on the committed
 10-24 legs every old line still prints and leg 6 reads frame #264, 601/606.
+PR #166 review: the head is placed by the frame's transport seq (the
+published line at its capture time), AMBIGUOUS when it cannot be read or
+differs from the TileDeltaFrame seq, and for every unplaced first frame
+(seq 1, seq 0 too); the ``tractor TX log`` share is withheld on a leg that
+may batch; the ``acquisition:`` line is the first image reception and the
+verdict under it rests on positive evidence (a cold or early final
+RX_SCAN_FAILED, the always-on stats counter or per-fragment logging shown on
+for FAILED; a bracket demotion or the share decoded for ACQUIRED; NOT
+DETERMINED otherwise); legs 1-5 of 10-24 read ACQUIRED, leg 6 FAILED.
 """
 from __future__ import annotations
 
 import io
 import json
+import re
 import sys
 import tempfile
 import unittest
@@ -183,9 +193,35 @@ class SeqGapLoss(unittest.TestCase):
         self.assertIn("(no tractor TX log was given to place it on)",
                       rep.format_seq_loss(res, "x.jsonl", None, None)[1])
         self.assertIn("(the daemons' start times fit 2)", lines[1])
-        # a capture that starts at seq 1 has no head to place: no line
-        lines = rep.format_seq_loss(rep.seq_gap_loss(_frames(V, [1, 2])), "x.jsonl")
-        self.assertEqual(len(lines), 1)
+        # review 2026-10-24: every unplaced first frame is AMBIGUOUS, however small
+        # its seq: seq 1 can be frame #257, seq 0 is frame #256 at the earliest
+        for s0, least in ((1, "0 frame(s) numbered before it if seq 1 is in the camera's "
+                                "first u8 cycle"),
+                          (0, "at least 255 frame(s) numbered before it (seq 0 is frame #256 "
+                              "at the earliest)"),
+                          (2, "1 frame(s) numbered before it if seq 2 is in the camera's "
+                              "first u8 cycle")):
+            lines = rep.format_seq_loss(rep.seq_gap_loss(_frames(V, [s0, s0 + 1])), "x.jsonl")
+            self.assertEqual(len(lines), 2, lines)
+            self.assertEqual(
+                lines[1], f"  first frame heard at seq {s0}: the head is AMBIGUOUS — {least}, "
+                          f"256 more per wrap, and it cannot be placed on the tractor's TX log "
+                          f"(no tractor TX log was given to place it on); no figure counting "
+                          f"from seq 1 (RS-13.1 A7)")
+        # placed in the first cycle, seq 1 has nothing before it: no line; a wrap
+        # before it is counted
+        res = rep.seq_gap_loss(_frames(V, [1, 2]))
+        first = {"frame": 1, "wraps": 0, "dt": 0.01, "rx_seq": 1, "rx_line": 9, "tdf_seq": 1}
+        place = {"sent": 2, "how": "offsets", "first": first, "batched": None,
+                 "last": dict(first, frame=2, rx_seq=2, tdf_seq=2)}
+        lines = rep.format_seq_loss(res, "x.jsonl", None, place)
+        self.assertFalse(any("first frame heard" in ln for ln in lines), lines)
+        place["first"] = dict(first, frame=257, wraps=1)
+        place["last"] = dict(first, frame=258, wraps=1, rx_seq=2, tdf_seq=2)
+        place["sent"] = 258
+        lines = rep.format_seq_loss(res, "x.jsonl", None, place)
+        self.assertTrue(lines[1].startswith("  first frame heard at seq 1 is the tractor's frame "
+                                            "#257 on air (1 u8 seq wrap before it"), lines[1])
 
     def test_a_head_after_a_wrap_counts_the_wrap(self) -> None:
         # leg 6's shape: seq 8 is frame #264 (one wrap), 226 lost after it
@@ -250,8 +286,9 @@ class SeqGapLoss(unittest.TestCase):
                                     {M: "mono_g4", V: "vector"})
         self.assertIn("lost 1/6 = 16.7%", lines[0])
         self.assertIn("2 codec runs", lines[0])
+        # (lines[1]: no TX log to place the head on, so it reads AMBIGUOUS)
         self.assertIn("mono_g4 seq 1..4 (3 rx, 1 lost) | vector seq 1..2",
-                      lines[1])
+                      lines[2])
 
     def test_empty_capture(self) -> None:
         lines = rep.format_seq_loss(rep.seq_gap_loss([]), "empty.jsonl")
@@ -814,8 +851,12 @@ class SharedWindowReport(unittest.TestCase):
                        if ln.startswith("capture seq gaps (leg2x_base.jsonl)"))
         self.assertEqual(cap_unv, cap_old)
         self.assertLess(cap_unv, 8)
-        self.assertTrue(unv[cap_unv + 1].startswith("  !! LOG WINDOW UNVERIFIED ("),
-                        unv[cap_unv + 1])
+        # the capture's head line (these logs hold no published line to read the
+        # first frame's transport seq from), then the note
+        self.assertTrue(unv[cap_unv + 1].startswith("  first frame heard at seq 1: the head "
+                                                    "is AMBIGUOUS"), unv[cap_unv + 1])
+        self.assertTrue(unv[cap_unv + 2].startswith("  !! LOG WINDOW UNVERIFIED ("),
+                        unv[cap_unv + 2])
         warn = next(n for n, ln in enumerate(unv) if "received 59 > sent 45" in ln)
         for n in range(1, cap_unv + 1):
             if n == warn:
@@ -915,16 +956,24 @@ LEG6 = (264, 293, 346, 358, 494)          # the tractor frames 10-24 leg 6's bas
 
 def _two_board_leg(d: Path, *, sent: int = 606, heard=LEG6, period: float = 0.5,
                    offsets: bool = True, base_extra=(), rx_skew: float = 0.6,
-                   profile: int = 1, capture: bool = True) -> tuple[Path, Path | None]:
+                   profile: int = 1, capture: bool = True, mask: bool = False,
+                   params_extra: str = "", cap_seq=None,
+                   published: bool = True) -> tuple[Path, Path | None]:
     """The TX daemon starts at PC 0 and puts frame n on air at 8 + (n - 1) *
     period; the RX daemon starts ``rx_skew`` later, activates ``profile`` at
     PC 1.4 (its LBT line), decodes the frames in ``heard`` 30 ms after their
-    txdone and stops 3 s after the tractor's last frame + 4 s. ``base_extra``:
-    ``(PC s, text)`` lines for the base log. Returns (archive, capture)."""
+    txdone, publishes each 1 ms later (``published`` False: no published
+    line), and stops 3 s after the tractor's last frame + 4 s. ``base_extra``:
+    ``(PC s, text)`` lines for the base log; ``mask``: the base log names its
+    50-channel FHSS hop set (untimestamped, as the activation prints it, 2 log
+    lines before the activation's); ``cap_seq``: n -> the TileDeltaFrame seq
+    of the tractor's frame n (default: its transport seq, n mod 256). params:
+    tx_batch=0 (as the 10-24 harness writes it), then ``params_extra``.
+    Returns (archive, capture)."""
     a = d / "radio_monitor_leg"
     a.mkdir()
     params = f"﻿git_sha=0000000\nreg_profile={profile}\nsynth_fps={1 / period:g}\n" \
-             "log_window=after_stop\n"
+             "log_window=after_stop\ntx_batch=0\n" + params_extra
     if offsets:
         params += f"tractor_clock_offset_s={_TR_OFF}\nbase_clock_offset_s={_BASE_OFF}\n"
     (a / "params.txt").write_text(params, encoding="utf-8")
@@ -942,18 +991,23 @@ def _two_board_leg(d: Path, *, sent: int = 606, heard=LEG6, period: float = 0.5,
           (1.39, f"CFG_SET_REQ(REG_PROFILE={profile}) OK: 14000100"),     # no timestamp
           (1.4, "INFO image_rx_daemon: LBT_ENABLE=0 (command uplink shares the image channel)"),
           (1.45, "INFO image_rx_daemon: RX worker ready; draining RX_FRAME_URC...")]
+    if mask:
+        rx.append((1.38, "  FHSS mask: WIDE (50 channels) [LIFETRAC_FHSS_WIDE_MASK=1]"))
     rows = []
     for n in heard:
         pc = 8 + (n - 1) * period + 0.03
-        rx += [(pc, f"INFO image_rx_daemon: frag_arrival: seq={n % 256} idx=0 total=1 fw_us=1 "
-                    f"len=202"),
-               (pc + 0.001, f"INFO image_rx_daemon: published frame_id=0 seq={n % 256} 198 B")]
-        rows.append((_epoch(pc + 0.002, _BASE_OFF), _payload(V, n % 256)))
+        rx.append((pc, f"INFO image_rx_daemon: frag_arrival: seq={n % 256} idx=0 total=1 "
+                       f"fw_us=1 len=202"))
+        if published:
+            rx.append((pc + 0.001, f"INFO image_rx_daemon: published frame_id=0 seq={n % 256} "
+                                   f"198 B"))
+        rows.append((_epoch(pc + 0.002, _BASE_OFF),
+                     _payload(V, n % 256 if cap_seq is None else cap_seq(n))))
     rx += list(base_extra)
     rx += [(end + 2, f"INFO image_rx_daemon: stats: rx_frames={len(heard)} "
                      f"frames_published={len(heard)} reassembler_timeouts=0"),
            (end + 3, "INFO image_rx_daemon: signal received; shutting down")]
-    text = [line if pc == 1.39 else f"{_stamp(pc, _BASE_OFF)} {line}"
+    text = [line if pc in (1.38, 1.39) else f"{_stamp(pc, _BASE_OFF)} {line}"
             for pc, line in sorted(rx, key=lambda r: r[0])]
     (a / "rx_daemon.log").write_text("\n\n".join(text) + "\n", encoding="utf-8")
     cap = None
@@ -1054,6 +1108,113 @@ class HeadOnTheTxLog(unittest.TestCase):
         self.assertEqual(p["last"], {"why": "it came after the TX log's last frame (#300): "
                                             "the TX log ends before the capture does"})
 
+    def test_frames_are_placed_by_their_transport_seq(self) -> None:
+        # review 2026-10-24 (2): txdone_arrival logs the TX daemon's own count of the
+        # messages it took, the seq the base logs in frag_arrival and its published
+        # line; the TileDeltaFrame seq is the camera's counter. Here the camera
+        # numbers one behind (the TX daemon took one more message): its seq 138 is
+        # frame #139 on air, and txdone_arrival seq 138 (#138) went 0.5 s earlier,
+        # well inside PLACE_TOL_S, so placing by the TileDeltaFrame seq would put it
+        # one frame off without a word
+        with tempfile.TemporaryDirectory() as d:
+            p = self._place(Path(d), heard=range(139, 607), cap_seq=lambda n: (n - 1) % 256)
+        self.assertEqual((p["first"]["frame"], p["first"]["tdf_seq"], p["first"]["rx_seq"]),
+                         (139, 138, 139))
+        self.assertEqual((p["last"]["frame"], p["last"]["tdf_seq"], p["last"]["rx_seq"]),
+                         (606, 605 % 256, 606 % 256))
+        self.assertIsNone(p["batched"])
+        # no published line at the capture time: no transport seq, not placed
+        with tempfile.TemporaryDirectory() as d:
+            p = self._place(Path(d), heard=range(139, 607), published=False)
+        self.assertNotIn("frame", p["first"])
+        self.assertEqual(p["first"]["why"], "rx_daemon.log has no published line within 0.05 s "
+                                            "of its capture time, so its transport seq (the "
+                                            "one txdone_arrival logs) is unknown, and its "
+                                            "TileDeltaFrame seq is the camera's own counter")
+        # two published seqs at once: ambiguous, not placed
+        pubs = [(10.0, 7, 3), (10.02, 8, 5)]
+        self.assertEqual(rep.transport_seq(10.01, pubs),
+                         {"why": "rx_daemon.log published transport seqs [7, 8] within 0.05 s "
+                                 "of its capture time"})
+        # frames batched in one train share its seq: one seq, placed on that train
+        self.assertEqual(rep.transport_seq(10.01, [(10.0, 7, 3), (10.0, 7, 4)]),
+                         {"seq": 7, "line": 3})
+        self.assertEqual(rep.rx_publications("2026-10-24 15:35:00,000 INFO x: published "
+                                             "frame_id=0 seq=-1 9 B\n"), [])
+
+    def test_the_head_line_when_the_two_counters_differ(self) -> None:
+        # the capture's first frame is placed on the TX log by its transport seq, but
+        # the camera's frames before it cannot be counted from there
+        with tempfile.TemporaryDirectory() as d:
+            arch, cap = _two_board_leg(Path(d), heard=range(139, 607), mask=True,
+                                       cap_seq=lambda n: (n - 1) % 256)
+            out = _run([arch, "--capture", cap])
+        # placed (the TX-log line below places it too), but its head not counted
+        self.assertIn("  first frame heard at seq 138: the head is AMBIGUOUS — it is the "
+                      "tractor's frame #139 on air by its transport seq 139 (rx_daemon.log line "
+                      "13), but its TileDeltaFrame seq is not that seq: the camera's counter and "
+                      "the TX daemon's differ here (a codec switch, a camera restart or a frame "
+                      "the TX daemon never took), so the camera's frames before it cannot be "
+                      "counted from the TX log (137 frame(s) numbered before it if seq 138 is in "
+                      "the camera's first u8 cycle, 256 more per wrap); no figure counting from "
+                      "seq 1 (RS-13.1 A7)\n", out)
+        self.assertNotIn("cannot be placed", out)
+        self.assertNotIn("counting from seq 1:", out)
+        self.assertIn("the capture's first frame is its #139, its last #606 (placed by the "
+                      "params.txt clock offsets, within 0.03 s): 138/606 = 22.8% of them never "
+                      "reached the capture", out)
+
+    def test_a_leg_that_batched_withholds_the_tx_log_share(self) -> None:
+        # review 2026-10-24 (1): with LIFETRAC_TX_BATCH on, a train carries several
+        # frames under the first one's seq, so the TX log's trains and the capture's
+        # frames are not one unit. image_tx_daemon.py logs "batching:" on its first
+        # batched train (never for a VECTOR or key frame): withheld on that line,
+        # and the lines count trains
+        batch = (f"{_stamp(9, _TR_OFF)} INFO image_tx_daemon: batching: 2 frames in 1 trains "
+                 f"so far (this train: 2 frames, 400 B)")
+
+        def leg(d, extra, batched, heard=range(139, 607)):
+            arch, cap = _two_board_leg(Path(d), heard=heard, params_extra=extra)
+            if batched:
+                p = arch / "tx_daemon.log"
+                head, rest = _read(p).split("\n\n", 1)
+                p.write_text(head + "\n\n" + batch + "\n\n" + rest, encoding="utf-8")
+            return _run([arch, "--capture", cap])
+        for extra in ("tx_batch=1\n", "tx_batch=4\n", "tx_batch=\n"):
+            with tempfile.TemporaryDirectory() as d:
+                out = leg(d, extra, True)
+            want = "params.txt " + extra.strip()
+            self.assertIn("  tractor TX log: 606 train(s) on air (txdone_arrival); the capture's "
+                          "first frame is in its train #139, its last in train #606 (placed by "
+                          "the params.txt clock offsets, within 0.03 s): no share of them that "
+                          "never reached the capture (tx_daemon.log line 3 logs a batched train "
+                          f"({want}): a train can carry several frames, so the TX log's trains "
+                          "and the capture's frames are not one unit)", out)
+            self.assertNotIn("of them never reached the capture", out)
+        # ... and the head line names the train it is in
+        with tempfile.TemporaryDirectory() as d:
+            out = leg(d, "tx_batch=1\n", True, heard=range(300, 607))
+        self.assertIn("  first frame heard at seq 44 is in the tractor's train #300 on air (1 "
+                      "u8 seq wrap before it, by its TX log): the 299 frame(s)", out)
+        # params that do not say tx_batch=0, but no train batched (the harness default
+        # -TxBatch 1 on a VECTOR leg): the share, and why it holds
+        with tempfile.TemporaryDirectory() as d:
+            out = leg(d, "tx_batch=1\n", False)
+        self.assertIn("  tractor TX log: 606 frame(s) on air (txdone_arrival); the capture's "
+                      "first frame is its #139, its last #606 (placed by the params.txt clock "
+                      "offsets, within 0.03 s): 138/606 = 22.8% of them never reached the "
+                      "capture (138 before its first, 0 after its last); params.txt tx_batch=1, "
+                      "but tx_daemon.log logs no 'batching:' line: no train carried two "
+                      "frames\n", out)
+        self.assertEqual(rep.batching({}), "params.txt has no tx_batch: a train can carry "
+                                           "several frames, so the TX log's trains and the "
+                                           "capture's frames are not one unit")
+        self.assertIsNone(rep.batching({"tx_batch": "0"}))
+        self.assertIsNone(rep.batching({"tx_batch": "0"}, batch))
+        self.assertIsNone(rep.batching({"tx_batch": "1"}, "x: frame seq=1 done\n"))
+        self.assertTrue(rep.batching({"tx_batch": "1"}, "x\n" + batch).startswith(
+            "tx_daemon.log line 2 logs a batched train (params.txt tx_batch=1)"))
+
 
 class Acquisition(unittest.TestCase):
     """2026-10-24: the base's first decoded frame against the 120 s scan budget."""
@@ -1071,47 +1232,412 @@ class Acquisition(unittest.TestCase):
             acq = self._acq(Path(d))
         self.assertTrue(acq["applies"])
         self.assertAlmostEqual(acq["first"], 138.13, places=2)
-        self.assertIs(acq["failed"], True)
+        self.assertEqual((acq["status"], acq["failed"]), (rep.FAILED, True))
         self.assertEqual((acq["act_line"], acq["tractor"]), (5, 606))
         lines = rep.format_acquisition(acq)
         self.assertTrue(lines[0].startswith(
-            "acquisition: the base's first decoded frame came 138.1 s after its profile-1 "
-            "activation (rx_daemon.log line 5 at 15:35:36.531 board time, the frame at line "
-            "9), past the FHSS cold-start scan budget of 120 s (4 attempts x 30 s: "
-            "SX1276_RX_SCAN_MAX_RETRIES 3 + 1, SX1276_RX_SCAN_REDESIGN_MS 30000)"), lines[0])
-        self.assertTrue(lines[1].startswith("  !! ACQUISITION FAILED: "), lines[1])
+            "acquisition: first image reception: the base's first decoded frame came 138.1 s "
+            "after its profile-1 activation (rx_daemon.log line 5 at 15:35:36.531 board time, "
+            "the frame at line 9), past the FHSS cold-start scan budget of 120 s (4 attempts x "
+            "30 s: SX1276_RX_SCAN_MAX_RETRIES 3 + 1, SX1276_RX_SCAN_REDESIGN_MS 30000)"),
+            lines[0])
+        # review 2026-10-24: FAILED on positive evidence. These logs hold frag_arrival
+        # lines, so per-fragment logging was on all run (image_rx_daemon.py reads the
+        # flag once), and the first came past the budget
+        self.assertTrue(lines[1].startswith(
+            "  !! ACQUISITION FAILED: per-fragment logging was on (rx_daemon.log holds "
+            "frag_arrival lines) and the first came at +138.1 s: no image fragment reached the "
+            "base within the 120 s budget, and its scan locks only on a frame it decodes. Its "
+            "scan ran out into FAILED, which is absorbing"), lines[1])
         self.assertTrue(lines[1].endswith("The tractor logged 606 frame(s) on air."))
-        # an archive without base FAULT lines (every one before 2026-10-24) says so
-        self.assertEqual(lines[2], "  (rx_daemon.log holds no base FAULT 0x0D line: "
-                                   "image_rx_daemon.py dropped FAULT URCs at DEBUG before "
-                                   "2026-10-24, so the FAILED entry is inferred, not seen)")
+        # an archive without FAULT_URC lines (every one before 2026-10-24) says so, and
+        # what a newer daemon's silence would mean (review 2026-10-24)
+        self.assertEqual(lines[2], "  (rx_daemon.log holds no FAULT_URC line, so the FAILED "
+                                   "entry is inferred, not seen: image_rx_daemon.py dropped "
+                                   "FAULT URCs at DEBUG before 2026-10-24; from 2026-10-24 on it "
+                                   "logs every one, and a scan that runs out sends an "
+                                   "RX_SCAN_FAILED per attempt, so with that daemon this "
+                                   "silence would contradict the FAILED entry; check which "
+                                   "daemon ran)")
         self.assertEqual(len(lines), 3)
-        # legs 1-5 of 10-24 caught their first frame 15-75 s in
+        # legs 1-5 of 10-24 caught their first frame 15-75 s in and decoded most of the
+        # tractor's fragments on the 50-channel hop set: ACQUIRED, a lock shown
         with tempfile.TemporaryDirectory() as d:
-            acq = self._acq(Path(d), heard=range(139, 607))
-        self.assertIs(acq["failed"], False)
+            acq = self._acq(Path(d), heard=range(139, 607), mask=True)
+        self.assertEqual((acq["status"], acq["failed"]), (rep.ACQUIRED, False))
         lines = rep.format_acquisition(acq)
-        self.assertEqual(len(lines), 1)
+        self.assertEqual(len(lines), 2)
         self.assertIn("came 75.6 s after its profile-1 activation", lines[0])
         self.assertIn(", within the FHSS cold-start scan budget", lines[0])
+        self.assertEqual(lines[1], "  confirmed acquisition: ACQUIRED: the base decoded 468 of "
+                                   "the tractor's 606 fragments on air (77.2 %): on its "
+                                   "50-channel hop set a receiver that does not follow the hop "
+                                   "grid is on the tractor's channel about one slot in 50, and "
+                                   "only a locked scan follows the grid")
+
+    def test_a_frame_received_in_the_budget_is_not_a_lock(self) -> None:
+        # review 2026-10-24 (3): sx1276_rx.c delivers a frame whose FHSS header it
+        # rejected (10-24 leg 6's base: d(fhss_dec_rej_epoch_drift) 2 of its 5), so a
+        # first image reception within the budget confirms no acquisition
+        with tempfile.TemporaryDirectory() as d:
+            acq = self._acq(Path(d), heard=(40, 300, 560), mask=True)
+        self.assertEqual((acq["status"], acq["failed"]), (rep.UNDETERMINED, None))
+        lines = rep.format_acquisition(acq)
+        self.assertIn("came 26.1 s after its profile-1 activation", lines[0])
+        self.assertIn(", within the FHSS cold-start scan budget", lines[0])
+        self.assertEqual(lines[1], "  confirmed acquisition: NOT DETERMINED: a frame received "
+                                   "is not a lock (sx1276_rx.c still delivers a frame whose FHSS "
+                                   "header it rejected), and nothing here shows one; the base "
+                                   "decoded 3 of the tractor's 606 fragments on air (0.5 %), "
+                                   "under the 25 % that shows a receiver following its "
+                                   "50-channel hop grid")
+        self.assertEqual(len(lines), 2)
+
+        def urc(pc, sub):
+            return (pc, f"WARNING image_rx_daemon: FAULT_URC: code=0x0D sub=0x{sub:02X} "
+                        f"name=RX_SCAN_FAILED attempt=3 final=1 uptime_ms=1 raw=0d")
+        # a cold final RX_SCAN_FAILED (warm=0: the L072 never locked since it booted)
+        # after that reception: FAILED, never reported as acquired
+        with tempfile.TemporaryDirectory() as d:
+            acq = self._acq(Path(d), heard=(40, 300, 560), mask=True,
+                            base_extra=[urc(121.6, 0x83)])
+        self.assertEqual(acq["status"], rep.FAILED)
+        lines = rep.format_acquisition(acq)
+        self.assertTrue(lines[1].startswith(
+            "  !! ACQUISITION FAILED: the base's final RX_SCAN_FAILED at +120.2 s (rx_daemon.log "
+            "line 15, sub 0x83) is cold (warm=0): the base's L072 had not locked since it "
+            "booted. Its scan ran out into FAILED"), lines[1])
+        # it wins over a share that would otherwise show a lock
+        with tempfile.TemporaryDirectory() as d:
+            acq = self._acq(Path(d), heard=range(139, 607), mask=True,
+                            base_extra=[urc(300.0, 0x83)])
+        self.assertEqual(acq["status"], rep.FAILED)
+        # a warm final less than 122 s after the activation: 4 attempts in a row
+        # from it with no lock (a lock resets the count but keeps the channel anchor
+        # the activation's BEGIN_SCAN set, so its loss comes 2 s after that at the
+        # earliest). The activation is dated by the line before it (PC 0.6 here,
+        # 0.8 s before its LBT line), so the final's time from it is not read short
+        with tempfile.TemporaryDirectory() as d:
+            acq = self._acq(Path(d), heard=(40,), mask=True, base_extra=[urc(122.0, 0xC3)])
+        self.assertEqual(acq["status"], rep.FAILED)
+        self.assertIn("the base's final RX_SCAN_FAILED at +120.6 s (rx_daemon.log line 15, sub "
+                      "0xC3) came less than 122 s after the activation (at most +121.4 s from "
+                      "rx_daemon.log line 1, the last timestamped line before it): 4 scan "
+                      "attempts failed in a row from it (a lock resets the attempt count but "
+                      "keeps the channel anchor the activation's BEGIN_SCAN set, so a locked "
+                      "scan drops back to scanning no sooner than SX1276_RX_SCAN_LOCK_LOSS_MS "
+                      "2000 after the activation)", acq["basis"])
+        # review 2026-10-24: 121.3 s after the LBT line can be 122.1 s after the
+        # activation, so a lock lost at once is not ruled out: no evidence
+        with tempfile.TemporaryDirectory() as d:
+            acq = self._acq(Path(d), heard=(40,), mask=True, base_extra=[urc(122.7, 0xC3)])
+        self.assertEqual(acq["status"], rep.UNDETERMINED)
+        self.assertAlmostEqual(acq["faults"][0]["t"], 121.3, places=3)
+        # a log with no timestamped line before the activation cannot date it: no
+        # early-final evidence (a cold final still is)
+        rx = ("CFG_SET_REQ(REG_PROFILE=1) OK: 14000100\n"
+              "2026-10-24 15:35:00,000 INFO x: LBT_ENABLE=0\n"
+              "2026-10-24 15:35:10,000 INFO x: frag_arrival: seq=8 idx=0 total=1\n"
+              "2026-10-24 15:37:00,500 WARNING x: FAULT_URC: code=0x0D sub=0x{:02X} "
+              "name=RX_SCAN_FAILED uptime_ms=1 raw=0d\n")
+        self.assertEqual(rep.acquisition(rx.format(0xC3))["status"], rep.UNDETERMINED)
+        self.assertEqual(rep.acquisition(rx.format(0x83))["status"], rep.FAILED)
+        # a warm final later (a lock lost mid-leg) does not undo the lock shown; its
+        # !! line still says the scan entered FAILED there
+        with tempfile.TemporaryDirectory() as d:
+            acq = self._acq(Path(d), heard=range(139, 300), mask=True,
+                            base_extra=[urc(280.0, 0xC3)])
+        self.assertEqual(acq["status"], rep.ACQUIRED)
+        self.assertIn("  !! the base's final RX_SCAN_FAILED at +278.6 s",
+                      "\n".join(rep.format_acquisition(acq)))
+        # an AMBIGUOUS final (maybe a TX FIFO readback mismatch) is no evidence
+        with tempfile.TemporaryDirectory() as d:
+            acq = self._acq(Path(d), heard=(40, 300, 560), mask=True, base_extra=[
+                (121.6, "WARNING image_rx_daemon: FAULT_URC: code=0x0D sub=0x83 "
+                        "name=AMBIGUOUS uptime_ms=1 raw=0d83")])
+        self.assertEqual(acq["status"], rep.UNDETERMINED)
+
+    def test_silence_counts_only_from_an_instrument_known_to_be_on(self) -> None:
+        # review 2026-10-24 (4): -LogFragArrivals defaults off, and a frame can take
+        # several fragments, so a base can log no frame line for over 120 s while it
+        # hears the tractor. The stats counter is always on.
+        def rx(*rows):
+            # the start-up configuration prints the mask before its REG_PROFILE line
+            return ("  FHSS mask: WIDE (50 channels) [LIFETRAC_FHSS_WIDE_MASK=1]\n"
+                    "CFG_SET_REQ(REG_PROFILE=1) OK: 14000100\n"
+                    "2026-10-24 15:35:00,000 INFO x: LBT_ENABLE=0\n"
+                    + "".join(f"2026-10-24 {15 + (35 * 60 + s) // 3600:02d}:"
+                              f"{(35 * 60 + s) // 60 % 60:02d}:{s % 60:02d},000 INFO x: {t}\n"
+                              for s, t in rows)
+                    + "2026-10-24 15:40:00,000 INFO x: signal received; shutting down\n")
+        tx = "x frame seq=1 done (pipelined): 600 fragments ok\n"
+        counting = [(s, f"stats: rx_frames={0 if s < 20 else 2 * s}") for s in range(10, 300, 10)]
+        # no frame line in 300 s, but the counter counts from +20 s: received, and the
+        # share shows the lock (the a3dc5d01 rule read this silence as FAILED)
+        acq = rep.acquisition(rx(*counting), tx)
+        self.assertEqual((acq["first"], acq["heard"][0], acq["status"]),
+                         (None, 20.0, rep.ACQUIRED))
+        self.assertTrue(rep.format_acquisition(acq)[0].startswith(
+            "acquisition: first image reception: no decoded-frame line, but the base's stats "
+            "counter counted a frame by +20.0 s after its profile-1 activation"))
+        self.assertIn("the base decoded 580 of the tractor's 600 fragments on air (96.7 %)",
+                      acq["basis"])
+        # no frame line, no stats line, no frag_arrival line: not determined
+        acq = rep.acquisition(rx(), tx)
+        self.assertEqual(acq["status"], rep.UNDETERMINED)
+        self.assertTrue(acq["basis"].startswith(
+            "the base's log holds no frame line, but no instrument known to be on shows that no "
+            "frame reached it within the budget (no stats line after it still at rx_frames=0, "
+            "no frag_arrival line to show per-fragment logging on)"), acq["basis"])
+        # a published line past the budget, alone: not determined either
+        late = (130, "published frame_id=0 seq=8 198 B")
+        self.assertEqual(rep.acquisition(rx(late), tx)["status"], rep.UNDETERMINED)
+        # ... FAILED once the counter shows nothing by +125 s, or per-fragment logging
+        # shows itself on
+        acq = rep.acquisition(rx((125, "stats: rx_frames=0"), late), tx)
+        self.assertEqual(acq["status"], rep.FAILED)
+        self.assertTrue(acq["basis"].startswith(
+            "the base's stats counter still read rx_frames=0 at +125.0 s (rx_daemon.log line 4; "
+            "always on, it counts every image fragment, logged or not): no image fragment "
+            "reached the base within the 120 s budget"), acq["basis"])
+        acq = rep.acquisition(rx((130, "frag_arrival: seq=8 idx=0 total=1"), late), tx)
+        self.assertEqual(acq["status"], rep.FAILED)
+        # the counter's baseline is its value at the activation
+        acq = rep.acquisition("2026-10-24 15:34:59,000 INFO x: stats: rx_frames=7\n"
+                              + rx((125, "stats: rx_frames=7")), tx)
+        self.assertEqual((acq["base_rx"], acq["status"], acq["rx_frags"]), (7, rep.FAILED, 0))
+        # ... and the fragments the base decoded count from it
+        acq = rep.acquisition("2026-10-24 15:34:59,000 INFO x: stats: rx_frames=7\n"
+                              + rx((20, "stats: rx_frames=307")), tx)
+        self.assertEqual((acq["rx_frags"], acq["status"]), (300, rep.ACQUIRED))
+
+    def test_a_bracket_demotion_shows_the_lock(self) -> None:
+        # rs12_leg_report.py --pre/--post (leg_post.sh passes the base's): a
+        # LOCKED -> SCANNING demotion, which only a locked scan makes
+        pre = {"clk_demotion_reset": 4, "clk_demotion_kept": 0, "radio_rx_ok": 10}
+        post = {"clk_demotion_reset": 5, "clk_demotion_kept": 0, "radio_rx_ok": 400}
+        with tempfile.TemporaryDirectory() as d:
+            arch, _ = _two_board_leg(Path(d), heard=(40, 300, 560), capture=False)
+            rx, tx = _read(arch / "rx_daemon.log"), _read(arch / "tx_daemon.log")
+        acq = rep.acquisition(rx, tx, pre, post)
+        self.assertEqual(acq["status"], rep.ACQUIRED)
+        self.assertEqual(acq["basis"], "the base's bracket counts 1 LOCKED -> SCANNING "
+                                       "demotion(s) (d(clk_demotion_reset) 1, "
+                                       "d(clk_demotion_kept) 0), which only a locked scan makes")
+        acq = rep.acquisition(rx, tx, pre, dict(post, clk_demotion_reset=4))
+        self.assertEqual(acq["status"], rep.UNDETERMINED)
+        self.assertIn("; the base's bracket counts no LOCKED -> SCANNING demotion; ",
+                      acq["basis"])
+        # an L072 reset between the brackets restarts the counters: the post values
+        self.assertEqual(rep.bracket_demotions(
+            {"clk_demotion_reset": 9, "clk_demotion_kept": 0, "radio_rx_ok": 500},
+            {"clk_demotion_reset": 1, "clk_demotion_kept": 0, "radio_rx_ok": 3}), (1, 0))
+        self.assertIsNone(rep.bracket_demotions({"clk_demotion_reset": 1}, post))
+        self.assertIsNone(rep.bracket_demotions(None, None))
+        # a demotion that kept a self-anchored clock is a lock lost too (sx1276_rx.c
+        # counts it as kept, not reset)
+        acq = rep.acquisition(rx, tx, pre, dict(post, clk_demotion_reset=4, clk_demotion_kept=1))
+        self.assertEqual(acq["status"], rep.ACQUIRED)
+        self.assertIn("(d(clk_demotion_reset) 0, d(clk_demotion_kept) 1)", acq["basis"])
+
+    def test_silence_that_a_lock_or_the_firmware_contradicts_is_not_a_failure(self) -> None:
+        # review 2026-10-24: the host's silence (its stats counter flat past the budget,
+        # per-fragment logging on with the first frag_arrival past it) is FAILED evidence
+        # only while nothing contradicts it. The scan's FAILED is absorbing, so a lock
+        # shown anywhere in the leg means the host missed what the base received (UART
+        # contention, a stalled RX worker, lost URCs, a lock on a command frame)
+        stats = [(s, f"INFO x: stats: rx_frames={0 if s < 138 else 2 * (s - 130)}")
+                 for s in range(10, 320, 10)]
+
+        def acq(mask=False, pre=None, post=None):
+            with tempfile.TemporaryDirectory() as d:
+                arch, _ = _two_board_leg(Path(d), capture=False, mask=mask,
+                                         heard=range(261, 607), base_extra=stats)
+                return rep.acquisition(_read(arch / "rx_daemon.log"),
+                                       _read(arch / "tx_daemon.log"), pre, post)
+        alone = acq()
+        self.assertEqual(alone["status"], rep.FAILED)
+        self.assertTrue(alone["basis"].startswith(
+            "the base's stats counter still read rx_frames=0 at +128.6 s (rx_daemon.log line "),
+            alone["basis"])
+        # the share decoded on the 50-channel hop set: 346/606 = 57 %
+        got = acq(mask=True)
+        self.assertEqual((got["status"], got["failed"]), (rep.UNDETERMINED, None))
+        self.assertIn("first came at +136.6 s: no image fragment reached the base within the "
+                      "120 s budget by the host's count, but the base decoded 346 of the "
+                      "tractor's 606 fragments on air (57.1 %): on its 50-channel hop set",
+                      got["basis"])
+        self.assertTrue(got["basis"].endswith(
+            ". The scan's FAILED is absorbing (only a re-activation leaves it), so this silence "
+            "is the host's, not the scan's: its RX path missed what the base received (UART "
+            "contention, a stalled RX worker, lost URCs), or the base locked on a command "
+            "frame, which rx_frames does not count"), got["basis"])
+        line = rep.format_acquisition(got)[1]
+        self.assertTrue(line.startswith("  confirmed acquisition: NOT DETERMINED: "), line)
+        # a base-bracket demotion alone
+        pre = {"clk_demotion_reset": 0, "clk_demotion_kept": 0, "radio_rx_ok": 0}
+        got = acq(pre=pre, post=dict(pre, clk_demotion_reset=1, radio_rx_ok=346))
+        self.assertEqual(got["status"], rep.UNDETERMINED)
+        self.assertIn("by the host's count, but the base's bracket counts 1 LOCKED -> SCANNING "
+                      "demotion(s)", got["basis"])
+        # the bracket's radio_rx_ok well above the host's count (a deaf host)
+        got = acq(pre=dict(pre, rx_urc_lost=0),
+                  post=dict(pre, radio_rx_ok=550, rx_urc_lost=2))
+        self.assertEqual(got["status"], rep.UNDETERMINED)
+        self.assertIn("but the base's bracket counts d(radio_rx_ok) 550 against the host's 346 "
+                      "(FIRMWARE DROP 204, d(rx_urc_lost) 2): the L072 delivered frames the host "
+                      "never counted", got["basis"])
+        # ... but not the log-window drop every bracketed leg shows (0-6)
+        got = acq(pre=dict(pre, rx_urc_lost=0), post=dict(pre, radio_rx_ok=352, rx_urc_lost=0))
+        self.assertEqual(got["status"], rep.FAILED)
+        # firmware evidence still wins over a lock shown: a cold final
+        with tempfile.TemporaryDirectory() as d:
+            arch, _ = _two_board_leg(Path(d), capture=False, mask=True, heard=range(261, 607),
+                                     base_extra=stats + [(121.6, "WARNING x: FAULT_URC: "
+                                                         "code=0x0D sub=0x83 name=RX_SCAN_"
+                                                         "FAILED uptime_ms=1 raw=0d83")])
+            got = rep.acquisition(_read(arch / "rx_daemon.log"), _read(arch / "tx_daemon.log"))
+        self.assertEqual(got["status"], rep.FAILED)
+
+    def test_a_dead_rx_worker_is_no_instrument(self) -> None:
+        # review 2026-10-24: bench-evidence radio_monitor_20260724_154301_c522dcc3's shape.
+        # Its image-rx-worker thread died (an AttributeError) right after it started,
+        # and its stats thread kept printing rx_frames=0 every 10 s: that counter is
+        # frozen, not silence the scan made
+        crash = ["Exception in thread image-rx-worker:", "Traceback (most recent call last):",
+                 "AttributeError: 'FragmentReassembler' object has no attribute 'tick'"]
+
+        def rx(crash_after_s, until_s=210):
+            out = ["2026-10-24 15:34:59,600 INFO x: opening L072 HostLink",
+                   "  FHSS mask: WIDE (50 channels) [LIFETRAC_FHSS_WIDE_MASK=1]",
+                   "CFG_SET_REQ(REG_PROFILE=1) OK: 14000100",
+                   "2026-10-24 15:35:00,000 INFO x: LBT_ENABLE=0"]
+            for s in range(10, until_s + 1, 10):
+                if crash_after_s is not None and s - 10 < crash_after_s <= s:
+                    out += crash
+                out.append(f"2026-10-24 {15 + (35 * 60 + s) // 3600:02d}:"
+                           f"{(35 * 60 + s) // 60 % 60:02d}:{s % 60:02d},000 INFO x: stats: "
+                           f"rx_frames=0 frames_published=0")
+            return "\n".join(out) + "\n"
+        tx = "x frame seq=1 done (pipelined): 600 fragments ok\n"
+        self.assertEqual(rep.acquisition(rx(None), tx)["status"], rep.FAILED)
+        got = rep.acquisition(rx(5), tx)
+        self.assertEqual((got["status"], got["crash"]), (rep.UNDETERMINED, (0.0, 5)))
+        self.assertIsNone(got["quiet"])
+        self.assertEqual(got["basis"], "the base's log holds no frame line, but no instrument "
+                                       "known to be on shows that no frame reached it within the "
+                                       "budget; the base decoded 0 of the tractor's 600 fragments "
+                                       "on air (0.0 %), under the 25 % that shows a receiver "
+                                       "following its 50-channel hop grid; the base's "
+                                       "image-rx-worker thread died at +0.0 s (rx_daemon.log "
+                                       "line 5): its stats counter and frag_arrival lines stop "
+                                       "counting there")
+        # a worker that died after the budget: its counter read 0 past it first
+        got = rep.acquisition(rx(135), tx)
+        self.assertEqual((got["status"], got["quiet"][0]), (rep.FAILED, 130.0))
+
+    def test_a_dead_stats_thread_leaves_a_floor(self) -> None:
+        # review 2026-10-24: bench-evidence radio_monitor_20260915_130259_aa74cde2 (leg U)
+        # shape: the stats thread died one frame in, so its last rx_frames=1 is no
+        # count. With per-fragment logging off, the published frames are the floor
+        def acq(heard):
+            with tempfile.TemporaryDirectory() as d:
+                arch, _ = _two_board_leg(Path(d), capture=False, mask=True, heard=heard)
+                rx, tx = _read(arch / "rx_daemon.log"), _read(arch / "tx_daemon.log")
+            rx = "\n\n".join(ln for ln in rx.split("\n\n") if "frag_arrival" not in ln)
+            rx = re.sub(r"stats: rx_frames=\d+", "stats: rx_frames=1", rx).replace(
+                "RX worker ready", "RX worker ready\n\nException in thread image-rx-stats:\n\n"
+                                   "Traceback (most recent call last):\n\nx")
+            return rep.acquisition(rx, tx)
+        got = acq(range(139, 607))
+        self.assertEqual((got["status"], got["rx_frags"], got["rx_exact"]),
+                         (rep.ACQUIRED, 468, False))
+        self.assertTrue(got["basis"].startswith(
+            "the base decoded at least 468 of the tractor's 606 fragments on air (at least "
+            "77.2 %): on its 50-channel hop set"), got["basis"])
+        got = acq((40, 300, 560))
+        self.assertEqual(got["status"], rep.UNDETERMINED)
+        self.assertIn("; the base's fragment count is unknown: its stats thread died "
+                      "(rx_daemon.log holds 'Exception in thread image-rx-stats') and "
+                      "per-fragment logging was off, so its published frames give only a floor "
+                      "(the base decoded at least 3 of the tractor's 606 fragments on air (at "
+                      "least 0.5 %))", got["basis"])
+        # on a leg whose TX log shows a batched train, the published frames of one
+        # train share its seq: one fragment at least per run of a seq
+        rx = ("  FHSS mask: WIDE (50 channels)\nCFG_SET_REQ(REG_PROFILE=1) OK: 1\n"
+              "2026-10-24 15:35:00,000 INFO x: LBT_ENABLE=0\n"
+              + "".join(f"2026-10-24 15:35:0{k},000 INFO x: published frame_id=0 seq={s} 9 B\n"
+                        for k, s in enumerate((5, 5, 6, 7, 7))))
+        self.assertEqual(rep.acquisition(rx, "x: frame seq=5 done: 9 fragments ok\n")["rx_frags"],
+                         5)
+        self.assertEqual(rep.acquisition(rx, "x: batching: 2 frames in 1 trains so far\nx: frame "
+                                             "seq=5 done: 9 fragments ok\n")["rx_frags"], 3)
+
+    def test_rules_that_need_their_own_case(self) -> None:
+        # review 2026-10-24 (mutation run): each of these survived every other test.
+        # The firmware's defensive 0x80 marker (a final attempt 0 with warm=0) is no
+        # evidence: a locked leg that logs one stays ACQUIRED, a leg with no lock
+        # shown NOT DETERMINED
+        marker = (31.4, "WARNING x: FAULT_URC: code=0x0D sub=0x80 name=RX_SCAN_FAILED "
+                        "uptime_ms=1 raw=0d80")
+        with tempfile.TemporaryDirectory() as d:
+            self.assertEqual(self._acq(Path(d), heard=range(139, 607), mask=True,
+                                       base_extra=[marker])["status"], rep.ACQUIRED)
+        with tempfile.TemporaryDirectory() as d:
+            self.assertEqual(self._acq(Path(d), heard=(40, 300, 560),
+                                       base_extra=[marker])["status"], rep.UNDETERMINED)
+        # a single-channel hop set: a high share shows no grid following
+        with tempfile.TemporaryDirectory() as d:
+            arch, _ = _two_board_leg(Path(d), capture=False, mask=True, heard=range(139, 607))
+            rx = _read(arch / "rx_daemon.log").replace(
+                "FHSS mask: WIDE (50 channels) [LIFETRAC_FHSS_WIDE_MASK=1]",
+                "FHSS mask: single channel 0 (0100000000000000)")
+            got = rep.acquisition(rx, _read(arch / "tx_daemon.log"))
+        self.assertEqual((got["status"], got["channels"]), (rep.UNDETERMINED, 1))
+        self.assertIn("rx_daemon.log names no FHSS hop set of 10 or more channels",
+                      got["basis"])
+        # the hop set is the start-up configuration's (printed before its REG_PROFILE
+        # line), not a mask printed later
+        streamed = "x frame seq=1 done (pipelined): 600 fragments ok\n"
+        got = rep.acquisition(rx + "\n\n  FHSS mask: WIDE (50 channels)\n", streamed)
+        self.assertEqual(got["channels"], 1)
+        got = rep.acquisition(rx.replace("single channel 0 (0100000000000000)",
+                                         "WIDE (50 channels)")
+                              + "\n\n  FHSS mask: single channel 0 (0100000000000000)\n", streamed)
+        self.assertEqual(got["channels"], 50)
+        # a reception the stats counter dates within the budget is within it, even
+        # with the first frag_arrival line past it (a frame of several fragments)
+        rx = ("  FHSS mask: WIDE (50 channels)\nCFG_SET_REQ(REG_PROFILE=1) OK: 1\n"
+              "2026-10-24 15:35:00,000 INFO x: LBT_ENABLE=0\n"
+              "2026-10-24 15:35:20,000 INFO x: stats: rx_frames=4\n"
+              "2026-10-24 15:37:10,000 INFO x: frag_arrival: seq=8 idx=0 total=1\n"
+              "2026-10-24 15:40:00,000 INFO x: stats: rx_frames=9\n")
+        got = rep.acquisition(rx, "x frame seq=1 done (pipelined): 600 fragments ok\n")
+        self.assertEqual((got["heard"][0], got["first_frag"], got["status"]),
+                         (20.0, 130.0, rep.UNDETERMINED))
 
     def test_no_frame_at_all(self) -> None:
         with tempfile.TemporaryDirectory() as d:
             acq = self._acq(Path(d), heard=())
-        self.assertIs(acq["failed"], True)
+        # no frame line, and the always-on counter still read rx_frames=0 at the end
+        self.assertEqual(acq["status"], rep.FAILED)
         self.assertIsNone(acq["first"])
         lines = rep.format_acquisition(acq)
-        self.assertIn("acquisition: the base decoded no frame in the 316.6 s its log covers "
-                      "after its profile-1 activation", lines[0])
+        self.assertIn("acquisition: first image reception: none, the base decoded no frame in "
+                      "the 316.6 s its log covers after its profile-1 activation", lines[0])
         self.assertIn(", past the FHSS cold-start scan budget", lines[0])
-        self.assertTrue(lines[1].startswith("  !! ACQUISITION FAILED"))
+        self.assertTrue(lines[1].startswith("  !! ACQUISITION FAILED: the base's stats counter "
+                                            "still read rx_frames=0 at +315.6 s"), lines[1])
         # a log too short to tell
         with tempfile.TemporaryDirectory() as d:
             acq = self._acq(Path(d), heard=(), sent=100)
-        self.assertIsNone(acq["failed"])
+        self.assertEqual((acq["status"], acq["failed"]), (rep.UNDETERMINED, None))
         lines = rep.format_acquisition(acq)
-        self.assertTrue(lines[0].endswith(": not determined"), lines[0])
-        self.assertEqual(len(lines), 1)
+        self.assertIn(", no longer than the FHSS cold-start scan budget", lines[0])
+        self.assertTrue(lines[1].startswith("  confirmed acquisition: NOT DETERMINED: the base's "
+                                            "log covers 63.6 s, no more than the budget"),
+                        lines[1])
+        self.assertEqual(len(lines), 2)
         # the tractor sent nothing: the flag says so
         with tempfile.TemporaryDirectory() as d:
             arch, _ = _two_board_leg(Path(d), heard=(), capture=False)
@@ -1129,14 +1655,94 @@ class Acquisition(unittest.TestCase):
         self.assertEqual(rep.format_acquisition(rep.acquisition("x: started\n")),
                          ["acquisition: n/a (rx_daemon.log has no REG_PROFILE activation "
                           "line)"])
-        # a later switch is not the start-up activation; it is noted
+        # review 2026-10-24: a later activation is a profile switch, which stops the
+        # FHSS scan (host_cfg_profile.c), so the window ends there: what the base
+        # decoded on the other profile is no lock, and the bracket spans both
         with tempfile.TemporaryDirectory() as d:
-            acq = self._acq(Path(d), heard=range(30, 606),
+            acq = self._acq(Path(d), heard=range(30, 606), mask=True,
                             base_extra=[(200.0, "INFO x: radio_profile: switching"),
-                                        (200.5, "INFO x: CFG_SET_REQ(REG_PROFILE=2) OK: 1")])
-        self.assertEqual(acq["later"], 1)
-        self.assertIn("; 1 later REG_PROFILE activation(s) (a profile switch) not checked",
-                      rep.format_acquisition(acq)[0])
+                                        (200.5, "CFG_SET_REQ(REG_PROFILE=2) OK: 1")])
+        self.assertEqual((acq["later"], acq["status"]), (1, rep.UNDETERMINED))
+        lines = rep.format_acquisition(acq)
+        self.assertTrue(lines[0].endswith(
+            ", within the FHSS cold-start scan budget of 120 s (4 attempts x 30 s: "
+            "SX1276_RX_SCAN_MAX_RETRIES 3 + 1, SX1276_RX_SCAN_REDESIGN_MS 30000); read up to its "
+            "switch to profile 2 (rx_daemon.log line 1437, +198.6 s)"), lines[0])
+        self.assertEqual(lines[1], "  confirmed acquisition: NOT DETERMINED: a frame received is "
+                                   "not a lock (sx1276_rx.c still delivers a frame whose FHSS "
+                                   "header it rejected), and nothing here shows one; the base "
+                                   "switched to profile 2 at rx_daemon.log line 1437 (+198.6 s), "
+                                   "which stops the FHSS scan: what it decoded after that is not "
+                                   "the scan's, so neither its share of the tractor's fragments "
+                                   "nor a bracket demotion is weighed")
+        self.assertEqual(len(lines), 2)
+        # the same leg without the switch reads ACQUIRED on the share
+        with tempfile.TemporaryDirectory() as d:
+            self.assertEqual(self._acq(Path(d), heard=range(30, 606), mask=True)["status"],
+                             rep.ACQUIRED)
+
+    def test_the_window_ends_at_a_profile_switch(self) -> None:
+        # review 2026-10-24: bench-evidence radio_monitor_20260726_133257_9a633f1c's
+        # shape. Scan attempts fail at +30 / +60 s, the base switches to DTS at +70 s
+        # and decodes every frame after that: not ACQUIRED (the frames are DTS's), and
+        # its silence on FHSS is no run-out either (the switch stopped the scan)
+        dts = [(1.4 + 30.0, "WARNING x: FAULT_URC: code=0x0D sub=0x50 name=RX_SCAN_FAILED "
+                            "uptime_ms=1 raw=0d50"),
+               (1.4 + 60.0, "WARNING x: FAULT_URC: code=0x0D sub=0x51 name=RX_SCAN_FAILED "
+                            "uptime_ms=1 raw=0d51"),
+               (71.0, "INFO x: radio_profile: tractor ACK for 2 — switching locally"),
+               (71.3, "  FHSS mask: single channel 0 (0100000000000000)"),
+               (71.39, "CFG_SET_REQ(REG_PROFILE=2) OK: 14000100")]
+        stats = [(s, f"INFO x: stats: rx_frames={0 if s < 80 else s}") for s in range(10, 300, 10)]
+        rx_tx = None
+        with tempfile.TemporaryDirectory() as d:
+            arch, _ = _two_board_leg(Path(d), capture=False, mask=True, heard=range(150, 606),
+                                     base_extra=dts + stats)
+            rx_tx = (_read(arch / "rx_daemon.log"), _read(arch / "tx_daemon.log"))
+            pre = {"clk_demotion_reset": 0, "clk_demotion_kept": 0, "radio_rx_ok": 0}
+            acq = rep.acquisition(*rx_tx, pre, dict(pre, clk_demotion_reset=1, radio_rx_ok=456))
+        self.assertEqual((acq["status"], acq["first"]), (rep.UNDETERMINED, None))
+        self.assertEqual((acq["cut"]["profile"], round(acq["span"], 1)), ("2", 69.9))
+        lines = rep.format_acquisition(acq)
+        self.assertIn("acquisition: first image reception: none, the base decoded no frame in "
+                      "the 69.9 s from its profile-1 activation (rx_daemon.log line 7 at "
+                      "15:35:36.531 board time) to its profile switch, no longer than the FHSS "
+                      "cold-start scan budget", lines[0])
+        self.assertTrue(lines[1].startswith(
+            "  confirmed acquisition: NOT DETERMINED: the scan ran 69.9 s before the base's "
+            "profile switch, no more than the budget; the base switched to profile 2"),
+            lines[1])
+        self.assertIn("attempt 0 at +30.0 s", lines[2])
+        # the scorer's phrase names the switch too
+        self.assertTrue(rep.reception_phrase(acq).startswith(
+            "no image reception in the 69.9 s from the base's profile-1 activation to its switch "
+            "to profile 2, no longer than"), rep.reception_phrase(acq))
+        # a cold final inside the window still fails it: the switch came at +200 s
+        late = [(121.4, "WARNING x: FAULT_URC: code=0x0D sub=0x83 name=RX_SCAN_FAILED "
+                        "uptime_ms=1 raw=0d83"),
+                (200.0, "CFG_SET_REQ(REG_PROFILE=2) OK: 14000100")]
+        with tempfile.TemporaryDirectory() as d:
+            acq = self._acq(Path(d), mask=True, heard=range(400, 606), base_extra=late)
+        self.assertEqual(acq["status"], rep.FAILED)
+        # so does the host's silence past the budget: the bracket's radio_rx_ok, which
+        # counts the frames decoded after the switch too, does not contradict it
+        quiet = [(s, "INFO x: stats: rx_frames=0") for s in range(10, 200, 10)]
+        with tempfile.TemporaryDirectory() as d:
+            arch, _ = _two_board_leg(Path(d), capture=False, mask=True, heard=range(400, 606),
+                                     base_extra=quiet + late[1:])
+            pre = {"clk_demotion_reset": 0, "clk_demotion_kept": 0, "radio_rx_ok": 0}
+            acq = rep.acquisition(_read(arch / "rx_daemon.log"), _read(arch / "tx_daemon.log"),
+                                  pre, dict(pre, clk_demotion_reset=1, radio_rx_ok=206))
+        self.assertEqual((acq["status"], acq["rx_frags"]), (rep.FAILED, 0))
+        self.assertTrue(acq["basis"].startswith("the base's stats counter still read "
+                                                "rx_frames=0 at +188.6 s"), acq["basis"])
+        # and the committed archive itself, when this tree has it
+        arch = _BS.parent / "bench-evidence" / "radio_monitor_20260726_133257_9a633f1c"
+        if (arch / "rx_daemon.log").is_file():
+            out = _run([arch])
+            self.assertIn("; read up to its switch to profile 2 (rx_daemon.log line 177, ", out)
+            self.assertIn("  confirmed acquisition: NOT DETERMINED: the scan ran ", out)
+            self.assertNotIn("ACQUIRED", out)
 
     def test_scan_fault_sub_byte(self) -> None:
         # sx1276_rx_scan_fail.h: final 7, warm 6, hw_suspect 5, crc_seen 4, attempt 3..0
@@ -1172,22 +1778,25 @@ class Acquisition(unittest.TestCase):
         self.assertEqual([s for s in range(256) if rep.scan_fault_sub(s) is not None], valid)
 
     def test_the_first_frame_at_the_budget_boundary(self) -> None:
-        # whole-second stamps: the first frame exactly 120.0 s after the activation is
-        # within the budget (failed only past it); a log exactly 120.0 s long that
-        # holds no frame is not determined
-        def acq(frame_at):
+        # whole-second stamps, per-fragment logging on: the first frame exactly 120.0 s
+        # after the activation is within the budget (no evidence of a failure, nor of a
+        # lock), 1 ms later past it (FAILED); the always-on counter likewise
+        def acq(ms, line="frag_arrival: seq=8 idx=0 total=1 fw_us=1 len=202"):
             rx = ("CFG_SET_REQ(REG_PROFILE=1) OK: 14000100\n"
                   "2026-10-24 15:35:00,000 INFO image_rx_daemon: LBT_ENABLE=0\n"
-                  f"2026-10-24 15:37:00,{frame_at:03d} INFO image_rx_daemon: "
-                  "published frame_id=0 seq=8 198 B\n")
+                  f"2026-10-24 15:37:00,{ms:03d} INFO image_rx_daemon: {line}\n")
             return rep.acquisition(rx)
         got = acq(0)
-        self.assertEqual((got["first"], got["failed"]), (120.0, False))
-        self.assertIs(acq(1)["failed"], True)
-        got = rep.acquisition("CFG_SET_REQ(REG_PROFILE=1) OK: 14000100\n"
-                              "2026-10-24 15:35:00,000 INFO x: LBT_ENABLE=0\n"
-                              "2026-10-24 15:37:00,000 INFO x: stats: rx_frames=0\n")
-        self.assertEqual((got["span"], got["first"], got["failed"]), (120.0, None, None))
+        self.assertEqual((got["first"], got["status"], got["failed"]),
+                         (120.0, rep.UNDETERMINED, None))
+        self.assertEqual((acq(1)["status"], acq(1)["failed"]), (rep.FAILED, True))
+        # a published line alone shows no instrument on (a frame can take several
+        # fragments): not determined either side of the boundary
+        self.assertEqual(acq(1, "published frame_id=0 seq=8 198 B")["status"], rep.UNDETERMINED)
+        got = acq(0, "stats: rx_frames=0")
+        self.assertEqual((got["span"], got["first"], got["quiet"], got["status"]),
+                         (120.0, None, (120.0, 3), rep.UNDETERMINED))
+        self.assertEqual(acq(1, "stats: rx_frames=0")["status"], rep.FAILED)
 
     def test_base_fault_lines_in_the_legacy_format(self) -> None:
         # the tractor's legacy "FAULT during pipelined TX:" shape
@@ -1227,13 +1836,18 @@ class Acquisition(unittest.TestCase):
                                    "the fragment's tx_id; not in the scan sub-byte layout): "
                                    "sub 0x07 at +128.6 s (line 19)")
         self.assertEqual(len(lines), 5)                 # no "inferred" note
+        # the cold final (0xA3, warm=0) is itself evidence of the failure
+        self.assertTrue(acq["basis"].startswith(
+            "the base's final RX_SCAN_FAILED at +120.0 s (rx_daemon.log line 17, sub 0xA3) is "
+            "cold (warm=0)"), acq["basis"])
         # a locked leg's earlier attempts print without a flag
         with tempfile.TemporaryDirectory() as d:
-            acq = self._acq(Path(d), heard=range(139, 607), base_extra=extra[:2])
+            acq = self._acq(Path(d), heard=range(139, 607), base_extra=extra[:2], mask=True)
         lines = rep.format_acquisition(acq)
-        self.assertEqual(len(lines), 2)
+        self.assertEqual(len(lines), 3)
+        self.assertEqual(acq["status"], rep.ACQUIRED)
         self.assertNotIn("!!", "\n".join(lines))
-        self.assertIn("attempt 0 at +30.0 s", lines[1])
+        self.assertIn("attempt 0 at +30.0 s", lines[2])
 
     def test_base_fault_urc_lines_of_2026_10_24(self) -> None:
         # image_rx_daemon.py from 2026-10-24: one "FAULT_URC: ... name=" line per
@@ -1310,12 +1924,30 @@ class Acquisition(unittest.TestCase):
             acq = self._acq(Path(d), base_extra=[(31.4, urc(0x84, "RX_SCAN_FAILED"))])
         self.assertEqual([(f["sub"], f["scan"]["attempt"], f["scan"]["final"])
                           for f in acq["faults"]], [(0x84, 4, True)])
-        # FAULT_URC lines but no 0x0D one: the note says the base logged none
+        # review 2026-10-24: FAULT_URC lines but no 0x0D one. This daemon logs every
+        # FAULT_URC and a scan that runs out sends one per attempt, so the silence
+        # the host shows contradicts a run-out: not determined, not FAILED
         with tempfile.TemporaryDirectory() as d:
             acq = self._acq(Path(d), base_extra=[extra[2]])
-        self.assertEqual(rep.format_acquisition(acq)[-1],
-                         "  (rx_daemon.log holds no base FAULT 0x0D line: the base logged no "
-                         "RX_SCAN_FAILED FAULT_URC, so the FAILED entry is inferred, not seen)")
+        self.assertEqual((acq["logged"], acq["status"]), (True, rep.UNDETERMINED))
+        lines = rep.format_acquisition(acq)
+        self.assertEqual(len(lines), 2)
+        self.assertTrue(lines[1].startswith(
+            "  confirmed acquisition: NOT DETERMINED: per-fragment logging was on (rx_daemon.log "
+            "holds frag_arrival lines) and the first came at +138.1 s"), lines[1])
+        self.assertIn("no image fragment reached the base within the 120 s budget by the host's "
+                      "count, but this daemon logs every FAULT_URC (rx_daemon.log holds "
+                      "FAULT_URC lines) and a scan that runs out sends an RX_SCAN_FAILED one "
+                      "per attempt, yet the window holds none. The scan's FAILED is absorbing",
+                      lines[1])
+        # the same with its four attempts logged: FAILED, the cold final seen
+        with tempfile.TemporaryDirectory() as d:
+            acq = self._acq(Path(d), base_extra=[extra[2]] + [
+                (1.4 + 30.0 * (k + 1), urc(k | (0x80 if k == 3 else 0), "RX_SCAN_FAILED"))
+                for k in range(4)])
+        self.assertEqual(acq["status"], rep.FAILED)
+        self.assertTrue(acq["basis"].startswith("the base's final RX_SCAN_FAILED at +120.0 s"),
+                        acq["basis"])
 
 
 class LegReportEndToEnd(unittest.TestCase):
@@ -1333,8 +1965,9 @@ class LegReportEndToEnd(unittest.TestCase):
                       lines[i + 1])
         self.assertIn("the capture's first frame is its #264, its last #494 (placed by the "
                       "params.txt clock offsets, within 0.03 s): 601/606 = 99.2%", lines[i + 2])
-        self.assertTrue(lines[i + 3].startswith("acquisition: the base's first decoded frame "
-                                                "came 138.1 s after"), lines[i + 3])
+        self.assertTrue(lines[i + 3].startswith("acquisition: first image reception: the base's "
+                                                "first decoded frame came 138.1 s after"),
+                        lines[i + 3])
         self.assertTrue(lines[i + 4].startswith("  !! ACQUISITION FAILED"), lines[i + 4])
         self.assertLess(i + 4, 8)
         self.assertNotIn("jumps", out)
@@ -1360,7 +1993,7 @@ class LegReportEndToEnd(unittest.TestCase):
         self.assertIn("!! ACQUISITION FAILED (see the acquisition line below)", lines[0])
         # only a failed acquisition: not one that is not determined (a log shorter than
         # the budget) or n/a (off FHSS)
-        for kw, acq in ((dict(heard=(), sent=100), ": not determined"),
+        for kw, acq in ((dict(heard=(), sent=100), "  confirmed acquisition: NOT DETERMINED: "),
                         (dict(profile=2), "acquisition: n/a (")):
             with tempfile.TemporaryDirectory() as d:
                 arch, _ = _two_board_leg(Path(d), capture=False, **kw)
@@ -1368,9 +2001,29 @@ class LegReportEndToEnd(unittest.TestCase):
             self.assertIn(acq, out)
             self.assertTrue(out.splitlines()[0].endswith("log_window=after_stop  "), out)
 
+    def test_a_missing_bracket_still_prints_the_loss_lines_first(self) -> None:
+        # review 2026-10-24: the acquisition reads the brackets before the first line
+        # prints; a missing one must not cost the loss lines (leg_post.sh keeps the
+        # report's first 8 on the console). The radio-deltas block fails on it as
+        # before, after them
+        with tempfile.TemporaryDirectory() as d:
+            arch, cap = _two_board_leg(Path(d))
+            buf = io.StringIO()
+            with redirect_stdout(buf), self.assertRaises(OSError):
+                rep.main([str(arch), "--pre", str(Path(d) / "missing_pre.txt"),
+                          "--post", str(Path(d) / "missing_post.txt"), "--capture", str(cap)])
+        out = buf.getvalue()
+        self.assertIn("!! ACQUISITION FAILED (see the acquisition line below)",
+                      out.splitlines()[0])
+        for want in ("\nloss 601/606 = 99.2%", "\nshared-window loss 601/606 = 99.2%",
+                     "\ncapture seq gaps (leg2x_base.jsonl): lost 226/231 = 97.8%",
+                     "\nacquisition: first image reception: ", "\n  !! ACQUISITION FAILED: "):
+            self.assertIn(want, out)
+        self.assertNotIn("radio deltas", out)
+
     def test_a_locked_leg_keeps_its_old_head_line(self) -> None:
         with tempfile.TemporaryDirectory() as d:
-            arch, cap = _two_board_leg(Path(d), heard=range(139, 607))
+            arch, cap = _two_board_leg(Path(d), heard=range(139, 607), mask=True)
             out = _run([arch, "--capture", cap])
         self.assertIn("  first frame heard at seq 139: the 138 frame(s) numbered before it "
                       "are not in the figure above (the camera numbers from seq 1 at "
@@ -1378,12 +2031,16 @@ class LegReportEndToEnd(unittest.TestCase):
                       "counting from seq 1: 138/606 = 22.8%", out)
         self.assertIn("the capture's first frame is its #139, its last #606", out)
         self.assertNotIn("!!", out)
-        # without a capture: the acquisition line, no head
+        # without a capture: the acquisition lines, no head
         with tempfile.TemporaryDirectory() as d:
-            arch, _ = _two_board_leg(Path(d), heard=range(139, 607), capture=False)
+            arch, _ = _two_board_leg(Path(d), heard=range(139, 607), capture=False, mask=True)
             out = _run([arch])
+        self.assertTrue(out.splitlines()[-2].startswith(
+            "acquisition: first image reception: the base's first decoded frame came 75.6 s "
+            "after"), out)
         self.assertTrue(out.splitlines()[-1].startswith(
-            "acquisition: the base's first decoded frame came 75.6 s after"), out)
+            "  confirmed acquisition: ACQUIRED: the base decoded 468 of the tractor's 606 "
+            "fragments on air (77.2 %)"), out)
 
 
 # -- committed evidence ---------------------------------------------------------
@@ -1475,7 +2132,21 @@ class CommittedArchives(unittest.TestCase):
                 if tag != "2b_f3":
                     self.assertIn(", within the FHSS cold-start scan budget", acq)
                     self.assertNotIn("!!", out)
+                    # review 2026-10-24: a lock shown, by the base bracket's
+                    # end-of-leg demotion and by the share decoded
+                    self.assertIn("  confirmed acquisition: ACQUIRED: the base's bracket counts "
+                                  "1 LOCKED -> SCANNING demotion(s) (d(clk_demotion_reset) 1, "
+                                  "d(clk_demotion_kept) 0), which only a locked scan makes; the "
+                                  "base decoded ", out)
                     continue
+                # leg 6: FAILED on the evidence it has (no FAULT_URC line: its daemon
+                # predates them): the always-on counter and per-fragment logging
+                self.assertIn("  !! ACQUISITION FAILED: the base's stats counter still read "
+                              "rx_frames=0 at +130.2 s (rx_daemon.log line 65; always on, it "
+                              "counts every image fragment, logged or not); per-fragment "
+                              "logging was on (rx_daemon.log holds frag_arrival lines) and the "
+                              "first came at +138.1 s: no image fragment reached the base within "
+                              "the 120 s budget", out)
                 self.assertIn("capture seq gaps (leg2b_f3_base.jsonl): lost 226/231 = 97.8%", out)
                 self.assertIn("  first frame heard at seq 8 is the tractor's frame #264 on air (1 "
                               "u8 seq wrap before it, by its TX log): the 263 frame(s)", out)

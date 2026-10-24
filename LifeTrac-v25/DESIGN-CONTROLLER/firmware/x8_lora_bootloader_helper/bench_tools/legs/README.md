@@ -199,11 +199,15 @@ can fall outside the 8 lines `leg_post.sh` shows on the console: read
 
 On an FHSS leg, read the end of the report's first line on the console
 (2026-10-24; tested offline, not yet used on a flown leg). `!! ACQUISITION
-FAILED (see the acquisition line below)` means the base decoded no frame
-within 120 s of its profile-1 activation: its scan ran out into FAILED and it
-never followed the hop grid, so the leg's loss and command figures measure
-that, not the link (2026-10-24 leg 6). The `acquisition:` line itself, and
-the base's 0x0D `FAULT_URC:` lines under it, are in `leg<X>_report.txt`. The
+FAILED (see the acquisition line below)` means positive evidence that the
+base's scan ran out into FAILED (a cold or early final RX_SCAN_FAILED, or no
+frame within 120 s of its profile-1 activation on an instrument known to be
+on, with nothing contradicting that silence): it never followed the hop
+grid, so the leg's loss and command figures
+measure that, not the link (2026-10-24 leg 6). The `acquisition:` line (the
+first image reception), the verdict line under it (`!! ACQUISITION FAILED`,
+`confirmed acquisition: ACQUIRED` or `NOT DETERMINED`, with the evidence),
+and the base's 0x0D `FAULT_URC:` lines are in `leg<X>_report.txt`. The
 STOP RULE line of `leg<X>_deltas.txt` should then end `(!! BASE NEVER LOCKED
 above: ...)`, and `leg<X>_probe_score.txt` holds `!! base ACQUISITION
 FAILED`. Let
@@ -334,8 +338,8 @@ that the bench has no attenuator path.
     a `!! base command TX attempts other than PROBE (0x69)` line means the
     base sent other opcodes during a `-ReactiveFire 1` leg (control or
     profile traffic; 0x63 is expected on a 2d switch leg). Since 2026-10-24
-    an FHSS leg's block ends with a `base acquisition:` line (`!! base
-    ACQUISITION FAILED` past the 120 s scan budget);
+    an FHSS leg's block ends with a `base acquisition:` line (ACQUIRED, NOT
+    DETERMINED, or `!! base ACQUISITION FAILED` on positive evidence);
   - `../rs13_rf_extract.py <archive> --lines` -> `leg<X>_rf.txt` (every leg);
   - `../rs13_rf_extract.py --leak <archive>` -> `leg<X>_leak.txt` (`leak_*`
     legs);
@@ -343,7 +347,8 @@ that the bench has no attenuator path.
     (skipped when the capture's summary counts no VECTOR frame). Since
     2026-10-24 it places the capture's head on the tractor's TX log of the
     archive that `leg<X>_params.txt` names (copied there by this step, before
-    the scorers), looked for next to the session folder; without it the head
+    the scorers), looked for next to the session folder, by the frame's
+    transport seq off that archive's `rx_daemon.log`; without it the head
     reads AMBIGUOUS;
   - `../bracket_deltas.py <legs> <X>` -> `leg<X>_deltas.txt`. Since
     2026-10-24 an FHSS leg whose base never locked gets a `!! BASE NEVER
@@ -357,8 +362,9 @@ that the bench has no attenuator path.
   the A16 verdict over 2a + 2a′) stay manual: RS13_RANGE_EDGE_LEG.md. The
   codec pool refuses legs of different `log_window` values (exit 1). Add
   `--void-unlocked` to it (2026-10-24) only when the pass rule written before
-  leg 1 says so: it leaves the FHSS legs whose base acquisition failed out of
-  the pool and lists them.
+  leg 1 says so: it leaves the FHSS legs whose base acquisition FAILED on
+  positive evidence out of the pool and lists them (never a leg NOT
+  DETERMINED).
 
 ## Step 1: camera-only dry run (no radio)
 

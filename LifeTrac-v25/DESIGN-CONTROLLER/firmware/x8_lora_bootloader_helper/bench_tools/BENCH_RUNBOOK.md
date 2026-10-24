@@ -32,8 +32,8 @@ per-session reference and the trap list. The rest of the bench kit:
 | `frag_gap_report.py <archive>` | PC | lock-loss episodes from the base's fragment-arrival timeline (needs `-LogFragArrivals 1`). Gaps > 3 s are lock losses; healthy links never exceed ~1 s. The gaps run from the first fragment to the last. Since 2026-10-24 (not yet used on a flown leg) a `head:` line gives the silence before the first fragment, from the base's profile activation and, with the params.txt clock offsets, from the tractor's first txdone; a `tail:` line gives the silence after the last, to the tractor's last txdone and to the base daemon's stop (2026-10-24 leg 6: 138.1 s / 131.6 s before, 55.9 s / 62.7 s after, around gaps that spanned 115 s). A leg with fewer than two fragments still gets them (when `tx_daemon.log` has `txdone_arrival` lines) but no command-plane tally, and still exits 1, so `bracket_deltas.py` stays UNVERIFIED there. The copy `stage_boards.sh` puts on the boards has no `tools/` beside it and prints as before. |
 | `bracket_deltas.py <legs dir> <leg>` | PC | one leg's L072 counter deltas from the rs115 brackets (`leg<X>_{pre,post}_{base,tractor}.txt`), reset-aware and cross-checked against the log counts in `leg<X>_gaps.txt`; the RS-12.15 bracket criteria and STOP rule on FHSS legs only (profile from `leg<X>_params.txt`, or `--params <archive>` / `--profile fhss\|dts`). The kit copy (2026-10-19) of RS-12.15's `scripts/deltas.py`, which stays as flown ("A leg", below). `leg_post.sh` writes it to `leg<X>_deltas.txt`. Exit 1 on a FAIL or UNVERIFIED criterion, 2 on incomplete brackets or an unknown profile; `--selftest`. Since 2026-10-24 (not yet used on a flown leg) an FHSS leg whose base never locked gets a `!! BASE NEVER LOCKED` line above the STOP RULE line, and the STOP RULE line points at it ("A leg", Base acquisition). It changes no verdict and no exit code. |
 | `rs13_rf_extract.py <archive> [...]` | PC | received level per leg from the base's `rx_rf:` windows (median of the window medians, minimums, n) and crc_dumps; R0 over the 0 dB legs with the −65 to −75 dBm check; checks the FRF read-back of both boards at the pick (an abort condition) and flags 915 MHz by params or read-back. `--leak`, `--r0 --step [--floor]` (tracking rule), `--r0 --closing`, `--lines`. `--path antenna` (2026-10-19) is for legs flown on the antennas: the level per leg and their median, without R0's verdict or pad advice; it refuses `--leak`, `--r0` / `--step` and `--closing`, which need the conducted path. Exit 1 when the windows cannot stand for the leg (stats thread or receive worker crashed, RS-12.17), or with `--leak` on a decoded frame or `NOT SCORED` (no `rx_frames=` line, a crashed stats thread, receive worker or receiver, stats lines that stop before the log does or cover less than the leg's `duration_s` (params must give it as a positive number), or a DTS leg off the pick); 2 on garbled input. |
-| `rs13_probe_score.py [--margin PP] [--void-unlocked] <archive> [...]` | PC | base→tractor command delivery (tractor `LoRa cmd: PROBE` seqs that the base sent / base `PROBE TX`). Pools VECTOR against `mono_g4` per profile (params `reg_profile`) with a two-sided Fisher exact test, only over legs whose params show `probe_echo=0`, a VECTOR or `mono_g4` codec (`cam_extra_env` `LIFETRAC_ENCODE_MODE=9` / `6`) and one profile: DTS (`reg_profile=2`) gives the VECTOR_SCENE §8.6 verdict, FHSS (`1`) the same comparison labelled FHSS (since 2026-10-19). Otherwise the pooled verdict is withheld, exit 1. Each leg's `tail:` line lists the base PROBE seqs sent after the tractor's last logged one: they count as undelivered, but at a leg's end they are often end-of-log artefacts, so check them before quoting a miss. Since 2026-10-22: a leg whose params `log_window` is not `after_stop` says so in its block (absent = an older harness that read the logs while the daemons ran; `after_stop_unverified` with its `log_window_detail`), and legs whose `log_window` values differ (absent counts as one value) are not pooled, exit 1. On a `-ReactiveFire 1` leg a `!! base command TX attempts other than PROBE (0x69)` line tallies every other opcode the base sent (0x60 REQ_KEYFRAME, 0x63 ENCODE_MODE, ...): control or profile traffic on the command channel during the probes. On a 2d switch leg the 0x63 commands are expected (`leg2d_switch.sh` sends them). The line withholds nothing. `--margin PP` adds a non-inferiority rule under the Fisher lines, which print unchanged: VECTOR minus `mono_g4` delivery, its one-sided 95 % lower bound (Newcombe hybrid score interval), `NOT WORSE (margin rule)` when that bound is above −PP pp and `not shown at this margin` otherwise, and about how many probes per arm the bound would need at the observed rates. The Fisher rule passes whenever the sample is too small (390/400 against 396/400 gives p = 0.176), so state the margin and the legs per codec in RESULTS before leg 1 (RS13_RESULTS_TEMPLATE.md, "Pass rule"). Legs that share a `log_window` other than `after_stop` still pool, but with `--margin` a `!!` line under the verdict says the pool does not meet a pass rule that needs `log_window=after_stop` on every leg. Exit 2 on an empty or error-only daemon log (a failed `docker logs`), a tractor log showing its `image-tx-worker` crashed, a fatal HostLink open, or RXCONT arming disabled (`-RxcontArm 0`) (it was not receiving), counter skips, or logs from different legs; exit 1 when a leg fired no probe. Since 2026-10-24 (not yet used on a flown leg) each FHSS leg's block (params `reg_profile=1`) ends with the base's acquisition by `rs12_leg_report.py`'s rule ("A leg", Base acquisition): `base acquisition: ... within the 120 s FHSS scan budget`, `... not determined` (a log shorter than that), or `!! base ACQUISITION FAILED: ...`. By default nothing else changes: such a leg pools like any other, and one that fired no probe still exits 1 and withholds the pooled verdict. `--void-unlocked` leaves every leg whose acquisition failed out of the pool (and out of the log-window and profile checks) and lists them on a `voided by --void-unlocked ...` line above the pooled lines, so a leg that fired no probe for that reason no longer withholds the verdict; a leg whose acquisition was not determined or does not apply stays in, and a set of two or more that it leaves with nothing to pool prints `pooled: no leg left to pool after --void-unlocked` and exits 1. Use it only when the pass rule written before leg 1 says so (RS13_RESULTS_TEMPLATE.md, "Pass rule", the "never locks" row, a proposal): dropping a leg after seeing its numbers is a choice made after the data. On the 2026-10-24 archives, for information only: by default VECTOR 383/384 against `mono_g4` 542/543, bound −0.99 pp; with `--void-unlocked` leg 2b_f3 is voided and VECTOR reads 379/379, bound −0.54 pp. That round had no such clause and stays scored with leg 2b_f3 counted. |
-| `rs13_digest_trace.py <leg>_base.jsonl [...] [--archive DIR]` | PC | the A16 confirmation table and per-row DIGEST trace (encoder n_live against the base's live count) of a VECTOR capture, replayed through this checkout's store (run it at the base image's SHA); flags `!! A16 shape` in not-scored episodes. A gap of two or more frames is a burst, not scored. The join ends at the first epoch start the store accepts (a key frame, or its repeat-once copy when the key was lost inside the capture), and DIGEST mismatch runs split at epoch switches and starts. Refuses (exit 2) a capture with a second meta line (two capture sessions appended into one file), a payload the replay cannot parse or a VECTOR body the store rejects. Since 2026-10-24 (not yet used on a flown leg) its `capture seq gaps` lines place the head on the tractor's TX log, as `rs12_leg_report.py` does (below), and time a capture with no clean +1 seq step by the leg's `synth_fps`. It finds the leg's archive from the `leg<X>_params.txt` beside the capture (`leg_post.sh` copies it there; the archive is looked for next to the session folder), or takes `--archive DIR` for one capture; without either the head reads AMBIGUOUS. |
+| `rs13_probe_score.py [--margin PP] [--void-unlocked] <archive> [...]` | PC | base→tractor command delivery (tractor `LoRa cmd: PROBE` seqs that the base sent / base `PROBE TX`). Pools VECTOR against `mono_g4` per profile (params `reg_profile`) with a two-sided Fisher exact test, only over legs whose params show `probe_echo=0`, a VECTOR or `mono_g4` codec (`cam_extra_env` `LIFETRAC_ENCODE_MODE=9` / `6`) and one profile: DTS (`reg_profile=2`) gives the VECTOR_SCENE §8.6 verdict, FHSS (`1`) the same comparison labelled FHSS (since 2026-10-19). Otherwise the pooled verdict is withheld, exit 1. Each leg's `tail:` line lists the base PROBE seqs sent after the tractor's last logged one: they count as undelivered, but at a leg's end they are often end-of-log artefacts, so check them before quoting a miss. Since 2026-10-22: a leg whose params `log_window` is not `after_stop` says so in its block (absent = an older harness that read the logs while the daemons ran; `after_stop_unverified` with its `log_window_detail`), and legs whose `log_window` values differ (absent counts as one value) are not pooled, exit 1. On a `-ReactiveFire 1` leg a `!! base command TX attempts other than PROBE (0x69)` line tallies every other opcode the base sent (0x60 REQ_KEYFRAME, 0x63 ENCODE_MODE, ...): control or profile traffic on the command channel during the probes. On a 2d switch leg the 0x63 commands are expected (`leg2d_switch.sh` sends them). The line withholds nothing. `--margin PP` adds a non-inferiority rule under the Fisher lines, which print unchanged: VECTOR minus `mono_g4` delivery, its one-sided 95 % lower bound (Newcombe hybrid score interval), `NOT WORSE (margin rule)` when that bound is above −PP pp and `not shown at this margin` otherwise, and about how many probes per arm the bound would need at the observed rates. The Fisher rule passes whenever the sample is too small (390/400 against 396/400 gives p = 0.176), so state the margin and the legs per codec in RESULTS before leg 1 (RS13_RESULTS_TEMPLATE.md, "Pass rule"). Legs that share a `log_window` other than `after_stop` still pool, but with `--margin` a `!!` line under the verdict says the pool does not meet a pass rule that needs `log_window=after_stop` on every leg. Exit 2 on an empty or error-only daemon log (a failed `docker logs`), a tractor log showing its `image-tx-worker` crashed, a fatal HostLink open, or RXCONT arming disabled (`-RxcontArm 0`) (it was not receiving), counter skips, or logs from different legs; exit 1 when a leg fired no probe. Since 2026-10-24 (not yet used on a flown leg) each FHSS leg's block (params `reg_profile=1`) ends with the base's acquisition by `rs12_leg_report.py`'s rule, on the archive's logs ("A leg", Base acquisition): `base acquisition: ACQUIRED; <first image reception>; evidence: ...`, `base acquisition: NOT DETERMINED; ...` (a first image reception within the 120 s FHSS scan budget alone is not a lock), or `!! base ACQUISITION FAILED; ...`, which needs positive evidence. By default nothing else changes: such a leg pools like any other, and one that fired no probe still exits 1 and withholds the pooled verdict. `--void-unlocked` leaves every leg FAILED on positive evidence out of the pool (and out of the log-window and profile checks) and lists them on a `voided by --void-unlocked ...` line above the pooled lines, so a leg that fired no probe for that reason no longer withholds the verdict; a leg NOT DETERMINED or n/a stays in, and a set of two or more that it leaves with nothing to pool prints `pooled: no leg left to pool after --void-unlocked` and exits 1. Use it only when the pass rule written before leg 1 says so (RS13_RESULTS_TEMPLATE.md, "Pass rule", the "never locks" row, a proposal): dropping a leg after seeing its numbers is a choice made after the data. On the 2026-10-24 archives, for information only: by default VECTOR 383/384 against `mono_g4` 542/543, bound −0.99 pp; with `--void-unlocked` leg 2b_f3 is voided and VECTOR reads 379/379, bound −0.54 pp. That round had no such clause and stays scored with leg 2b_f3 counted. |
+| `rs13_digest_trace.py <leg>_base.jsonl [...] [--archive DIR]` | PC | the A16 confirmation table and per-row DIGEST trace (encoder n_live against the base's live count) of a VECTOR capture, replayed through this checkout's store (run it at the base image's SHA); flags `!! A16 shape` in not-scored episodes. A gap of two or more frames is a burst, not scored. The join ends at the first epoch start the store accepts (a key frame, or its repeat-once copy when the key was lost inside the capture), and DIGEST mismatch runs split at epoch switches and starts. Refuses (exit 2) a capture with a second meta line (two capture sessions appended into one file), a payload the replay cannot parse or a VECTOR body the store rejects. Since 2026-10-24 (not yet used on a flown leg) its `capture seq gaps` lines place the head on the tractor's TX log by the frame's transport seq off the archive's `rx_daemon.log`, as `rs12_leg_report.py` does (below), and time a capture with no clean +1 seq step by the leg's `synth_fps`. It finds the leg's archive from the `leg<X>_params.txt` beside the capture (`leg_post.sh` copies it there; the archive is looked for next to the session folder), or takes `--archive DIR` for one capture; without either the head reads AMBIGUOUS. |
 | [`RS13_VECTOR_LEG.md`](RS13_VECTOR_LEG.md) + [`RS13_RESULTS_TEMPLATE.md`](RS13_RESULTS_TEMPLATE.md) | PC | RS-13.1 VECTOR (codec 6) legs: image smoke, camera-only dry run, radio legs with pass criteria, and the `RESULTS.md` skeleton (since 2026-10-22 with an RF-setup record and a pass rule written before leg 1: the margin, its one-sided 95 % bound and the legs per codec). Adds `-CamExtraEnv` to the harness (env for the `camera_svc` container) and archives `camera_service.log`. |
 | [`RS13_RANGE_EDGE_LEG.md`](RS13_RANGE_EDGE_LEG.md) | PC | written 2026-10-10 as the next radio session after RS-13.1 (not flown; radios only on an explicit GO per round): conducted SMA-attenuator path, leakage check, 0 dB step with VECTOR / mono_g4 interleaved and `-ReactiveFire 1 -ProbeEcho 0` (the `VECTOR_SCENE.md` §8.6 command-delivery row, the A16-fix confirmation), then the 3 dB walk-down at both profiles, stop rules and its own RESULTS template. **Not planned since 2026-10-19:** the bench has no attenuator path, so the conducted path, the leakage check and the walks stay as reference only. Its interleaved DTS legs `A2c`, `A2a`, `A2c2`, `A2a2` and their scoring still apply, on the antennas; they flew 2026-10-19 (`bench-evidence/RS_13_range_edge_2026-10-19/RESULTS.md`). |
 | `../../../tools/vector_dry_run.py capture\|replay\|tractor-log` | both boards (daemon container) / PC | captures `cmd/image_frame` (tractor) or `video/tile_delta` (base) payloads to JSONL, replays them through the base station's own parser + `VectorSceneStore`, and prints per-frame size vs the one-fragment limit, store verdict, orphans, DIGEST, arrival timing and PASS/FAIL checks (`--strict` exits 1). `tractor-log` summarises camera_service's `vector_stats` lines (encoder ms per stage) and totals their cumulative counters on a `counters` line: frames, epoch starts per cause, and the A16 repair's share frames, re-sends, carousel re-sends and DEL repeats. |
@@ -48,11 +48,12 @@ log-window artefact. The `loss … [whole logs]` line is the old figure.
 It reads `n/a, withheld (…)` when the logs cannot be aligned (an outage of
 about one u8 seq wrap, key-frame copies or parity).
 Since 2026-10-24 (not yet used on a flown leg) the report also prints an
-`acquisition:` line on a profile-1 leg (`acquisition: n/a` on other
-profiles), flags `!! ACQUISITION FAILED` there
-and at the end of its first line, places the `--capture` head on the
-tractor's TX log, and times a capture with no clean +1 seq step by the leg's
-`synth_fps` ("A leg", Base acquisition).
+`acquisition:` line (the first image reception) and a verdict line under it
+on a profile-1 leg (`acquisition: n/a` on other profiles), flags `!!
+ACQUISITION FAILED` there, on positive evidence only, and at the end of its
+first line, places the `--capture` head on the tractor's TX log by the
+frame's transport seq, and times a capture with no clean +1 seq step by the
+leg's `synth_fps` ("A leg", Base acquisition).
 
 ## Board facts
 
@@ -387,25 +388,66 @@ its FAILED entry was inferred, not seen
 checks now flag such a leg:
 
 - `rs12_leg_report.py`: an `acquisition:` line, after the loss lines, gives
-  the base's first decoded frame (its first `frag_arrival` or `published
-  frame_id` line) after its profile-1 activation (the first `REG_PROFILE=1)
-  OK` line in `rx_daemon.log`, dated by the next timestamped line). Past
-  120 s, or with no frame in a log that covers more, it prints `!!
-  ACQUISITION FAILED: ...` and ends the report's first line with `!!
+  the base's first image reception (its first `frag_arrival` or `published
+  frame_id` line, or with none the first `stats:` line whose `rx_frames`
+  counted a frame) after its profile-1 activation (the first `REG_PROFILE=1)
+  OK` line in `rx_daemon.log`, dated by the next timestamped line), against
+  the 120 s budget. That is a fact, not the verdict: the L072 also delivers a
+  frame whose FHSS header it rejected (leg 6's base: Δ`fhss_dec_rej_epoch_drift`
+  2 of its 5), so a frame received is not a lock. The verdict line under it
+  rests on positive evidence only (review 2026-10-24), read from the
+  activation to the base daemon's next `REG_PROFILE` activation (a profile
+  switch stops the scan; the `acquisition:` line then ends `read up to its
+  switch to profile N`). `!! ACQUISITION
+  FAILED: <evidence>`, and the report's first line ends with `!!
   ACQUISITION FAILED (see the acquisition line below)`, which `leg_post.sh`'s
-  8-line console excerpt always shows. No frame in a log shorter than 120 s
-  reads `not determined`; a leg on another profile reads `acquisition: n/a
-  (...)`. Below it come the base's 0x0D lines from `rx_daemon.log`: each
+  8-line console excerpt always shows: a final RX_SCAN_FAILED that is cold
+  (warm=0) or came less than 122 s after the activation (dated by the last
+  timestamped line before it: a lock keeps the channel anchor the
+  activation's BEGIN_SCAN set, so its loss comes 2 s after that at the
+  earliest), or an instrument known to be on that shows no frame within
+  120 s (a `stats:` line past it still at the activation's `rx_frames`, the
+  counter being on while the `image-rx-worker` thread lives; or per-fragment
+  logging shown on by a `frag_arrival` line anywhere in the log, the daemon
+  reading the flag once at start-up, with none within it) when nothing
+  contradicts that silence: a lock shown (below), a daemon that logs
+  `FAULT_URC:` lines with no RX_SCAN_FAILED one in the window, or a base
+  bracket whose Δ`radio_rx_ok` exceeds the host's count by more than
+  Δ`rx_urc_lost` + 10 make it the host's silence (scan FAILED is absorbing),
+  and the verdict NOT DETERMINED, naming it. `confirmed acquisition:
+  ACQUIRED: <evidence>` when a lock shows in a window no switch cut: a
+  LOCKED → SCANNING demotion in the base bracket (Δ`clk_demotion_reset` +
+  Δ`clk_demotion_kept`, from `--pre`/`--post`), or at least 25 % of the
+  tractor's fragments on air decoded on a hop set of 10 or more channels (a
+  receiver that does not follow the grid is on the tractor's channel about
+  one slot in 50). Otherwise `confirmed acquisition: NOT DETERMINED: <why>`,
+  never a failure: silence counts only from an instrument known to be on
+  (`-LogFragArrivals` defaults off and params.txt does not record it), and
+  a share counts only on the hop set the start-up configuration printed.
+  The base's fragment count is its `stats:` counter floored by its
+  `frag_arrival` and `published` lines (`at least N` when its stats thread
+  died with per-fragment logging off). A leg
+  on another profile reads `acquisition: n/a (...)`. Below it come the base's
+  0x0D lines from `rx_daemon.log`: each
   RX_SCAN_FAILED with its attempt, its time after the activation and its
   flags; `!! the base's final RX_SCAN_FAILED at +N s ...: its scan entered
   FAILED there` when the final one was logged (qualified when that URC is
   AMBIGUOUS); TX_FIFO_RB_MISMATCH ones on a line of their own; and on a
-  failed leg without any, a note that the FAILED entry is inferred, not seen
-  (before 2026-10-24 the daemon dropped them). The exit code does not change.
-  Leg 6 now reads: the first decoded frame came 138.1 s after the profile-1
-  activation, past the 120 s budget.
-- `rs13_probe_score.py`: the same rule, as one line per FHSS leg block
-  (`!! base ACQUISITION FAILED: ...`), and `--void-unlocked` (table above).
+  failed leg whose log holds no `FAULT_URC:` line at all, a note that the
+  FAILED entry is inferred, not seen (before 2026-10-24 the daemon dropped
+  them; a newer daemon's silence would contradict it, so check which daemon
+  ran). The exit code does not change.
+  Leg 6 now reads: first image reception 138.1 s after the profile-1
+  activation, past the 120 s budget, and `!! ACQUISITION FAILED` on the
+  evidence it has (no FAULT_URC line: its daemon predates them): the `stats:`
+  line at +130.2 s still reads `rx_frames=0`, and its first `frag_arrival`
+  came at +138.1 s. Legs 1–5 read ACQUIRED (the bracket's end-of-leg
+  demotion; 77–97 % of the tractor's fragments decoded).
+- `rs13_probe_score.py`: the same rule on the archive's logs (no bracket), as
+  one line per FHSS leg block (`base acquisition: ACQUIRED; ...`, `...
+  NOT DETERMINED; ...` or `!! base ACQUISITION FAILED; ...`), and
+  `--void-unlocked` (table above), which voids only a leg FAILED on positive
+  evidence.
 - `bracket_deltas.py`: `!! BASE NEVER LOCKED`, from the counters: base
   Δ`clk_demotion_reset` 0 (no LOCKED → SCANNING edge, which every locked leg
   ends with) and Δ`fhss_dec_aligned` 0 while the tractor sent at least 20
@@ -427,8 +469,9 @@ When a leg is flagged (the leg-6 case):
    Note the post `radio_state` of both boards (leg 6: 4 on both), and run
    `legs/power_up_guard.sh --check-only` at least ~2 min after the daemons
    stopped.
-3. Record in RESULTS the `acquisition:` line, the base's 0x0D `FAULT_URC:`
-   lines (name, attempt, final, hw_suspect, uptime_ms), the `!! BASE NEVER
+3. Record in RESULTS the `acquisition:` line and the verdict line under it,
+   the base's 0x0D `FAULT_URC:` lines (name, attempt, final, hw_suspect,
+   uptime_ms), the `!! BASE NEVER
    LOCKED` line, and which tractor frame the first frame heard was (the head
    line).
 4. Score by the pass rule as written before leg 1. With the "never locks"
@@ -469,8 +512,10 @@ and Base acquisition, above; not yet flown). Confirm:
 - on an FHSS leg: base 0x0D `name=RX_SCAN_FAILED` lines about 30 s apart
   before the base's first frame, none when it locks inside the first
   attempt (a prediction), and the report's `acquisition:` line within
-  120 s (15–75 s on 2026-10-24 legs 1–5);
-- the report's head line placed by the params.txt clock offsets, with its
+  120 s (15–75 s on 2026-10-24 legs 1–5) with `confirmed acquisition:
+  ACQUIRED` under it;
+- the report's head line placed by the params.txt clock offsets (by the
+  frame's transport seq, off its `published` line), with its
   `tractor TX log:` line, and `frag_gap_report.py`'s `head:` and `tail:`
   lines in `leg<X>_gaps.txt`;
 - each FHSS block of `leg<X>_probe_score.txt` ends with a `base
