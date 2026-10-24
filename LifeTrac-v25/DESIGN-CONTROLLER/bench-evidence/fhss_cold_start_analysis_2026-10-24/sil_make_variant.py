@@ -21,9 +21,11 @@ usage: py -3 sil_make_variant.py <murata_l072 dir> <out root> <name>[+<name>...]
   a    FAILED + an accepted header -> LOCKED (pure policy)
   b    no absorbing FAILED for a node without originator authority
   d10  scan dwell 10 s (>= one 50-slot epoch) and the walk continues across
-       attempts (no restart at ch 0 on a retry)
-  d2   scan dwell 2 s, walk continues
-  d10r scan dwell 10 s, walker still restarts at ch 0 every attempt
+       attempts (no restart at ch 0 on a retry; with b, nor on b's two
+       restarts out of the final FAIL and out of FAILED)
+  d2   scan dwell 2 s, walk continues (with b too)
+  d10r scan dwell 10 s, walker still restarts at ch 0 every attempt (with b
+       too)
   L    a LOCK always re-anchors the LOCKED loss timer (implied by every d
        option; a alone gets the FAILED-only form)
   noL  leave the loss timer as on main, whatever else is named: shows what L
@@ -146,7 +148,31 @@ def lock_anchor(always):
          LOCK_ANCHOR_ALWAYS if always else LOCK_ANCHOR_FAILED)
 
 
-def opt_b():
+def opt_b(continues):
+    # (b)'s two restarts (the final FAIL without authority, and scan_tick
+    # out of FAILED once authority has decayed) are attempts like a
+    # non-final retry, so they follow the same walk policy. With d2 or d10
+    # (`continues`) they dispatch ADVANCE_CHANNEL, as walk_continues() makes
+    # a non-final retry do: the walk goes on where it stopped, so successive
+    # attempts cover all 50 channels. Before 2026-10-24 (review) they always
+    # dispatched BEGIN_SCAN, which resets the walker: after the fourth FAIL
+    # a silent b+L+d2 node rescanned channels 0-14 for ever, b+d10 0-2.
+    # Plain b and b+d10r keep BEGIN_SCAN: their non-final retries restart at
+    # ch 0 too (plain b's patch is byte-identical to the earlier one).
+    if continues:
+        act = 'ADVANCE_CHANNEL'
+        note_fail = ''' With (d) the walk continues where
+                 * it stopped (ADVANCE, not BEGIN_SCAN, which resets the
+                 * walker), as on a non-final retry: successive attempts
+                 * cover all 50 channels. */'''
+        note_tick = ''' With
+     * (d) the walk continues where it stopped (ADVANCE, not BEGIN_SCAN,
+     * which resets the walker), as on a non-final retry; the counter
+     * still records the FAILED -> SCANNING edge as BEGIN_SCAN. */'''
+    else:
+        act = 'BEGIN_SCAN'
+        note_fail = ' */'
+        note_tick = ' */'
     edit('radio/sx1276_rx.c',
          '''                if (rx_follow_own_now() == 0U) {
                     (void)sx1276_modes_to_standby();
@@ -164,14 +190,14 @@ def opt_b():
                  * its fault (final bit set, attempt nibble at MAX) are
                  * kept, so the host still hears "not acquired" every
                  * 30 s. The retry count stays at MAX: every later FAIL is
-                 * final too. */
+                 * final too.%s
                 s_scan_state               = SX1276_RX_SCAN_STATE_SCANNING;
                 s_scan_channel_entry_ms    = now_ms;
                 s_scan_cold_start_entry_ms = now_ms;
-                scan_dispatch_action(SX1276_RX_SCAN_ACTION_BEGIN_SCAN, now_ms);
+                scan_dispatch_action(SX1276_RX_SCAN_ACTION_%s, now_ms);
                 return;
             }
-''')
+''' % (note_fail, act))
     edit('radio/sx1276_rx.c',
          '''void sx1276_rx_scan_tick(uint32_t now_ms) {
     scan_drive(SX1276_RX_SCAN_EVENT_TICK, false, now_ms);
@@ -184,7 +210,7 @@ def opt_b():
      * last own TX). So once the daemons stop, both boards re-arm RXCONT
      * every dwell indefinitely and the bench park (0x80) holds on
      * neither: (b) needs the RS-12.21 firmware park command, or a
-     * park-aware gate, before it can be bench-flown. */
+     * park-aware gate, before it can be bench-flown.%s
     if (s_scan_state == SX1276_RX_SCAN_STATE_FAILED &&
         sx1276_fhss_is_initialized() != 0U && !sx1276_tx_busy() &&
         rx_follow_own_now() == 0U) {
@@ -193,12 +219,12 @@ def opt_b():
         s_scan_state               = SX1276_RX_SCAN_STATE_SCANNING;
         s_scan_channel_entry_ms    = now_ms;
         s_scan_cold_start_entry_ms = now_ms;
-        scan_dispatch_action(SX1276_RX_SCAN_ACTION_BEGIN_SCAN, now_ms);
+        scan_dispatch_action(SX1276_RX_SCAN_ACTION_%s, now_ms);
         return;
     }
     scan_drive(SX1276_RX_SCAN_EVENT_TICK, false, now_ms);
 }
-''')
+''' % (note_tick, act))
 
 
 def dwell(ms):
@@ -231,7 +257,7 @@ for n in NAMES.split('+'):
     if n == 'a':
         opt_a()
     elif n == 'b':
-        opt_b()
+        opt_b(any(m in ('d10', 'd2') for m in _names))
     elif n == 'd10':
         dwell(10000)
         walk_continues()

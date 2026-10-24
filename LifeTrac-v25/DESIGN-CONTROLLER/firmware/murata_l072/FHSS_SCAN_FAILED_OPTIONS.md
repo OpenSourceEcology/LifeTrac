@@ -253,7 +253,7 @@ the change in section 5, item 3.
 | | (a) FAILED + accepted header → LOCK | (b) no absorbing FAILED without authority | (c) host watchdog re-sends REG_PROFILE=1 | (d) dwell ≥ 2-10 s |
 |---|---|---|---|---|
 | change | policy + dispatcher, ~13 lines, + L | `sx1276_rx.c`, ~19 lines | `image_rx_daemon.py` only | 1 constant + walk continues across attempts, + L |
-| leg-6 replay (E1) | 100/100; median 17.2 s, p90 48.4 s; 99.8 % heard | 100/100; median 34.8 s, p90 107.9 s; 97.6 % heard | 100/100; median 31.5 s, p90 88.9 s; 99.5 % heard | 0/100 alone; b+d10 100/100, median 15.3 s, 99.9 % |
+| leg-6 replay (E1) | 100/100; median 17.2 s, p90 48.4 s; 99.8 % heard | 100/100; median 34.8 s, p90 107.9 s; 97.6 % heard | 100/100; median 31.5 s, p90 88.9 s; 99.5 % heard | 0/100 alone; b+d10 100/100, median 16.8 s, 99.9 % |
 | 2750 ppm drift | 100/100, 99.9 % | 99/100, 98.2 % | not run | b+d10 100/100 |
 | cold start (E2), 2 fps | 6.7 % no LOCK in 120 s; 600/600 by 300 s | 6.7 %; 599/600 by 300 s | 6.7 % (fires only after the first budget); not run past it | d2 1.3 %, d10 0.3 %, d10r 0.5 % |
 | cold start (E2), 1 fps | 23.2 %; 598/600 by 300 s | 23.2 %; 584/600 by 300 s | 23.2 %, as above | d2 10.7 %, d10 8.5 %, d10r 6.0 % |
@@ -299,10 +299,11 @@ the change in section 5, item 3.
 - **Against:**
   - **Harness:** the shared simulation (`rx_reverse_delivery.c`) assumes
     a final FAIL parks. There it expects no retune and mirrors the scan
-    state as FAILED, so the BEGIN_SCAN that (b) dispatches counts as a
-    walker violation and the mirror loses track for the rest of the run
+    state as FAILED, so the retune that (b) dispatches at the final FAIL
+    (BEGIN_SCAN; ADVANCE_CHANNEL with d2 or d10) counts as a walker
+    violation, and the mirror loses track until the next LOCK
     (`check_structure`, leg-6 run: 2 walker violations and 47 396 mirror
-    mismatches under (b), 1 and 21 628 under b+L+d2). The prototype also
+    mismatches under (b), 1 and 3200 under b+L+d2). The prototype also
     records only one of its two FAILED → SCANNING edges: the `scan_tick`
     restart calls `sx1276_rx_scan_counter_record`, the re-entry at the
     final FAIL does not. So (b)'s acceptance check needs the harness's
@@ -351,7 +352,9 @@ the change in section 5, item 3.
 
 - **What:** `SX1276_RX_SCAN_DWELL_MS` 500 → 2000 (d2) or 10000 (d10), and
   the walk continues across attempts instead of restarting at channel 0.
-  d10r keeps the restart.
+  With (b) it also continues across (b)'s two restarts, so a silent node's
+  successive attempts cover all 50 channels (b+L+d2: 15 new channels per
+  attempt; b+d10: 3). d10r keeps the restart.
 - **For:** fewer cold starts end in FAILED (table). At 1 fps d10r is best
   (6.0 %), but it only ever covers channels 0-2.
 - **Against:** alone it does not recover leg 6 (E1 0/100): FAILED still
@@ -394,16 +397,16 @@ This is a recommendation, not a decision.
    characterisation with (b)'s acceptance check, which needs the harness
    changes in section 4 (b).
    - The recommended scan, b+L+d2, in the SIL: leg-6 replay 100/100,
-     median 16.9 s, p90 72.7 s, 99.5 % heard (2750 ppm: 100/100, 99.9 %);
+     median 17.9 s, p90 56.3 s, 99.8 % heard (2750 ppm: 100/100, 99.9 %);
      cold start 1.3 % at 2 fps (600/600 by 300 s), 10.7 % at 1 fps
-     (597/600); tractor twin: authority back in 50/50.
+     (598/600); tractor twin: authority back in 50/50.
    - Why (b) over (a): no change to the pure policy contract, none of the
      shipped checks regresses (the harness needs updating), no reliance on
      a host re-arm, and the tractor twin is covered. (a) alone is faster
-     than (b) alone (median 17 s against 35 s; with d2, (b) takes 16.9 s)
-     but needs the receiver kept armed in FAILED and changes the
-     2026-10-18 expectations. (a) is the fallback if the park command
-     cannot be built first.
+     than (b) alone (median 17 s against 35 s; with d2, (b) takes 17.9 s,
+     about the same as (a)) but needs the receiver kept armed in FAILED
+     and changes the 2026-10-18 expectations. (a) is the fallback if the
+     park command cannot be built first.
    - Why d2: it cuts 2 fps cold-start failures from 6.7 % to 1.3 % and
      1 fps from 23.2 % to 10.7 % with every existing check green. With L
      it also moves the tractor's decay window (item 3). d10 is better at
@@ -464,7 +467,7 @@ deploy to the X8s, which is also the operator's call.
 |---|---|---|---|
 | T1 forced FAILED | main, after the FAULT logging is deployed | H1 directly: start the base, keep the tractor silent ≥ 125 s, then stream at 2 fps for 180 s (needs a harness option to delay the tractor's stream; not built) | four base 0x0D (final one sub bit 7 set) logged; about 1 frame in 50 heard; Δaligned 0; Δ`clk_demotion_reset` 0; post `radio_state` 4 |
 | T2 cold-start set | main | the FAILED rate and first-frame times (R:618-620) | about 10 starts of ≥ 150 s; compare with section 3 (at ~7 % per start, 10 starts see a FAILED about half the time, so T1 is the stronger test) |
-| T3 fix A/B | fix | T1 and T2 on the new image | T1: LOCK a median ~35 s after the stream starts or sooner, ≥ 97 % heard afterwards (SIL-E1: b alone median 34.8 s, 97.6 %; b+L+d2 median 16.9 s, 99.5 %); 0x0D every 30 s while silent; the park command parks both boards (0x80 holds) |
+| T3 fix A/B | fix | T1 and T2 on the new image | T1: LOCK a median ~35 s after the stream starts or sooner, ≥ 97 % heard afterwards (SIL-E1: b alone median 34.8 s, 97.6 %; b+L+d2 median 17.9 s, 99.8 %); 0x0D every 30 s while silent; the park command parks both boards (0x80 holds) |
 | T4 tractor twin | main, then fix | a 2026-10-18 leg-X shape (scan FAILED first) with 2.5 s camera stalls and commands; on the fix, the same stalls before FAILED too (the decay window, section 5, item 3) | main: commands received drop after the first stall with a command heard in it; fix: tractor `clk_demotion_*` counters move and delivery returns to the fix image's own pre-FAILED level (SIL-E3, b+L+d2: 59.7 % out of FAILED, 59.1 % before it, main 53.2 % before it) |
 | T5 fault codes | fix | the 0x0D split | scan faults arrive as 0x0D only; `tx_fifo_rb_bad` 0 and no 0x0F |
 
@@ -675,7 +678,9 @@ one CRC error (R:490-492).
   `legload.py`, `load_all.py`, `risk_run.py`, `risk_summary.py`,
   `clock_run.py` and their `.txt` outputs; `sil_make_variant.py` for the
   option patches (a, b, L, d2, d10, d10r, combinations such as b+L+d2, and
-  `noL` to leave L out).
+  `noL` to leave L out). With b, d2 and d10 also continue the walk across
+  b's two restarts (b+d10r and plain b restart at channel 0, as their
+  retries do).
 - Unchanged by this work: the bench image (md5 `e083ae46a64686031b39866eca42e094`)
   and the production image (md5 `148de24e1f9acce417c46c2c69a5be6b`), both
   rebuilt and checked on 2026-10-24.
