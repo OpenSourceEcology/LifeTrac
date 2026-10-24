@@ -11,6 +11,19 @@ firmware-drop count (drx_ok - host URCs). With ``--capture`` (the base-side
 frame loss read from the TileDeltaFrame sequence numbers, which no
 periodic counter line can make stale.
 
+2026-10-24 (the FHSS round's leg 6, where the base never locked): an
+``acquisition:`` line gives the base's first decoded frame after its
+profile-1 activation against the FHSS cold-start scan budget (4 attempts x
+30 s = 120 s) and flags ``!! ACQUISITION FAILED`` past it (also at the end
+of the report's first line, which leg_post.sh's 8-line console excerpt
+always shows), with the base's RX_SCAN_FAILED FAULT lines when its log
+holds them; the capture's head (the frames before the first one heard,
+RS-13.1 A7) is placed on the tractor's TX log (``txdone_arrival``) instead
+of being assumed to sit in the first u8 seq cycle, and reads AMBIGUOUS when
+it cannot be placed; a capture with no clean +1 seq step times its gaps by
+the leg's synth_fps, so an outage of more than 128 frames is counted, not
+booked as a counter-restart jump.
+
 Usage:
     py -3 rs12_leg_report.py <archive_dir> [--pre stats_pre.txt --post stats_post.txt]
                              [--capture legs/leg<X>_base.jsonl]
@@ -52,6 +65,55 @@ TRAIN_SPLIT_S = 10.0
 # 2.1 s (a 15-fragment train whose first fragments the base lost), and one
 # wrap is 256 frames, 25.6 s even at 10 frames/s.
 ALIGN_TOL_S = 10.0
+
+# 2026-10-24: placing a frame the base captured on the tractor's TX log (the
+# A7 head). With the params.txt clock offsets (board minus PC, read after the
+# leg, error at most rtt/2, about 0.03 s) the frame's txdone_arrival lands
+# within a few tens of ms of it on the PC clock (19-33 ms on the 10-24 legs);
+# the next frame of the same u8 seq is a wrap away, 25.6 s even at 10 fps.
+PLACE_TOL_S = 2.0
+# Without the offsets (every archive before 10-24): how much later the RX
+# daemon's first log line came than the TX daemon's, PC time, for the
+# candidate to be the frame. The harness starts the TX daemon first: 0.1 to
+# 32.4 s later on the 61 committed archives with per-fragment events. Two
+# candidates fit when a wrap is shorter than the window (above ~5.6 fps):
+# the head is then ambiguous.
+START_SKEW_S = (-5.0, 40.0)
+
+# 2026-10-24 (leg 6): the FHSS cold-start scan budget. A scan attempt dwells
+# SX1276_RX_SCAN_DWELL_MS (500 ms) per channel and fails after
+# SX1276_RX_SCAN_REDESIGN_MS (30000 ms, sx1276_rx_scan_policy.h); the first
+# attempt and SX1276_RX_SCAN_MAX_RETRIES (3, sx1276_rx_scan_fail.h) retries
+# make 4, and the fourth FAIL enters scan FAILED, which is absorbing
+# (sx1276_rx_scan_policy.c): only a reset or a profile re-activation leaves
+# it, and a follower there never hops. A base that decodes no frame within
+# 4 x 30 s of its profile-1 activation ran out of scan.
+SCAN_ATTEMPT_S = 30.0
+SCAN_MAX_RETRIES = 3
+SCAN_BUDGET_S = SCAN_ATTEMPT_S * (SCAN_MAX_RETRIES + 1)
+# "CFG_SET_REQ(REG_PROFILE=1) OK: 14000100", printed (no timestamp) when the
+# daemon's profile activation is acknowledged; the next timestamped line (the
+# LBT_ENABLE line on every committed archive since 07-25) dates it.
+ACTIVATION_RE = re.compile(r"REG_PROFILE=(\d+)\) OK")
+# A frame the base decoded: frag_arrival (-LogFragArrivals 1) or a publish.
+DECODED_RE = re.compile(r"frag_arrival: seq=|published frame_id=")
+# FAULT_URC lines as the daemons log them: the tractor's legacy "FAULT during
+# pipelined TX: code=0x0D sub=0x20 raw=..." (format_fault_payload), and from
+# 2026-10-24 one "FAULT_URC: code=0x0D sub=0xA3 name=RX_SCAN_FAILED ..." line
+# per URC from both daemons (format_fault_urc_line, method_g_stage1_probe.py).
+# The same URC can leave a legacy line beside its FAULT_URC line, so when a
+# log holds FAULT_URC lines (with name=) only they are counted. Code 0x0D is
+# HOST_FAULT_CODE_RX_SCAN_FAILED and also TX_FIFO_RB_MISMATCH (host_types.h):
+# the daemon's name= decides it when it names one of them, else (AMBIGUOUS,
+# or a legacy line) scan_fault_sub() reads the sub-byte by the scan layout.
+FAULT_RE = re.compile(r"\bFAULT\w*\b.*?\bcode=0x([0-9A-Fa-f]{2}) sub=0x([0-9A-Fa-f]{2})")
+FAULT_URC_RE = re.compile(r"\bFAULT_URC: code=0x[0-9A-Fa-f]{2} sub=0x[0-9A-Fa-f]{2} "
+                          r"name=(\w+)")
+FAULT_CODE_SCAN = 0x0D
+# sx1276_rx_scan_fail.h, the RX_SCAN_FAILED sub-byte (MSB to LSB)
+SCAN_SUB_FINAL, SCAN_SUB_WARM, SCAN_SUB_HW_SUSPECT, SCAN_SUB_CRC_SEEN = 0x80, 0x40, 0x20, 0x10
+SCAN_SUB_ATTEMPT = 0x0F
+PROFILE_NAMES = {"0": "bench-only fixed 915 MHz", "1": "FHSS", "2": "DTS"}
 
 
 def parse_stats(path: pathlib.Path) -> dict[str, int]:
@@ -99,7 +161,9 @@ def fragment_trains(events) -> list[dict]:
     """Trains: consecutive events with the same seq (mod 256), in log order,
     split where two of them are more than TRAIN_SPLIT_S apart (the seq came
     round again). Each train: ``seq``, ``idxs`` (set), ``idx_list`` (as
-    logged, duplicates kept), ``totals`` (set), ``t`` (first event's time)."""
+    logged, duplicates kept), ``totals`` (set), ``t`` (first event's time),
+    ``t_end`` (last event's time: the base publishes a frame after its last
+    fragment, 2026-10-24)."""
     trains: list[dict] = []
     last_t = None
     for t, seq, idx, total in events:
@@ -108,14 +172,14 @@ def fragment_trains(events) -> list[dict]:
                          and t - last_t > TRAIN_SPLIT_S))
         if not same:
             trains.append({"seq": seq, "idxs": set(), "idx_list": [],
-                           "totals": set(), "t": t})
+                           "totals": set(), "t": t, "t_end": t})
         tr = trains[-1]
         tr["idxs"].add(idx)
         tr["idx_list"].append(idx)
         if total is not None:
             tr["totals"].add(total)
         if t is not None:
-            last_t = t
+            last_t = tr["t_end"] = t
     return trains
 
 
@@ -247,11 +311,15 @@ def format_shared_loss(res: dict | None) -> list[str]:
     return out
 
 
-def seq_gap_loss(frames) -> dict:
+def seq_gap_loss(frames, period_s: float | None = None) -> dict:
     """Frame loss from TileDeltaFrame sequence numbers (RS-13.1 A14).
 
     ``frames``: one ``(ts, codec, seq)`` per captured payload, in arrival
     order; ``codec`` and ``seq`` are None for a payload that did not parse.
+    ``period_s``: the leg's nominal frame period (1 / params synth_fps),
+    used only when the capture has no clean +1 step to time the cadence by
+    (2026-10-24 leg 6: 5 frames, no two consecutive; its 102 -> 238 step,
+    68 s, read as a counter-restart jump and the loss as 91/96, not 226/231).
 
     The header seq is a u8 and each encoder path numbers its own frames
     (camera_service: ``_VECTOR_SEQ`` for codec 6, the tile accumulator's
@@ -272,6 +340,9 @@ def seq_gap_loss(frames) -> dict:
     steps = [b[0] - a[0] for a, b in zip(parsed, parsed[1:])
              if a[1] == b[1] and (b[2] - a[2]) % SEQ_MOD == 1]
     period = statistics.median(steps) if steps else None
+    period_src = "steps" if steps else None
+    if period is None and period_s:
+        period, period_src = float(period_s), "nominal"
     runs: list[dict] = []
     for ts, codec, seq in parsed:
         run = runs[-1] if runs else None
@@ -304,6 +375,7 @@ def seq_gap_loss(frames) -> dict:
     lost = sum(r["lost"] for r in runs)
     return {"runs": runs, "received": received, "lost": lost,
             "expected": received + lost, "period_s": period,
+            "period_src": period_src,
             "gaps": sum(r["gaps"] for r in runs),
             "longest": max((r["longest"] for r in runs), default=0),
             "duplicates": sum(r["duplicates"] for r in runs),
@@ -312,9 +384,14 @@ def seq_gap_loss(frames) -> dict:
             "first_seq": runs[0]["first_seq"] if runs else None}
 
 
-def format_seq_loss(res: dict, label: str,
-                    names: dict | None = None) -> list[str]:
-    """Report lines for :func:`seq_gap_loss`."""
+def format_seq_loss(res: dict, label: str, names: dict | None = None,
+                    place: dict | None = None) -> list[str]:
+    """Report lines for :func:`seq_gap_loss`. ``place``: the capture's first
+    and last frames on the tractor's TX log (:func:`place_capture`); without
+    it, or when the first frame could not be placed, a capture that starts
+    after seq 1 gets no head figure (2026-10-24: the head was counted as if
+    the first frame heard sat in the camera's first u8 seq cycle, and leg 6's
+    seq 8 was the tractor's frame #264)."""
     names = names or {}
     if not res["runs"]:
         return [f"capture seq gaps ({label}): no parseable frames "
@@ -322,20 +399,48 @@ def format_seq_loss(res: dict, label: str,
     exp, lost = res["expected"], res["lost"]
     n_runs = len(res["runs"])
     period = f"; period {res['period_s']:.2f} s" if res["period_s"] else ""
+    if period and res.get("period_src") == "nominal":
+        period += " (the leg's synth_fps: no clean +1 step to time it by)"
     out = [f"capture seq gaps ({label}): lost {lost}/{exp} = "
            f"{100 * lost / exp:.1f}%  (received {res['received']}, "
            f"{res['gaps']} gap{'' if res['gaps'] == 1 else 's'}, "
            f"longest {res['longest']}; "
            f"{n_runs} codec run{'s' if n_runs > 1 else ''}{period})"]
-    head = res["first_seq"] - 1
-    if head > 0:
+    seq0 = res["first_seq"]
+    first = (place or {}).get("first") or {}
+    head = seq0 - 1
+    if "frame" in first:
+        head += SEQ_MOD * first["wraps"]
+    if head > 0 and "frame" in first and first["wraps"] == 0:
+        # word for word as before 2026-10-24: the TX log puts the first frame
+        # in the first u8 cycle (every committed leg but 10-24 leg 6)
         out.append(
-            f"  first frame heard at seq {res['first_seq']}: the {head} "
+            f"  first frame heard at seq {seq0}: the {head} "
             f"frame(s) numbered before it are not in the figure above (the "
             f"camera numbers from seq 1 at start-up — an acquisition delay "
             f"or a late capture, RS-13.1 A7); counting from seq 1: "
             f"{lost + head}/{exp + head} = "
             f"{100 * (lost + head) / (exp + head):.1f}%")
+    elif head > 0 and "frame" in first:
+        w = first["wraps"]
+        out.append(
+            f"  first frame heard at seq {seq0} is the tractor's frame "
+            f"#{first['frame']} on air ({w} u8 seq wrap{'s' if w > 1 else ''} "
+            f"before it, by its TX log): the {head} frame(s) numbered before "
+            f"it are not in the figure above (the camera numbers from seq 1 "
+            f"at start-up — an acquisition delay or a late capture, RS-13.1 "
+            f"A7); counting from seq 1: {lost + head}/{exp + head} = "
+            f"{100 * (lost + head) / (exp + head):.1f}%")
+    elif head > 0:
+        why = first.get("why") or (place or {}).get("why") or (
+            "no tractor TX log was given to place it on")
+        out.append(
+            f"  first frame heard at seq {seq0}: the head is AMBIGUOUS — "
+            f"{head} frame(s) numbered before it if seq {seq0} is in the "
+            f"camera's first u8 cycle, {SEQ_MOD} more per wrap, and it cannot "
+            f"be placed on the tractor's TX log ({why}); no figure counting "
+            f"from seq 1 (RS-13.1 A7)")
+    out += format_tx_place(res, place)
     if n_runs > 1:
         out.append(
             "  codec runs: " + " | ".join(
@@ -350,6 +455,361 @@ def format_seq_loss(res: dict, label: str,
         out.append("  !! " + ", ".join(f"{k} {v}" for k, v in odd.items())
                    + " (jumps = a counter restart or a reorder; none of "
                      "these is counted as loss)")
+    return out
+
+
+def format_tx_place(res: dict, place: dict | None) -> list[str]:
+    """The ``tractor TX log`` line under the capture seq-gap line
+    (2026-10-24): the capture's first and last frames placed on the
+    tractor's frames on air, and the share of those frames the capture never
+    received, the head and the tail included. Nothing when the first frame
+    was not placed (the head line says why)."""
+    first = (place or {}).get("first") or {}
+    if "frame" not in first:
+        return []
+    last = place.get("last") or {}
+    sent = place["sent"]
+    if place["how"] == "offsets":
+        dts = [abs(p["dt"]) for p in (first, last) if "dt" in p]
+        basis = (f"placed by the params.txt clock offsets, within "
+                 f"{max(dts):.2f} s")
+    else:
+        basis = (f"placed by the daemons' start times: the RX log starts "
+                 f"{first['skew']:.1f} s after the TX log on the PC clock")
+    line = (f"  tractor TX log: {sent} frame(s) on air (txdone_arrival); the "
+            f"capture's first frame is its #{first['frame']}")
+    if "frame" not in last:
+        return [line + f" ({basis}); its last could not be placed "
+                       f"({last.get('why', 'no frame')})"]
+    line += f", its last #{last['frame']} ({basis})"
+    rcv = res["received"]
+    if rcv <= sent and first["frame"] <= last["frame"]:
+        line += (f": {sent - rcv}/{sent} = {100 * (sent - rcv) / sent:.1f}% "
+                 f"of them never reached the capture ({first['frame'] - 1} "
+                 f"before its first, {sent - last['frame']} after its last)")
+    return [line]
+
+
+def params_dict(text: str) -> dict[str, str]:
+    """params.txt (key=value lines, a BOM on the first) -> {key: value}."""
+    out = {}
+    for line in text.splitlines():
+        key, sep, val = line.lstrip("\ufeff").partition("=")
+        if sep:
+            out[key.strip()] = val.strip()
+    return out
+
+
+def clock_offsets(params: dict) -> tuple[float, float] | None:
+    """``(tractor, base)`` board-minus-PC clock offsets from params.txt
+    (2026-10-24 harness on), or None."""
+    try:
+        return (float(params["tractor_clock_offset_s"]),
+                float(params["base_clock_offset_s"]))
+    except (KeyError, ValueError):
+        return None
+
+
+def nominal_period(params: dict) -> float | None:
+    """1 / params synth_fps (the leg's frame rate), or None."""
+    try:
+        fps = float(params.get("synth_fps", ""))
+    except ValueError:
+        return None
+    return 1.0 / fps if fps > 0 else None
+
+
+def log_start(text: str) -> float | None:
+    """Board time of a daemon log's first timestamped line, or None."""
+    return next((t for t in map(_log_time, text.splitlines()) if t is not None),
+                None)
+
+
+def tx_frames(tx: str) -> list[dict]:
+    """The tractor's frames on air, in log order: the ``txdone_arrival``
+    trains (:func:`fragment_trains`), each with ``n`` (1-based) and ``u``,
+    its seq unwrapped along the log (the first train's seq taken as in the
+    camera's first u8 cycle)."""
+    trains = fragment_trains(fragment_events(tx, rx=False))
+    u = None
+    for n, tr in enumerate(trains, 1):
+        u = tr["seq"] if u is None else u + (tr["seq"] - u) % SEQ_MOD
+        tr["n"], tr["u"] = n, u
+    return trains
+
+
+def place_frame(ts: float, seq: int, frames: list[dict],
+                offsets: tuple[float, float] | None = None,
+                starts: tuple[float, float] | None = None,
+                basis: str = "the params.txt clock offsets") -> dict:
+    """Which of the tractor's frames on air (:func:`tx_frames`) a frame the
+    base captured at ``ts`` (base board time) with u8 ``seq`` is.
+
+    With ``offsets`` (``(tractor, base)`` board minus PC, as in params.txt):
+    the frame of that seq whose last txdone_arrival (its train's ``t_end``:
+    the base publishes after the last fragment) lands nearest it on the PC
+    clock, within PLACE_TOL_S (``basis`` names the offsets in the reason).
+    Else with ``starts`` (rx_daemon.log and tx_daemon.log first-line board
+    times): the one frame of that seq for which the RX daemon started
+    START_SKEW_S after the TX daemon on the PC clock; none or several is no
+    placement. Returns ``frame`` (its n), ``wraps`` (u8 seq wraps before
+    it), ``dt`` or ``skew``, or ``why`` when not placed."""
+    cands = [f for f in frames
+             if f["seq"] == seq % SEQ_MOD and f["t_end"] is not None]
+    if not cands:
+        return {"why": f"no txdone_arrival with seq {seq} in tx_daemon.log"}
+
+    def hit(f, **kw):
+        return dict(kw, frame=f["n"], wraps=(f["u"] - seq) // SEQ_MOD)
+    if offsets is not None:
+        tr_off, base_off = offsets
+        dt, f = min((((ts - base_off) - (f["t_end"] - tr_off), f)
+                     for f in cands), key=lambda c: abs(c[0]))
+        if abs(dt) > PLACE_TOL_S:
+            return {"why": f"the nearest txdone_arrival with seq {seq} is "
+                           f"{dt:+.1f} s from it on {basis} (more than "
+                           f"{PLACE_TOL_S:g} s)"}
+        return hit(f, dt=dt)
+    if starts is None:
+        return {"why": "no clock offsets in params.txt and no daemon start "
+                       "times to align the two logs by"}
+    rx0, tx0 = starts
+    lo, hi = START_SKEW_S
+    fit = [(s, f) for s, f in (((rx0 - tx0) - (ts - f["t_end"]), f)
+                               for f in cands) if lo <= s <= hi]
+    if len(fit) == 1:
+        return hit(fit[0][1], skew=fit[0][0])
+    return {"why": (f"no params.txt clock offsets, and the daemons' start "
+                    f"times fit {len(fit)} of the tractor's frames with seq "
+                    f"{seq}" + (f" (#{', #'.join(str(f['n']) for _, f in fit)})"
+                                if fit else ""))}
+
+
+def place_capture(frames, tx: str, rx: str | None, params: dict) -> dict | None:
+    """The capture's first and last parsed frames on the tractor's TX log
+    (:func:`place_frame`): ``sent`` (its frames on air), ``how`` ("offsets"
+    or "starts"), ``first`` and ``last``; ``why`` when the TX log has no
+    txdone_arrival line. None for a capture with no parsed frame. Without
+    the params.txt offsets the last frame is placed on the first one's own
+    match (the two clocks tick together), so the start-time window is not
+    needed twice; a capture that runs past the TX log's last frame (a
+    harness that read the logs while the daemons ran) says so."""
+    parsed = [(float(t), s) for t, c, s in frames
+              if c is not None and s is not None]
+    if not parsed:
+        return None
+    trains = tx_frames(tx)
+    if not trains:
+        return {"sent": 0, "why": "tx_daemon.log has no txdone_arrival line "
+                                  "(harness -LogFragArrivals 1)"}
+    offsets = clock_offsets(params)
+    starts = None
+    if offsets is None and rx is not None:
+        rx0, tx0 = log_start(rx), log_start(tx)
+        if rx0 is not None and tx0 is not None:
+            starts = (rx0, tx0)
+    first = place_frame(*parsed[0], trains, offsets, starts)
+    out = {"sent": len(trains), "how": "offsets" if offsets else "starts",
+           "first": first, "last": first if len(parsed) == 1 else None}
+    if "frame" not in first:
+        out["last"] = {"why": "the first frame was not placed"}
+    elif out["last"] is None:
+        ts, seq = parsed[-1]
+        if offsets is not None:
+            rel, basis = offsets, "the params.txt clock offsets"
+        else:
+            rel = (0.0, parsed[0][0] - trains[first["frame"] - 1]["t_end"])
+            basis = "the first frame's alignment"
+        last = place_frame(ts, seq, trains, rel, basis=basis)
+        t_tractor = ts - rel[1] + rel[0]      # its time on the tractor clock
+        if "frame" not in last and t_tractor > trains[-1]["t_end"]:
+            last = {"why": f"it came after the TX log's last frame "
+                           f"(#{len(trains)}): the TX log ends before the "
+                           f"capture does"}
+        if offsets is None:
+            last.pop("dt", None)            # not a params-offset residual
+        out["last"] = last
+    return out
+
+
+def scan_fault_sub(sub: int, strict: bool = True) -> dict | None:
+    """An RX_SCAN_FAILED FAULT sub-byte (sx1276_rx_scan_fail.h, built by
+    sx1276_rx_scan_fail_eval): ``attempt`` (bits 3..0), ``final`` (bit 7,
+    set on the last attempt only: retries >= SX1276_RX_SCAN_MAX_RETRIES),
+    ``warm`` (bit 6), ``hw_suspect`` (bit 5: no DIO0 IRQ in the attempt),
+    ``crc_seen`` (bit 4, never with hw_suspect), ``marker``: 0x80, the
+    final attempt 0 sx1276_rx_scan_fail_eval sends for a NULL input (its
+    defensive path). None when the byte does not fit that layout: code 0x0D
+    is also TX_FIFO_RB_MISMATCH (host_types.h), whose sub is the fragment's
+    tx_id. The same 25 values as rx_scan_fail_sub_valid
+    (method_g_stage1_probe.py, the daemons' decoder). ``strict`` False reads
+    the bits whatever they hold (the daemon named the URC RX_SCAN_FAILED)."""
+    attempt, final = sub & SCAN_SUB_ATTEMPT, bool(sub & SCAN_SUB_FINAL)
+    hw, crc = bool(sub & SCAN_SUB_HW_SUSPECT), bool(sub & SCAN_SUB_CRC_SEEN)
+    marker = sub == SCAN_SUB_FINAL
+    if strict and not marker and (attempt > SCAN_MAX_RETRIES
+                                  or final != (attempt == SCAN_MAX_RETRIES)
+                                  or (hw and crc)):
+        return None
+    return {"attempt": attempt, "final": final,
+            "warm": bool(sub & SCAN_SUB_WARM), "hw_suspect": hw,
+            "crc_seen": crc, "marker": marker}
+
+
+def acquisition(rx: str, tx: str | None = None) -> dict:
+    """The base's FHSS cold-start acquisition (2026-10-24, leg 6).
+
+    The base daemon's first ``REG_PROFILE=N) OK`` line is its start-up
+    activation (a later one is a profile switch, not checked here); on
+    profile 1 it starts the scan, dated by the next timestamped line. The
+    first ``frag_arrival`` or ``published frame_id`` line after it is the
+    first decoded frame. ``failed``: True when that frame came more than
+    SCAN_BUDGET_S after the activation, or none came and the log covers more
+    than that; None when no frame came in a log that ends sooner. ``faults``:
+    the timestamped FAULT code 0x0D lines after the activation, the base's
+    RX_SCAN_FAILED faults (logged by image_rx_daemon.py from 2026-10-24 on as
+    ``FAULT_URC: ... name=`` lines, ``logged`` True, and then only those
+    count; dropped at DEBUG before), each with ``scan`` (scan_fault_sub, None
+    for a TX_FIFO_RB_MISMATCH). ``tractor``: its frames on air
+    (txdone_arrival trains, else "K fragments ok" lines) when ``tx`` is
+    given. ``applies`` False, with ``why``, off profile 1 or without an
+    activation line."""
+    lines = rx.splitlines()
+    acts = [i for i, ln in enumerate(lines) if ACTIVATION_RE.search(ln)]
+    if not acts:
+        return {"applies": False,
+                "why": "rx_daemon.log has no REG_PROFILE activation line"}
+    prof = ACTIVATION_RE.search(lines[acts[0]]).group(1)
+    out = {"profile": prof, "later": len(acts) - 1}
+    if prof != "1":
+        return dict(out, applies=False,
+                    why=f"the base daemon started on reg_profile {prof} "
+                        f"({PROFILE_NAMES.get(prof, 'unknown')}): no FHSS scan")
+    at = next((n for n in range(acts[0] + 1, len(lines))
+               if _log_time(lines[n]) is not None), None)
+    if at is None:
+        return dict(out, applies=False, why="no timestamped line after its "
+                                            "REG_PROFILE=1 activation")
+    t_act = _log_time(lines[at])
+    first = first_line = None
+    last_t, faults = t_act, []
+    for n in range(at, len(lines)):
+        t = _log_time(lines[n])
+        if t is None:                 # the untimestamped stdout FAULT lines too
+            continue
+        last_t = t
+        if first is None and DECODED_RE.search(lines[n]):
+            first, first_line = t - t_act, n + 1
+        m = FAULT_RE.search(lines[n])
+        if m:
+            name = FAULT_URC_RE.search(lines[n])
+            faults.append({"t": t - t_act, "line": n + 1,
+                           "code": int(m.group(1), 16), "sub": int(m.group(2), 16),
+                           "name": name.group(1) if name else None})
+    logged = any(f["name"] for f in faults)     # the 2026-10-24 FAULT_URC lines
+    faults = [f for f in faults if f["code"] == FAULT_CODE_SCAN
+              and (f["name"] or not logged)]
+    for f in faults:
+        # the daemon's name= both ways: RX_SCAN_FAILED is a scan fault and
+        # TX_FIFO_RB_MISMATCH is not, whatever the layout says; AMBIGUOUS and
+        # a legacy line (no name=) go by the layout
+        f["scan"] = (None if f["name"] == "TX_FIFO_RB_MISMATCH"
+                     else scan_fault_sub(f["sub"],
+                                         strict=f["name"] != "RX_SCAN_FAILED"))
+    span = last_t - t_act
+    if first is not None:
+        failed = first > SCAN_BUDGET_S
+    else:
+        failed = True if span > SCAN_BUDGET_S else None
+    tractor = None
+    if tx is not None:
+        tractor = (len(fragment_trains(fragment_events(tx, rx=False)))
+                   or len(re.findall(r"\d+ fragments ok", tx)))
+    return dict(out, applies=True, t_act=t_act, act_line=at + 1, first=first,
+                first_line=first_line, span=span, failed=failed, faults=faults,
+                logged=logged, tractor=tractor)
+
+
+def format_acquisition(acq: dict) -> list[str]:
+    """Report lines for :func:`acquisition`: the ``acquisition:`` line, the
+    ``!! ACQUISITION FAILED`` flag, and the base's scan faults."""
+    if not acq["applies"]:
+        return [f"acquisition: n/a ({acq['why']})"]
+    budget = (f"the FHSS cold-start scan budget of {SCAN_BUDGET_S:g} s "
+              f"({SCAN_MAX_RETRIES + 1} attempts x {SCAN_ATTEMPT_S:g} s: "
+              f"SX1276_RX_SCAN_MAX_RETRIES {SCAN_MAX_RETRIES} + 1, "
+              f"SX1276_RX_SCAN_REDESIGN_MS {SCAN_ATTEMPT_S * 1000:.0f})")
+    stamp = datetime.fromtimestamp(acq["t_act"], timezone.utc).strftime(
+        "%H:%M:%S.%f")[:-3]
+    if acq["first"] is not None:
+        out = [f"acquisition: the base's first decoded frame came "
+               f"{acq['first']:.1f} s after its profile-1 activation "
+               f"(rx_daemon.log line {acq['act_line']} at {stamp} board time, "
+               f"the frame at line {acq['first_line']}), "
+               f"{'past' if acq['failed'] else 'within'} {budget}"]
+    else:
+        out = [f"acquisition: the base decoded no frame in the "
+               f"{acq['span']:.1f} s its log covers after its profile-1 "
+               f"activation (rx_daemon.log line {acq['act_line']} at {stamp} "
+               f"board time), "
+               + (f"past {budget}" if acq["failed"] else
+                  f"shorter than {budget}: not determined")]
+    if acq["later"]:
+        out[0] += (f"; {acq['later']} later REG_PROFILE activation(s) (a "
+                   f"profile switch) not checked")
+    if acq["failed"]:
+        sent = ("" if acq["tractor"] is None else
+                f" The tractor logged {acq['tractor']} frame(s) on air."
+                + (" It sent nothing, so the scan had nothing to find."
+                   if not acq["tractor"] else ""))
+        out.append("  !! ACQUISITION FAILED: the base caught no frame within "
+                   "its scan budget, so its scan ran out into FAILED, which is "
+                   "absorbing (sx1276_rx_scan_policy.c): a follower there never "
+                   "hops and hears only what crosses the channel it is parked "
+                   "on, until a reset or a profile re-activation. This leg's "
+                   "loss and command figures measure that, not the link "
+                   "(2026-10-24 leg 6)." + sent)
+    scan = [f for f in acq["faults"] if f["scan"]]
+    other = [f for f in acq["faults"] if not f["scan"]]
+    if scan:
+        def cell(f):
+            s = f["scan"]
+            flags = [k for k in ("final", "warm", "hw_suspect", "crc_seen") if s[k]]
+            if s["marker"]:
+                flags.append("the firmware's defensive NULL-input marker")
+            if f["name"] == "AMBIGUOUS":
+                flags.append("AMBIGUOUS with TX_FIFO_RB_MISMATCH")
+            return (f"attempt {s['attempt']} at +{f['t']:.1f} s (line {f['line']}, "
+                    f"sub 0x{f['sub']:02X}" + (f": {', '.join(flags)}" if flags else "")
+                    + ")")
+        how = ("the daemon's FAULT_URC name= and the scan sub-byte layout"
+               if acq["logged"] else "the scan sub-byte layout")
+        out.append(f"  base RX_SCAN_FAILED fault(s), FAULT code 0x0D read by {how}: "
+                   + "; ".join(cell(f) for f in scan))
+        final = [f for f in scan if f["scan"]["final"]]
+        if final:
+            f = final[-1]
+            amb = f["name"] == "AMBIGUOUS"
+            out.append(f"  !! the base's final RX_SCAN_FAILED at +{f['t']:.1f} s "
+                       f"(rx_daemon.log line {f['line']}, sub 0x{f['sub']:02X}"
+                       + (", AMBIGUOUS with TX_FIFO_RB_MISMATCH" if amb else "")
+                       + "): its scan entered FAILED there"
+                       + (" if this URC was the scan's (the daemon could not rule "
+                          "out a TX FIFO readback mismatch on a TX with that tx_id)"
+                          if amb else ""))
+    if other:
+        out.append("  base FAULT code 0x0D read as TX_FIFO_RB_MISMATCH (sub = the "
+                   "fragment's tx_id; " + ("by name= or " if acq["logged"] else "")
+                   + "not in the scan sub-byte layout): "
+                   + ", ".join(f"sub 0x{f['sub']:02X} at +{f['t']:.1f} s "
+                               f"(line {f['line']})" for f in other))
+    if acq["failed"] and not acq["faults"]:
+        out.append("  (rx_daemon.log holds no base FAULT 0x0D line: "
+                   + ("the base logged no RX_SCAN_FAILED FAULT_URC, so "
+                      if acq["logged"] else
+                      "image_rx_daemon.py dropped FAULT URCs at DEBUG before "
+                      "2026-10-24, so ")
+                   + "the FAILED entry is inferred, not seen)")
     return out
 
 
@@ -389,13 +849,19 @@ def main(argv: list[str] | None = None) -> int:
                                                     errors="replace")
     params = (args.archive / "params.txt").read_text(encoding="utf-8",
                                                      errors="replace")
+    params_kv = params_dict(params)
 
     for key in ("train_gap_ms", "tx_pipeline_depth", "synth_budget_b",
                 "force_frf_hz", "git_sha", "log_window"):
         m = re.search(rf"{key}=(\S+)", params)
         if m:
             print(f"{key}={m.group(1)}", end="  ")
-    print()
+    # 2026-10-24 (review): the acquisition lines come after the loss block,
+    # past leg_post.sh's 8-line console excerpt whenever a stale-counter line
+    # prints, so a failed acquisition also marks this first line
+    acq = acquisition(rx, tx)
+    print("!! ACQUISITION FAILED (see the acquisition line below)"
+          if acq.get("failed") else "")
     # 2026-10-19: every harness up to the 10-19 legs read the daemon logs
     # BEFORE it stopped the daemons (TX log first, then RX), while the post
     # brackets are read after; a harness that reads them after the stop says
@@ -566,11 +1032,18 @@ def main(argv: list[str] | None = None) -> int:
         print(line)
     if args.capture:
         frames, names = capture_frames(args.capture)
-        for line in format_seq_loss(seq_gap_loss(frames), args.capture.name,
-                                    names):
+        # 2026-10-24: the head placed on the TX log, and the leg's synth_fps
+        # for a capture with no clean +1 step (leg 6)
+        res = seq_gap_loss(frames, nominal_period(params_kv))
+        for line in format_seq_loss(res, args.capture.name, names,
+                                    place_capture(frames, tx, rx, params_kv)):
             print(line)
     if unverified_note:
         print(unverified_note)
+    # 2026-10-24: after the loss block, which leg_post.sh's 8-line excerpt
+    # must keep (the capture line is the loss of record)
+    for line in format_acquisition(acq):
+        print(line)
 
     # per-index loss histogram (attribution instrument)
     idx: collections.Counter = collections.Counter()

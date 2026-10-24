@@ -32,6 +32,7 @@ W1-9b probe modes (--probe regversion|fsk):
 from __future__ import annotations
 
 import argparse
+import logging
 import struct
 import sys
 import time
@@ -57,6 +58,7 @@ from method_g_stage1_probe import (  # type: ignore
     parse_stats,
     parse_version,
     format_fault_payload,
+    format_fault_urc_line,
     format_err_proto_payload,
 )
 
@@ -72,6 +74,40 @@ BENIGN_FAULT_CODES = (
     HOST_FAULT_CODE_HOST_RX_SEEN,
     HOST_FAULT_CODE_HOST_DIAG_MARK,
 )
+
+
+def fault_urc_log_level(payload: bytes) -> int:
+    """logging level of a `FAULT_URC:` line: INFO for BENIGN_FAULT_CODES,
+    WARNING for every other FAULT_URC (2026-10-24)."""
+    return (logging.INFO if payload and payload[0] in BENIGN_FAULT_CODES
+            else logging.WARNING)
+
+
+def install_fault_urc_logger(link: HostLink, logger) -> None:
+    """Log EVERY FAULT_URC `link` reads, once, as one format_fault_urc_line()
+    line on `logger` (2026-10-24).
+
+    The 2026-10-24 leg 6 (base never locked the FHSS grid) could not be
+    confirmed as a cold-start scan run-out: the only LOG line either daemon
+    wrote for a FAULT was the tractor's pipelined-TX `FAULT during pipelined
+    TX:`. wait_for_tx_done (tractor serial path, both daemons' command TX)
+    and drain_boot only print() one to stdout (`FAULT_URC during TX wait:` /
+    `FAULT_URC during settle`, untimestamped in the docker log), and the
+    base RX loop, the command drains and request()'s re-queue dropped them
+    (the base RX loop at DEBUG). Hooking HostLink.on_fault_urc catches a
+    FAULT wherever the daemon's reader takes it off the wire -- boot drain,
+    request(), TX waits, command drains, the RX loop -- with the in-flight
+    TX context the 0x0D decode needs. The print()/pipelined lines stay, so
+    a tool counts the `FAULT_URC: code=.. sub=.. name=` lines only. One log
+    line per FAULT_URC (they arrive about every 30 s during a scan);
+    nothing is read or written on the UART.
+    """
+    def _on_fault_urc(frame: dict, tx_ids_in_flight) -> None:
+        payload = bytes(frame.get("payload", b""))
+        logger.log(fault_urc_log_level(payload), "%s",
+                   format_fault_urc_line(payload, tx_ids_in_flight))
+
+    link.on_fault_urc = _on_fault_urc
 
 
 # 2026-05-22 P5: sidecar progress.txt. Per Open Problems doc v4.1 §4 the

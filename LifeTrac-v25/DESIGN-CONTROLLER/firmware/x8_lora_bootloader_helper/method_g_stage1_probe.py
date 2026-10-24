@@ -48,6 +48,63 @@ HOST_FAULT_CODE_HOST_RX_INACTIVE = 0x0A
 HOST_FAULT_CODE_HOST_PARSE_ERROR = 0x0B
 HOST_FAULT_CODE_HOST_DIAG_MARK = 0x0C
 
+# 2026-10-24 (FAULT URC logging): the rest of host_types.h's fault codes, for
+# the `FAULT_URC:` line (format_fault_urc_line). 0x0D is DOUBLE-BOOKED in the
+# firmware: TX_FIFO_RB_MISMATCH (radio/sx1276_tx.c, sub = that TX's tx_id,
+# emitted just BEFORE its TX_DONE_URC) and RX_SCAN_FAILED (radio/sx1276_rx.c,
+# sub = the sx1276_rx_scan_fail.h bit field) share the value, so 0x0D has no
+# entry in HOST_FAULT_CODE_NAMES -- decode_fault_0x0d() resolves it per URC.
+HOST_FAULT_CODE_HARDFAULT = 0x01
+HOST_FAULT_CODE_NMI = 0x02
+HOST_FAULT_CODE_RADIO_INIT_FAIL = 0x03
+HOST_FAULT_CODE_RADIO_OPMODE_DRIFT = 0x04
+HOST_FAULT_CODE_RX_CRC_DISABLED = 0x05
+HOST_FAULT_CODE_HOST_DMA_OVERRUN = 0x06
+HOST_FAULT_CODE_STACK_GUARD = 0x07
+HOST_FAULT_CODE_CLOCK_HSE_FAILED = 0x08
+HOST_FAULT_CODE_TX_FIFO_RB_MISMATCH = 0x0D
+HOST_FAULT_CODE_RX_SCAN_FAILED = 0x0D
+HOST_FAULT_CODE_TX_DONE_EARLY = 0x0E
+
+HOST_FAULT_CODE_NAMES = {
+    HOST_FAULT_CODE_HARDFAULT: "HARDFAULT",
+    HOST_FAULT_CODE_NMI: "NMI",
+    HOST_FAULT_CODE_RADIO_INIT_FAIL: "RADIO_INIT_FAIL",
+    HOST_FAULT_CODE_RADIO_OPMODE_DRIFT: "RADIO_OPMODE_DRIFT",
+    HOST_FAULT_CODE_RX_CRC_DISABLED: "RX_CRC_DISABLED",
+    HOST_FAULT_CODE_HOST_DMA_OVERRUN: "HOST_DMA_OVERRUN",
+    HOST_FAULT_CODE_STACK_GUARD: "STACK_GUARD",
+    HOST_FAULT_CODE_CLOCK_HSE_FAILED: "CLOCK_HSE_FAILED",
+    HOST_FAULT_CODE_HOST_RX_SEEN: "HOST_RX_SEEN",
+    HOST_FAULT_CODE_HOST_RX_INACTIVE: "HOST_RX_INACTIVE",
+    HOST_FAULT_CODE_HOST_PARSE_ERROR: "HOST_PARSE_ERROR",
+    HOST_FAULT_CODE_HOST_DIAG_MARK: "HOST_DIAG_MARK",
+    HOST_FAULT_CODE_TX_DONE_EARLY: "TX_DONE_EARLY",
+}
+
+# RX_SCAN_FAILED `sub` layout + retry budget, mirrored from
+# include/sx1276_rx_scan_fail.h (pinned against the header by
+# base_station/tests/test_fault_urc_log_sil.py).
+RX_SCAN_FAIL_SUB_FINAL = 0x80        # retries exhausted, absorbing FAILED
+RX_SCAN_FAIL_SUB_WARM = 0x40         # this boot has LOCKED at least once
+RX_SCAN_FAIL_SUB_HW_SUSPECT = 0x20   # window saw no DIO0 IRQ and no CRC error
+RX_SCAN_FAIL_SUB_CRC_SEEN = 0x10     # window saw >= 1 payload-CRC error
+RX_SCAN_FAIL_SUB_ATTEMPT_MASK = 0x0F
+RX_SCAN_MAX_RETRIES = 3              # SX1276_RX_SCAN_MAX_RETRIES (4 attempts)
+
+# TX bookkeeping for the 0x0D decode (HostLink.on_fault_urc): the request
+# that radiates, and the URC that retires it (payload[0] = tx_id in both).
+# An ERR_PROTO_URC whose payload[0] is TX_FRAME_REQ retires the request with
+# its seq too: the L072 refused it (host_cmd.c), so no TX_DONE_URC follows.
+HOST_TYPE_TX_FRAME_REQ = 0x10
+HOST_TYPE_TX_DONE_URC = 0x90
+# A tx_id with an unretired TX_FRAME_REQ counts as in flight until this long
+# after its NEWEST send (time.monotonic()) -- above every host TX timeout
+# (the daemons give up after 2-3 s), so a lost TX_DONE ages out instead of
+# pinning its tx_id "in flight" (which would make every later 0x0D on it
+# AMBIGUOUS).
+TX_INFLIGHT_STALE_S = 5.0
+
 HOST_ERR_PROTO_BAD_VERSION = 0x01
 HOST_ERR_PROTO_UNKNOWN_TYPE = 0x02
 HOST_ERR_PROTO_BAD_LENGTH = 0x03
@@ -189,6 +246,63 @@ class HostLink:
         # return, which dropped TX_DONE_URC arriving during post-TX_FRAME_REQ
         # diagnostic REG_READ_REQs.
         self.urc_queue = []
+        # 2026-10-24 (FAULT URC logging): optional observer, called as
+        # on_fault_urc(frame, tx_ids_in_flight) ONCE per FAULT_URC, when
+        # read_frames() takes it off the wire -- so a fault consumed inside
+        # request()/drain_boot()/drain_pending()/wait_for_tx_done() is still
+        # seen, and one request() re-queues is not seen twice. While it is
+        # set, send()/read_frames() also track TX_FRAME_REQs awaiting their
+        # TX_DONE_URC (the 0x0D decode's context). None (the default) keeps
+        # the historical reader exactly: no tracking, no callback.
+        self.on_fault_urc = None
+        # tx_id -> [(seq, time.monotonic()), ...]: its unretired sends,
+        # oldest first. A list, not one slot per tx_id: the daemons resend a
+        # tx_id (pipelined watchdog, serial retry) while the L072 may still
+        # hold the first copy, and one TX_DONE must not retire both.
+        self._tx_unacked = {}
+
+    def tx_ids_in_flight(self, now: "float | None" = None) -> frozenset:
+        """tx_ids with a TX_FRAME_REQ whose TX_DONE_URC (or ERR_PROTO
+        refusal) has not been read, while the newest such send is younger
+        than TX_INFLIGHT_STALE_S on time.monotonic() (the boards' wall
+        clocks step). Only maintained while on_fault_urc is set (otherwise
+        always empty)."""
+        now = time.monotonic() if now is None else now
+        for tx_id in [k for k, sends in self._tx_unacked.items()
+                      if now - sends[-1][1] > TX_INFLIGHT_STALE_S]:
+            del self._tx_unacked[tx_id]
+        return frozenset(self._tx_unacked)
+
+    def _tx_retire(self, tx_id: int, index: int) -> None:
+        sends = self._tx_unacked.get(tx_id)
+        if sends:
+            del sends[index]
+            if not sends:
+                del self._tx_unacked[tx_id]
+
+    def _observe_frame(self, frame: dict) -> None:
+        # on_fault_urc bookkeeping (2026-10-24); never raises into the reader.
+        payload = frame["payload"]
+        if frame["type"] == HOST_TYPE_TX_DONE_URC:
+            # the OLDEST unretired send of that tx_id: the L072 serves its
+            # TX ring head-first, and which copy a TX_DONE answers cannot be
+            # told -- a resent tx_id stays in flight (0x0D -> AMBIGUOUS)
+            if payload:
+                self._tx_retire(payload[0], 0)
+            return
+        if frame["type"] == HOST_TYPE_ERR_PROTO_URC:
+            if payload and payload[0] == HOST_TYPE_TX_FRAME_REQ:
+                for tx_id, sends in list(self._tx_unacked.items()):
+                    hit = [i for i, (seq, _t) in enumerate(sends)
+                           if seq == frame["seq"]]
+                    if hit:
+                        self._tx_retire(tx_id, hit[0])
+                        break
+            return
+        try:
+            self.on_fault_urc(frame, self.tx_ids_in_flight())
+        except Exception:
+            pass
 
     def close(self) -> None:
         os.close(self.fd)
@@ -250,6 +364,14 @@ class HostLink:
         if self.seq == 0:
             self.seq = 1
         self.write_all(build_frame(frame_type, seq, payload, flags))
+        if (self.on_fault_urc is not None
+                and frame_type == HOST_TYPE_TX_FRAME_REQ and payload):
+            # 0x0D decode context; sends already stale are dropped here so a
+            # lost TX_DONE cannot make this tx_id's list grow
+            now = time.monotonic()
+            self._tx_unacked[payload[0]] = [
+                s for s in self._tx_unacked.get(payload[0], ())
+                if now - s[1] <= TX_INFLIGHT_STALE_S] + [(seq, now)]
         return seq
 
     def read_frames(self, timeout: float):
@@ -289,10 +411,15 @@ class HostLink:
                     if not payload:
                         continue
                     try:
-                        frames.append(parse_frame(payload))
+                        frame = parse_frame(payload)
                     except ValueError as exc:
                         print(f"WARNING: dropped malformed frame: {exc}")
                         continue
+                    frames.append(frame)
+                    if (self.on_fault_urc is not None and frame["type"]
+                            in (HOST_TYPE_FAULT_URC, HOST_TYPE_TX_DONE_URC,
+                                HOST_TYPE_ERR_PROTO_URC)):
+                        self._observe_frame(frame)
                 if frames:
                     return frames
             time.sleep(0.01)
@@ -484,12 +611,10 @@ def print_raw_bytes(label: str, data: bytes) -> None:
     print(f"  txt: {printable}")
 
 
-def format_fault_payload(payload: bytes) -> str:
-    if len(payload) < 2:
-        return payload.hex()
-
-    code = payload[0]
-    sub = payload[1]
+def _fault_sub_detail(code: int, sub: int) -> str:
+    """The decoded-`sub` token format_fault_payload() has always printed for
+    the four host-transport codes, or "" for any other code. Shared with
+    format_fault_urc_line() so the two cannot drift (2026-10-24)."""
     if code == HOST_FAULT_CODE_HOST_RX_SEEN:
         lanes = []
         if sub & HOST_RX_SEEN_FLAG_LPUART:
@@ -497,13 +622,13 @@ def format_fault_payload(payload: bytes) -> str:
         if sub & HOST_RX_SEEN_FLAG_USART1:
             lanes.append("USART1")
         lane_text = ",".join(lanes) if lanes else "none"
-        return f"code=0x{code:02X} sub=0x{sub:02X} lanes={lane_text} raw={payload.hex()}"
+        return f"lanes={lane_text}"
 
     if code == HOST_FAULT_CODE_HOST_RX_INACTIVE:
-        return f"code=0x{code:02X} sub=0x{sub:02X} reason=no_ingress_during_probe_window raw={payload.hex()}"
+        return "reason=no_ingress_during_probe_window"
 
     if code == HOST_FAULT_CODE_HOST_PARSE_ERROR:
-        return f"code=0x{code:02X} sub=0x{sub:02X} parse_err_count_hint={sub} raw={payload.hex()}"
+        return f"parse_err_count_hint={sub}"
 
     if code == HOST_FAULT_CODE_HOST_DIAG_MARK:
         marks = []
@@ -518,9 +643,155 @@ def format_fault_payload(payload: bytes) -> str:
         if sub & HOST_DIAG_MARK_AT_VER_DISPATCHED:
             marks.append("AT_VER_DISPATCHED")
         marks_text = "|".join(marks) if marks else "none"
-        return f"code=0x{code:02X} sub=0x{sub:02X} marks={marks_text} raw={payload.hex()}"
+        return f"marks={marks_text}"
 
+    return ""
+
+
+def format_fault_payload(payload: bytes) -> str:
+    # Output is byte-identical to the pre-2026-10-24 version: bench tooling
+    # greps `code=0x.. sub=0x..` out of these lines (run_live_radio_monitor
+    # .ps1 Test-InjectFaultLine) and tests pin it on archived payloads.
+    if len(payload) < 2:
+        return payload.hex()
+
+    code = payload[0]
+    sub = payload[1]
+    detail = _fault_sub_detail(code, sub)
+    if detail:
+        return f"code=0x{code:02X} sub=0x{sub:02X} {detail} raw={payload.hex()}"
     return f"code=0x{code:02X} sub=0x{sub:02X} raw={payload.hex()}"
+
+
+def rx_scan_fail_sub_valid(sub: int) -> bool:
+    """True when `sub` is a byte sx1276_rx_scan_fail_eval() can emit.
+
+    With SX1276_RX_SCAN_MAX_RETRIES = 3 the firmware sets `final` exactly
+    when the attempt nibble reaches 3 (retries reset only on LOCK or
+    sx1276_rx_scan_reset), and `hw_suspect` only when `crc_seen` is clear --
+    25 of the 256 values (incl. the NULL-input marker 0x80). Every other
+    0x0D sub can only be a TX_FIFO_RB_MISMATCH tx_id.
+    """
+    if sub == RX_SCAN_FAIL_SUB_FINAL:          # defensive NULL-input marker
+        return True
+    if (sub & RX_SCAN_FAIL_SUB_HW_SUSPECT) and (sub & RX_SCAN_FAIL_SUB_CRC_SEEN):
+        return False
+    attempt = sub & RX_SCAN_FAIL_SUB_ATTEMPT_MASK
+    if sub & RX_SCAN_FAIL_SUB_FINAL:
+        return attempt == RX_SCAN_MAX_RETRIES
+    return attempt < RX_SCAN_MAX_RETRIES
+
+
+def decode_fault_0x0d(sub: int, tx_ids_in_flight=None) -> dict:
+    """Resolve a code-0x0D FAULT_URC (2026-10-24, leg-6 lesson).
+
+    The two firmware emitters share the code, so the only evidence is the
+    sub-byte and the host's own TX state:
+      * a sub RX_SCAN_FAILED cannot produce -> TX_FIFO_RB_MISMATCH
+        (basis=not_scan_encoding; certain whatever the TX state);
+      * a valid scan encoding while no TX with tx_id == sub is in flight
+        -> RX_SCAN_FAILED (basis=tx_id_not_in_flight): the FIFO fault fires
+        on that TX's TX_DONE, before its TX_DONE_URC, i.e. while in flight;
+      * a valid scan encoding that IS an in-flight tx_id -> AMBIGUOUS
+        (basis=tx_id_in_flight), e.g. sub 0x00 against fragment 0;
+      * no TX context from the caller (None) -> AMBIGUOUS (basis=no_tx_context).
+    Returns {"name", "basis", "scan" (dict or None), "tx_id" (int or None)}:
+    "scan" is set when the RX_SCAN_FAILED reading is possible, "tx_id" when
+    the TX_FIFO_RB_MISMATCH reading is.
+    """
+    scan = None
+    if rx_scan_fail_sub_valid(sub):
+        scan = {
+            "attempt": sub & RX_SCAN_FAIL_SUB_ATTEMPT_MASK,
+            "final": int(bool(sub & RX_SCAN_FAIL_SUB_FINAL)),
+            "warm": int(bool(sub & RX_SCAN_FAIL_SUB_WARM)),
+            "hw_suspect": int(bool(sub & RX_SCAN_FAIL_SUB_HW_SUSPECT)),
+            "crc_seen": int(bool(sub & RX_SCAN_FAIL_SUB_CRC_SEEN)),
+        }
+    if scan is None:
+        name, basis = "TX_FIFO_RB_MISMATCH", "not_scan_encoding"
+    elif tx_ids_in_flight is None:
+        name, basis = "AMBIGUOUS", "no_tx_context"
+    elif sub in tx_ids_in_flight:
+        name, basis = "AMBIGUOUS", "tx_id_in_flight"
+    else:
+        name, basis = "RX_SCAN_FAILED", "tx_id_not_in_flight"
+    return {"name": name, "basis": basis, "scan": scan,
+            "tx_id": None if name == "RX_SCAN_FAILED" else sub}
+
+
+# Upper case on purpose: the case-sensitive FAULT greps (rs12_leg_report.py
+# FAULT_RE, the 10-24 rescore.py `"FAULT" in l`) must see this line.
+FAULT_URC_LOG_TAG = "FAULT_URC:"
+
+
+def format_fault_urc_line(payload: bytes, tx_ids_in_flight=None) -> str:
+    """The ONE `FAULT_URC:` log line both strict-path daemons write per
+    FAULT_URC (2026-10-24). Space-separated key=value tokens, in order:
+
+      FAULT_URC: code=0xCC sub=0xSS name=NAME [detail...] uptime_ms=N raw=HEX
+
+    `code=0xCC sub=0xSS` stays adjacent (format_fault_payload's grep shape).
+    Count FAULTs on `FAULT_URC: code=0x.. sub=0x.. name=` alone: the same URC
+    can also leave a legacy line in the same log -- the tractor's `FAULT
+    during pipelined TX:`, or the untimestamped stdout `FAULT_URC during TX
+    wait:` / `FAULT_URC during settle` (wait_for_tx_done, drain_boot; both
+    daemons) -- and no legacy line carries `name=`.
+    NAME is HOST_FAULT_CODE_NAMES[code], UNKNOWN, or for 0x0D one of
+    RX_SCAN_FAILED / TX_FIFO_RB_MISMATCH / AMBIGUOUS (decode_fault_0x0d).
+    Detail tokens: 0x0D -> attempt= final= warm= hw_suspect= crc_seen= (when
+    the scan reading is possible), tx_id=0xSS (when the FIFO reading is),
+    basis=, tx_inflight= (comma list, '-' none, '?' unknown); 0x0E ->
+    tx_id=; 0x04 -> opmode=; 0x08 -> clock_source_id=; 0x09-0x0C -> the
+    format_fault_payload token; pc= lr= psr= bfar= when any is non-zero or
+    the code is a CPU fault (a replayed record from the previous boot).
+    uptime_ms is payload[20:24] -- the L072's platform_now_ms() when the URC
+    was SENT (host_cmd.c), '?' on a short payload.
+    """
+    raw = payload.hex()
+    if len(payload) < 2:
+        return f"{FAULT_URC_LOG_TAG} short_payload len={len(payload)} raw={raw}"
+    code = payload[0]
+    sub = payload[1]
+    parts = [f"{FAULT_URC_LOG_TAG} code=0x{code:02X} sub=0x{sub:02X}"]
+    if code == HOST_FAULT_CODE_RX_SCAN_FAILED:
+        d = decode_fault_0x0d(sub, tx_ids_in_flight)
+        parts.append(f"name={d['name']}")
+        if d["scan"] is not None:
+            parts.append("attempt={attempt} final={final} warm={warm} "
+                         "hw_suspect={hw_suspect} crc_seen={crc_seen}"
+                         .format(**d["scan"]))
+        if d["tx_id"] is not None:
+            parts.append(f"tx_id=0x{d['tx_id']:02X}")
+        parts.append(f"basis={d['basis']}")
+        if tx_ids_in_flight is None:
+            parts.append("tx_inflight=?")
+        else:
+            parts.append("tx_inflight=" + (",".join(
+                f"0x{t:02X}" for t in sorted(tx_ids_in_flight)) or "-"))
+    else:
+        parts.append(f"name={HOST_FAULT_CODE_NAMES.get(code, 'UNKNOWN')}")
+        detail = _fault_sub_detail(code, sub)
+        if detail:
+            parts.append(detail)
+        elif code == HOST_FAULT_CODE_TX_DONE_EARLY:
+            parts.append(f"tx_id=0x{sub:02X}")
+        elif code == HOST_FAULT_CODE_RADIO_OPMODE_DRIFT:
+            parts.append(f"opmode=0x{sub:02X}")
+        elif code == HOST_FAULT_CODE_CLOCK_HSE_FAILED:
+            parts.append(f"clock_source_id={sub}")
+    if len(payload) >= 24:
+        pc, lr, psr, bfar, uptime_ms = struct.unpack("<5I", payload[4:24])
+        if (pc or lr or psr or bfar or code in (
+                HOST_FAULT_CODE_HARDFAULT, HOST_FAULT_CODE_NMI,
+                HOST_FAULT_CODE_STACK_GUARD)):
+            parts.append(f"pc=0x{pc:08X} lr=0x{lr:08X} psr=0x{psr:08X} "
+                         f"bfar=0x{bfar:08X}")
+        parts.append(f"uptime_ms={uptime_ms}")
+    else:
+        parts.append("uptime_ms=?")
+    parts.append(f"raw={raw}")
+    return " ".join(parts)
 
 
 def format_err_proto_payload(payload: bytes) -> str:

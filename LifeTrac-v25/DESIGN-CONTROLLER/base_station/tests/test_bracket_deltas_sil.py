@@ -30,7 +30,14 @@ changes. Pins:
   that moved;
 * on the committed legs: 2026-10-18 V, W, W2 and X (FHSS) give the numbers
   of their legs/leg<X>_deltas.txt and pass; 2026-10-19 A2c, A2a, A2c2, A2a2
-  (DTS) report with no false FAIL.
+  (DTS) report with no false FAIL;
+* 2026-10-24 (the FHSS round's leg 6): base d(clk_demotion_reset) 0 and
+  d(fhss_dec_aligned) 0 while the tractor streamed, radio_state 4 on both
+  boards at post (or not in a bracket), prints ``!! BASE NEVER LOCKED`` and
+  the STOP RULE line points at it, with the criteria, the STOP verdict and
+  the exit code unchanged; a base that demoted or decoded aligned, a quiet
+  tractor, another radio_state or a DTS leg is not flagged; of the committed
+  10-24 legs only leg 6 is, and legs 1-5 print their deltas line for line.
 """
 from __future__ import annotations
 
@@ -122,7 +129,8 @@ class BracketDeltasTests(unittest.TestCase):
                    "base: L072 counters not reset", "tractor: L072 counters not reset",
                    "= 22/27 = 81.5 %", "-> AGREE",
                    "[PASS] tractor tx_first_anchor delta = 1 (post 1;",
-                   "[PASS] base tx_stream_streak_max post = 1 (d=0;", "STOP RULE: not tripped")
+                   "[PASS] base tx_stream_streak_max post = 1 (d=0;", "STOP RULE: not tripped",
+                   absent=("NEVER LOCKED",))
 
     def test_reset_detection(self) -> None:
         for mark in ("tx_deaf_max_us", "tx_done_to_rearm_max_us", "tx_stream_streak_max"):
@@ -224,6 +232,67 @@ class BracketDeltasTests(unittest.TestCase):
             self.check(1, "[UNVERIFIED] command delivery: no command counted (brackets 0/0)",
                        "STOP RULE: UNDETERMINED", absent=("[N/A]", "[FAIL]"), gaps=gaps,
                        **image_only)
+
+    def test_base_never_locked(self) -> None:
+        # 2026-10-24 leg 6: the base's demotion and aligned counters stood still while
+        # the tractor streamed, radio_state 4 (RX_CONT) on both boards at post. GOOD's
+        # base already has d(aligned) 0 and d(demotion) 0; its tractor reads radio_state 1.
+        unlocked = dict(post_tractor=post_tr(radio_state=4))
+        out = self.check(0, "!! BASE NEVER LOCKED: base d(clk_demotion_reset)=0 and "
+                            "d(fhss_dec_aligned)=0 while the tractor sent 50 (d(radio_tx_ok)); "
+                            "post radio_state 4 (RX_CONT) on both boards. The fingerprint of a "
+                            "base FHSS scan that ran out into FAILED",
+                         "command delivery counts only the probes the base fired after a frame "
+                         "it happened to catch (22/27). Re-fly the leg, or void it only under a "
+                         "rule written before leg 1",
+                         **unlocked)
+        lines = out.splitlines()
+        # the criteria and the exit code as before; the flag sits above the STOP RULE line,
+        # which points at it (leg_post.sh shows that line on the console)
+        self.assertEqual(out.count("[PASS]"), 6)
+        self.assertTrue(lines[-2].startswith("!! BASE NEVER LOCKED"), lines[-2])
+        self.assertEqual(lines[-1], "STOP RULE: not tripped (!! BASE NEVER LOCKED above: this "
+                                    "leg did not test FHSS reverse delivery)")
+        # the STOP rule keeps its verdict, tripped or undetermined
+        self.check(1, "STOP RULE: TRIPPED -- stop the round (!! BASE NEVER LOCKED above",
+                   post_tractor=post_tr(radio_state=4, clk_demotion_reset=1))
+        self.check(1, "STOP RULE: UNDETERMINED -- deltas not verified against the logs (!! "
+                      "BASE NEVER LOCKED above", gaps=None, **unlocked)
+        # radio_state missing from a post bracket does not rule it out; the line says so
+        self.check(0, "; post radio_state not in both brackets. ",
+                   post_tractor=post_tr(radio_state=None),
+                   post_base=bracket(radio_tx_ok=50, host_parse_ok=200, radio_state=None))
+        self.check(0, "; post radio_state not in the tractor bracket. ",
+                   post_tractor=post_tr(radio_state=None))
+
+    def test_a_base_that_locked_is_not_flagged(self) -> None:
+        for name, change in (
+                ("a demotion", dict(post_base=bracket(radio_tx_ok=50, host_parse_ok=200,
+                                                      clk_demotion_reset=1))),
+                ("aligned decodes", dict(post_base=bracket(radio_tx_ok=50, host_parse_ok=200,
+                                                           fhss_dec_aligned=30))),
+                ("a quiet tractor", dict(post_tractor=post_tr(radio_tx_ok=910,
+                                                              radio_state=4))),
+                ("the tractor's radio_state", dict(post_tractor=post_tr(radio_state=2))),
+                ("the base's radio_state", dict(post_base=bracket(radio_tx_ok=50,
+                                                                  host_parse_ok=200,
+                                                                  radio_state=2))),
+                # one bracket without radio_state, the other not RX_CONT: ruled out
+                ("a mixed post state", dict(post_base=bracket(radio_tx_ok=50, host_parse_ok=200,
+                                                              radio_state=None),
+                                            post_tractor=post_tr(radio_state=2)))):
+            change.setdefault("post_tractor", post_tr(radio_state=4))
+            rc, out = run(**change)
+            self.assertNotIn("NEVER LOCKED", out, name)
+            self.assertIn("STOP RULE: not tripped\n", out, name)
+        # a counter the fingerprint reads is missing: no flag
+        rc, out = run(post_tractor=post_tr(radio_state=4),
+                      post_base=bracket(radio_tx_ok=50, host_parse_ok=200,
+                                        fhss_dec_aligned=None))
+        self.assertNotIn("NEVER LOCKED", out)
+        # off FHSS there is no hop grid to lock: never flagged
+        self.check(0, absent=("NEVER LOCKED",), params="reg_profile=2\n",
+                   post_tractor=post_tr(radio_state=4, tx_first_anchor=0))
 
     def test_incomplete_input(self) -> None:
         self.check(2, "missing/ABSENT: fhss_dec_snapped", post_tractor=post_tr(fhss_dec_snapped=-1))
@@ -347,6 +416,37 @@ class CommittedLegsTests(unittest.TestCase):
                 self.assertIn(ln, _lines(out))
         self.assertIn("cross-check: brackets 211/211 vs logs: base sends on air=210, tractor "
                       "decoded cmds=209 -> DISAGREE or unavailable", out)
+
+
+_R1024 = _DC / "bench-evidence" / "bench_session_2026-10-24" / "legs"
+
+
+@unittest.skipUnless((_R1024 / "leg2b_f3_deltas.txt").is_file(),
+                     "the 2026-10-24 legs are not in this tree")
+class Round20261024Tests(unittest.TestCase):
+    """The FHSS round: legs 1-5 print their committed deltas line for line; leg 6
+    (2b_f3), whose base never locked, adds the flag and the STOP RULE pointer only."""
+
+    def test_only_leg_6_is_flagged(self) -> None:
+        for leg in ("2c_f1", "2b_f1", "2c_f2", "2b_f2", "2c_f3", "2b_f3"):
+            out = io.StringIO()
+            with redirect_stdout(out):
+                rc = bd.main([str(_R1024), leg])
+            new = _lines(out.getvalue())
+            old = _lines((_R1024 / f"leg{leg}_deltas.txt").read_text(encoding="utf-8"))
+            self.assertEqual(rc, 0, leg)
+            if leg != "2b_f3":
+                self.assertEqual(new, old, leg)
+                continue
+            self.assertEqual(new[:-2], old[:-1])
+            self.assertEqual(old[-1], "STOP RULE: not tripped")
+            self.assertTrue(new[-2].startswith(
+                "!! BASE NEVER LOCKED: base d(clk_demotion_reset)=0 and d(fhss_dec_aligned)=0 "
+                "while the tractor sent 607 (d(radio_tx_ok)); post radio_state 4 (RX_CONT) on "
+                "both boards."), new[-2])
+            self.assertIn("(4/5)", new[-2])
+            self.assertEqual(new[-1], "STOP RULE: not tripped (!! BASE NEVER LOCKED above: this "
+                                      "leg did not test FHSS reverse delivery)")
 
 
 if __name__ == "__main__":

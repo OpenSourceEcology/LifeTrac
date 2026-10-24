@@ -53,6 +53,19 @@ read from it).
 Command delivery on an FHSS leg that sent no command (brackets and logs 0/0, an image-only
 leg such as the RS-13 FHSS walk) is N/A, not FAIL; brackets at 0/0 that the logs do not
 confirm are UNVERIFIED. The base sending nothing while the tractor counts commands fails.
+A base that never locked (2026-10-24, the FHSS round's leg 6): on an FHSS leg, base
+d(clk_demotion_reset) 0 and d(fhss_dec_aligned) 0 while the tractor streamed (its
+d(radio_tx_ok) at least STREAMED_TX), with post radio_state 4 (RX_CONT) on both boards
+(or no radio_state in a post bracket), is the fingerprint of a base FHSS scan that ran out
+into FAILED: no LOCKED -> SCANNING edge and no aligned decode all leg. It prints
+`!! BASE NEVER LOCKED` above the STOP RULE line, and the STOP RULE line points at it. The
+flag changes no verdict: the criteria, the STOP rule and the exit code are judged as
+before. They read the tractor's counters and the probe counts, which a base parked on one
+channel leaves clean, so with the log cross-check they can pass without testing FHSS
+reverse delivery (see rs12_leg_report.py's acquisition line); a base that caught fewer
+than two fragments gets no command-plane tally in leg<leg>_gaps.txt (frag_gap_report.py),
+so there each criterion that would pass is UNVERIFIED, the STOP rule (unless it tripped)
+UNDETERMINED, exit 1.
 Exit codes: 0 every bracket criterion PASS or N/A (FHSS) or the non-FHSS report printed,
 1 a criterion FAILED or is UNVERIFIED, 2 incomplete input or bad arguments.
 --selftest runs base_station/tests/test_bracket_deltas_sil.py (the cases CI runs).
@@ -89,6 +102,10 @@ FHSS_ONLY = ("fhss_dec_aligned", "fhss_dec_snapped", "fhss_dec_rej_bad_hop",
              "fhss_dec_rej_epoch_drift", "fhss_dec_rej_locked_out", "clk_demotion_reset",
              "clk_demotion_kept", "tx_first_anchor")
 STREAK_LIMIT = 8          # the base must never stream into clock authority (>= 8 own TX)
+# 2026-10-24: "the tractor streamed" for the never-locked fingerprint: 10 s of frames at
+# 2 fps (leg 6's tractor sent 607 while its base never locked)
+STREAMED_TX = 20
+RADIO_STATE_RX_CONT = 4   # sx1276_modes.h SX1276_STATE_RX_CONT
 # host_cfg_keys.h REG_PROFILE_*
 PROFILE_NAMES = {"0": "bench-only fixed 915 MHz", "1": "FHSS", "2": "DTS"}
 FLAG_PROFILE = {"fhss": "1", "dts": "2"}
@@ -326,14 +343,57 @@ def score(E, LEG, profile="auto", params=None):
     ]
     for text, res in rows:
         print(f"  [{res}] {text}")
+    unlocked = never_locked(v, brackets)
+    if unlocked:
+        print(unlocked)
     if t["clk_demotion_reset"][2] > 0 or anchors > 1:
         stop = "TRIPPED -- stop the round"
     elif not cross_ok:
         stop = "UNDETERMINED -- deltas not verified against the logs"
     else:
         stop = "not tripped"
-    print(f"STOP RULE: {stop}")
+    # 2026-10-24: the STOP rule itself is unchanged; the line points at the flag,
+    # since leg_post.sh shows the STOP RULE line on the console and not the !! line
+    print(f"STOP RULE: {stop}" + (" (!! BASE NEVER LOCKED above: this leg did not test FHSS "
+                                  "reverse delivery)" if unlocked else ""))
     return 0 if all(res in ("PASS", "N/A") for _, res in rows) else 1
+
+
+def never_locked(v, brackets):
+    """The ``!! BASE NEVER LOCKED`` line on an FHSS leg, or None (2026-10-24, leg 6).
+
+    ``v``: deltas() per board; ``brackets``: the parsed brackets by (board, pre/post).
+    Fingerprint: base d(clk_demotion_reset) 0 (no LOCKED -> SCANNING edge, which every
+    locked leg ends with) and d(fhss_dec_aligned) 0 (no decode on a held grid) while the
+    tractor streamed (d(radio_tx_ok) >= STREAMED_TX), and post radio_state 4 (RX_CONT) on
+    both boards; a post bracket without radio_state does not rule it out. None when a
+    counter it reads is missing."""
+    b, t = v["base"], v["tractor"]
+    if any(k not in b for k in ("clk_demotion_reset", "fhss_dec_aligned", "radio_tx_ok")):
+        return None
+    streamed = t["radio_tx_ok"][2]            # radio_tx_ok / radio_rx_ok are REQUIRED
+    if b["clk_demotion_reset"][2] or b["fhss_dec_aligned"][2] or streamed < STREAMED_TX:
+        return None
+    states = [brackets[(w, "post")].get("radio_state") for w in ("base", "tractor")]
+    # any board that reports a post radio_state other than RX_CONT rules it out; only
+    # a missing radio_state leaves the question open
+    if any(s is not None and s != RADIO_STATE_RX_CONT for s in states):
+        return None
+    state = (f"post radio_state {RADIO_STATE_RX_CONT} (RX_CONT) on both boards"
+             if None not in states else
+             "post radio_state not in " + ("both brackets" if states == [None, None] else
+                                           f"the {('base', 'tractor')[states.index(None)]} "
+                                           f"bracket"))
+    bt, tr = b["radio_tx_ok"][2], t["radio_rx_ok"][2]
+    return (f"!! BASE NEVER LOCKED: base d(clk_demotion_reset)=0 and d(fhss_dec_aligned)=0 "
+            f"while the tractor sent {streamed} (d(radio_tx_ok)); {state}. The fingerprint of a "
+            f"base FHSS scan that ran out into FAILED (2026-10-24 leg 6; rs12_leg_report.py's "
+            f"acquisition line): the base never followed the hop grid and heard only what "
+            f"crossed the channel it was parked on. The criteria above are scored as before and "
+            f"do not test FHSS reverse delivery on this leg: the tractor's clock counters stay "
+            f"clean when its peer never hops, and command delivery counts only the probes the "
+            f"base fired after a frame it happened to catch ({tr}/{bt}). Re-fly the leg, or void "
+            f"it only under a rule written before leg 1")
 
 
 def selftest_path():

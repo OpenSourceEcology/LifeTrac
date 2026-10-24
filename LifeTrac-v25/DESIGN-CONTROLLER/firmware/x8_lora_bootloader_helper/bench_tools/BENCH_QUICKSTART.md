@@ -477,6 +477,43 @@ The loss of record is the report's `capture seq gaps` line. The counter
 `loss` line can be stale (RS13_VECTOR_LEG A14) or frozen by a dead stats
 thread (RS-12.17).
 
+**The head and the gaps** (2026-10-24; tested offline, not yet used on a
+flown leg). The `first frame heard at seq N` line under `capture seq gaps`
+is now placed on the tractor's TX log. After a u8 seq wrap it names the
+tractor's frame: on 2026-10-24 leg 6 it reads `first frame heard at seq 8 is
+the tractor's frame #264 on air (1 u8 seq wrap before it, by its TX log)`,
+where the old line counted the head as 7 frames (98/103). When the frame
+cannot be placed the line reads `the head is AMBIGUOUS` and gives no figure
+counting from seq 1. A `tractor TX log:` line under it gives the share of the
+tractor's frames on air that never reached the capture, head and tail
+included (leg 6: 601/606). A capture with no clean +1 seq step is timed by
+the leg's `synth_fps`, so a long outage is counted (leg 6: 226/231; the old
+line said 91/96). `frag_gap_report.py`'s gaps still run from the first
+fragment to the last; its new `head:` and `tail:` lines give the silence
+before and after them.
+
+**Acquisition** (2026-10-24; not yet used on a flown leg). On an FHSS leg the
+report prints an `acquisition:` line: the base's first decoded frame after its
+profile-1 activation, against the 120 s cold-start scan budget. When the
+report's first line ends with `!! ACQUISITION FAILED (see the acquisition
+line below)`, the base's scan ran out into FAILED: it never followed the hop
+grid, and the leg's loss and command figures measure that, not the link.
+`bracket_deltas.py` should then print `!! BASE NEVER LOCKED` (its STOP RULE
+line points at it), and `rs13_probe_score.py` prints `!! base ACQUISITION
+FAILED`. Finish the leg with `leg_post.sh` (park included), record it, and
+void or re-fly it only as the pass rule written before leg 1 says (the
+template's "never locks" row is a proposal until the operator agrees it). A
+re-fly needs a GO. Details: BENCH_RUNBOOK, "A leg", Base acquisition.
+
+**FAULT lines** (2026-10-24; not yet flown). Both daemon logs now carry one
+`FAULT_URC: code=0x.. sub=0x.. name=...` line per FAULT the L072 sends
+(WARNING; INFO for 0x09 and 0x0C), with `uptime_ms=`, the L072's uptime.
+Code 0x0D is either a failed scan attempt (`name=RX_SCAN_FAILED`, with
+`attempt=` and `final=`; `final=1` means the scan went FAILED) or a TX FIFO
+readback mismatch (`name=TX_FIFO_RB_MISMATCH`); `name=AMBIGUOUS` when the
+daemon cannot tell. Count faults on these lines only: the same URC can also
+leave an older line. Details: BENCH_RUNBOOK, "A leg", FAULT lines.
+
 `bracket_deltas.py <legs> <leg>` scores the L072 counter brackets (reset-aware,
 cross-checked against `leg<X>_gaps.txt`; the RS-12.15 criteria on FHSS legs
 only; BENCH_RUNBOOK, "A leg").
@@ -504,6 +541,14 @@ Since 2026-10-22 `rs13_probe_score.py` also:
   −PP pp. A two-sided Fisher p ≥ 0.05 passes whenever the sample is too
   small, so write the margin and the legs per codec into RESULTS before leg
   1 ([RS13_RESULTS_TEMPLATE.md](RS13_RESULTS_TEMPLATE.md), "Pass rule").
+
+Since 2026-10-24 (not yet used on a flown leg) each FHSS leg's block ends
+with a `base acquisition:` line (within the 120 s budget, not determined, or
+`!! base ACQUISITION FAILED`). By default such a leg still pools, and a leg
+that fired no probe still withholds the pooled verdict (exit 1).
+`--void-unlocked` leaves the legs whose acquisition failed out of the pool and
+lists them; use it only when the pass rule written before leg 1 says so
+(BENCH_RUNBOOK, `rs13_probe_score.py`).
 
 ## 8. Park and power down
 
@@ -562,6 +607,8 @@ list. These are the common symptoms:
 | `running scripts is disabled on this system` in PowerShell | execution policy `Restricted` | [PC_SETUP.md](PC_SETUP.md#powershell-execution-policy) |
 | camera changes mode or a profile is commanded mid-leg | retained control topics | `clear_retained.py` on the base broker **and** `clear_retained_host.py` on the PC broker |
 | report says ~99.8 % loss and `published=1` | stats thread died (RS-12.17) | use `capture seq gaps` / count `published frame_id` lines |
+| the report's first line ends `!! ACQUISITION FAILED`; `leg<X>_deltas.txt` says `!! BASE NEVER LOCKED` | the base decoded no frame within 120 s of its profile-1 activation: its FHSS scan ran out into FAILED, and it never followed the hop grid (2026-10-24 leg 6) | the leg measures that, not the link: finish it with `leg_post.sh`, record it, and void or re-fly it only as the pass rule written before leg 1 says (BENCH_RUNBOOK, "A leg", Base acquisition); a re-fly needs a GO |
+| FAULT counts differ between tools, or a tractor fault shows twice | since 2026-10-24 a URC leaves a `FAULT_URC:` line and can also leave a legacy line (`FAULT during pipelined TX:`, or stdout `FAULT_URC during TX wait:` / `during settle`) | count only the `FAULT_URC: code=0x.. sub=0x.. name=` lines |
 | docker images vanish on the base | `compose-apps-early-start-recovery.service` is unmasked: it runs `rm -rf /var/lib/docker` every 60 s | mask it ([BENCH_SETUP.md](BENCH_SETUP.md)) |
 | board resets about 60 s into a long operation | the U-Boot-armed X8 watchdog | FLASH_RUNBOOK §3; close `/dev/watchdog0` with `V` |
 | a harness parameter seems ignored | misspelled name | the harness now rejects unknown names; read the archive's `params.txt` |

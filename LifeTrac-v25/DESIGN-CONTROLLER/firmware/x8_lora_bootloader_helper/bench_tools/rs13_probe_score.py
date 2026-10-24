@@ -9,7 +9,7 @@ the base's `PROBE TX seq=N ... (tx#K)` lines (rx_daemon.log), over the base's
 PROBE TX count. The base's own `probe:` line counts echoes, so with
 -ProbeEcho 0 it reads 0 % and is ignored here.
 
-    py -3 rs13_probe_score.py [--margin PP] <archive_dir> [<archive_dir> ...]
+    py -3 rs13_probe_score.py [--margin PP] [--void-unlocked] <archive_dir> [<archive_dir> ...]
 
 Prints one block per archive (keep it as legs/leg<X>_probe_score.txt). Its
 `tail:` line lists the base PROBE seqs sent after the last one the tractor
@@ -39,7 +39,9 @@ leg withholds the pooled verdict; so does (exit 1) a leg whose params.txt does
 not show probe_echo=0 and a reg_profile of 1 (FHSS) or 2 (DTS), or whose codec
 is neither VECTOR nor mono_g4, and a set of legs that mixes FHSS and DTS, since
 the comparison pools VECTOR and mono_g4 legs of one profile flown with
--ProbeEcho 0 only (the per-leg figures still print). A real tractor log with no PROBE line
+-ProbeEcho 0 only (the per-leg figures still print). With --void-unlocked (Base
+acquisition, below) a leg voided for a failed acquisition does not exit 1 for firing no
+probe, but a set of legs it leaves nothing to pool exits 1. A real tractor log with no PROBE line
 scores 0 delivered: that is a real result on a dead reverse link (RS-0.12
 B1, 0/86), and the block says so loudly. Timestamps are not used to score:
 the base and tractor clocks are not comparable.
@@ -74,6 +76,27 @@ name the margin. Pooling treats every probe as independent; leg-to-leg
 variation is not modelled. Legs that share a log_window other than after_stop
 still pool, but a `!!` line under the margin verdict says that it does not
 meet a pass rule needing log_window=after_stop on every leg.
+
+Base acquisition (2026-10-24, the FHSS round's leg 6). On an FHSS leg
+(params reg_profile=1) each block says whether the base's cold-start scan
+caught a frame within its budget, by rs12_leg_report.py's acquisition rule:
+the base's first decoded frame more than 120 s (4 scan attempts x 30 s)
+after its profile-1 activation, or none in a log that covers more, is a
+failed acquisition (`!! base ACQUISITION FAILED`). Such a base never follows
+the hop grid: with -ReactiveFire 1 it fires a probe only after a frame it
+happened to catch, from the channel it is parked on, so the leg measures
+the acquisition failure, not command delivery (leg 6: 4/5 pooled; a leg
+that catches nothing fires no probe and withholds the pooled verdict). By
+default nothing else changes: such a leg pools like any other, and one that
+fired no probe still exits 1. --void-unlocked leaves every leg whose
+acquisition failed out of the pool (and out of the log-window and profile
+checks) and lists them, so a leg that fired no probe for that reason no
+longer withholds the verdict; a leg whose acquisition was not determined (a
+log shorter than the budget) or does not apply stays in. When it leaves no
+leg to pool in a set of two or more, it prints `pooled: no leg left to pool
+after --void-unlocked` and exits 1. Use it only when a pass rule written
+before leg 1 says so: dropping a leg after seeing its numbers is a choice
+made after the data.
 """
 from __future__ import annotations
 
@@ -81,8 +104,15 @@ import argparse
 import math
 import os
 import re
+import sys
 from fractions import Fraction
+from pathlib import Path
 from statistics import NormalDist
+
+DC = Path(__file__).resolve().parents[3]       # bench_tools -> helper -> firmware -> DC
+if str(DC / "tools") not in sys.path:
+    sys.path.insert(0, str(DC / "tools"))
+import rs12_leg_report as rep  # noqa: E402  (the acquisition rule, 2026-10-24)
 
 _BASE_MARK = re.compile(r"PROBE TX\b")
 _BASE_TX = re.compile(r"PROBE TX seq=(\d+) phase_ms=(-?\d+) size_b=(\d+) \(tx#(\d+)\)")
@@ -327,7 +357,39 @@ def _pct(x: int, y: int) -> str:
     return f"{100.0 * x / y:.1f} %" if y else "n/a"
 
 
-def format_leg(name: str, params: dict[str, str], res: dict) -> list[str]:
+def leg_acquisition(params: dict[str, str], rx_text: str, tx_text: str) -> dict | None:
+    """rs12_leg_report.acquisition on an FHSS leg (params reg_profile=1), else None."""
+    if params.get("reg_profile") != "1":
+        return None
+    return rep.acquisition(rx_text, tx_text)
+
+
+def acquisition_lines(acq: dict | None) -> list[str]:
+    """The per-leg base acquisition line (2026-10-24); none off FHSS."""
+    if acq is None:
+        return []
+    if not acq["applies"]:
+        return [f"  base acquisition: n/a ({acq['why']})"]
+    budget = f"the {rep.SCAN_BUDGET_S:g} s FHSS scan budget"
+    if acq["first"] is not None:
+        when = (f"first frame decoded {acq['first']:.1f} s after the base's profile-1 "
+                f"activation")
+    else:
+        when = (f"no frame decoded in the {acq['span']:.1f} s the base log covers after its "
+                f"profile-1 activation")
+    if acq["failed"] is None:
+        return [f"  base acquisition: {when}, shorter than {budget}: not determined"]
+    if not acq["failed"]:
+        return [f"  base acquisition: {when}, within {budget}"]
+    return [f"  !! base ACQUISITION FAILED: {when}, past {budget}: its scan ran out into "
+            f"FAILED and never followed the hop grid, so any probe it fired went out from the "
+            f"channel it was parked on, after a frame it happened to catch; this leg measures "
+            f"that, not command delivery (--void-unlocked leaves it out of the pool, only "
+            f"under a pass rule written before leg 1)"]
+
+
+def format_leg(name: str, params: dict[str, str], res: dict,
+               acq: dict | None = None) -> list[str]:
     out = [f"{name}: codec {leg_codec(params)}, reg_profile={params.get('reg_profile', '?')}, "
            f"reactive_fire={params.get('reactive_fire', '?')}, "
            f"probe_echo={params.get('probe_echo', '?')}, "
@@ -390,7 +452,7 @@ def format_leg(name: str, params: dict[str, str], res: dict) -> list[str]:
         out.append(f"  log window: log_window={window}, not {LOG_WINDOW_AFTER_STOP}"
                    + (f" (log_window_detail: {detail})" if detail else "")
                    + ": pools only with legs of the same log_window")
-    return out
+    return out + acquisition_lines(acq)
 
 
 def pooled_verdict(vec: tuple[int, int], mono: tuple[int, int], profile: str = "2",
@@ -465,6 +527,10 @@ def main(argv: list[str] | None = None) -> int:
                     help="non-inferiority margin in percentage points: adds the margin rule "
                          "(one-sided 95 %% Newcombe lower bound of VECTOR minus mono_g4 "
                          "delivery against -PP) to the pooled comparison")
+    ap.add_argument("--void-unlocked", action="store_true",
+                    help="leave the FHSS legs whose base acquisition failed (no frame within "
+                         "the 120 s scan budget) out of the pool and list them; only under a "
+                         "pass rule written before leg 1 that says so")
     a = ap.parse_args(argv)
     if a.margin is not None and not 0 < a.margin < 100:
         ap.error(f"--margin {a.margin:g}: give a margin between 0 and 100 percentage points")
@@ -474,24 +540,37 @@ def main(argv: list[str] | None = None) -> int:
     other: list[str] = []                    # legs that are neither VECTOR nor mono_g4
     scored: list[str] = []                   # every scored leg, with its profile and echo
     windows: dict[str, list[str]] = {}       # params log_window ("" = absent) -> legs
+    voided: list[str] = []                   # --void-unlocked: legs whose acquisition failed
     for arch in a.archive:
         name = os.path.basename(os.path.normpath(arch))
         try:
             params = parse_params(_read(os.path.join(arch, "params.txt")))
-            res = score_leg(_read(os.path.join(arch, "rx_daemon.log")),
-                            _read(os.path.join(arch, "tx_daemon.log")))
+            rx_text = _read(os.path.join(arch, "rx_daemon.log"))
+            tx_text = _read(os.path.join(arch, "tx_daemon.log"))
+            res = score_leg(rx_text, tx_text)
         except ScoreError as exc:
             print(f"{name}: CANNOT SCORE: {exc}")
             rc = 2
             continue
+        # 2026-10-24: the base's FHSS acquisition (rs12_leg_report's rule)
+        acq = leg_acquisition(params, rx_text, tx_text)
+        void = a.void_unlocked and bool(acq and acq.get("failed"))
         if res["sent"] == 0:
             print(f"{name}: no PROBE TX line in rx_daemon.log (reactive_fire="
                   f"{params.get('reactive_fire', '?')}): this leg fired no probe, so it has "
                   f"no command-delivery score (DTS legs need -ReactiveFire 1)")
-            rc = max(rc, 1)
+            for line in acquisition_lines(acq):
+                print(line)
+            if void:
+                voided.append(name)
+            else:
+                rc = max(rc, 1)
             continue
-        for line in format_leg(name, params, res):
+        for line in format_leg(name, params, res, acq):
             print(line)
+        if void:
+            voided.append(name)
+            continue
         codec = leg_codec(params)
         prof = params.get("reg_profile", "?")
         pool = pools.setdefault((prof, codec), [0, 0])
@@ -504,12 +583,22 @@ def main(argv: list[str] | None = None) -> int:
         if prof not in PROFILE_LABEL or params.get("probe_echo") != "0":
             unlike.append(leg)
         windows.setdefault(params.get("log_window", ""), []).append(name)
+    if voided:
+        # 2026-10-24: listed before any pooled line, so the reader sees what the
+        # verdict leaves out
+        print(f"voided by --void-unlocked (the base's FHSS acquisition failed: no frame within "
+              f"the {rep.SCAN_BUDGET_S:g} s scan budget), left out of the pool: "
+              f"{', '.join(voided)}. Valid only under a pass rule written before leg 1 that "
+              f"says so")
     if len(a.archive) > 1:
         codecs = {c for _, c in pools}
         profiles = sorted({p for p, _ in pools})
         both = "vector" in codecs and "mono_g4" in codecs
         if rc:
             print("pooled verdict withheld: a leg above could not be scored")
+        elif not pools:
+            print("pooled: no leg left to pool after --void-unlocked")
+            rc = 1
         elif other and both:
             print("pooled verdict withheld: the 8.6 comparison pools VECTOR and mono_g4 legs "
                   "only (params cam_extra_env LIFETRAC_ENCODE_MODE=9 / 6), and these legs are "
