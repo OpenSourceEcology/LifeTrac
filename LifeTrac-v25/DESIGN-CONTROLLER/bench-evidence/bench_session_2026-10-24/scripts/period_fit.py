@@ -23,7 +23,14 @@ for tag,stamp in LEGS:
         if mm: arr.append((last,int(mm.group(2))))
     xs=[a for a,t in rf]; ys=[t for a,t in rf]
     a,b,res=linfit(xs,ys)
-    # base L072 fw_us clock vs base host clock (rate)
-    a2,b2,res2=linfit([f/1e6 for t,f in arr],[t for t,f in arr]) if len(arr)>2 else (0,0,[0])
+    # base L072 fw_us clock vs base host clock (rate). fw_us is a u32 microsecond
+    # count: unwrap it (it wraps every 2**32 us, 71.6 min; leg 2c_f2 crosses one).
+    # Regress firmware seconds on host seconds, so the slope is d(fw)/d(host) and
+    # a negative ppm means the L072 clock runs slow (PR #165 review).
+    fw=[]; off=0; prev=None
+    for t,f in arr:
+        if prev is not None and f < prev - 2**31: off += 2**32
+        prev=f; fw.append((t,(f+off)/1e6))
+    rate=f'{(linfit([t for t,f in fw],[f for t,f in fw])[1]-1)*1e6:+.0f} ppm' if len(fw)>2 else 'n/a'
     print(f'{tag}: n={len(rf)} slot period in base-host time = {b*1000:.3f} ms ({(b/0.2-1)*1e6:+.0f} ppm); resid sd {statistics.pstdev(res)*1000:.1f} ms, range {min(res)*1000:.0f}..{max(res)*1000:.0f} ms;'
-          f'  base L072 fw_us rate vs base host = {(b2-1)*1e6:+.0f} ppm (n={len(arr)})')
+          f'  base L072 fw_us rate vs base host = {rate} (n={len(arr)})')
