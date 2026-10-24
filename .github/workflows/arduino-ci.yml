@@ -210,6 +210,15 @@ jobs:
             murata_host/mh_link.c \
             -o build/mh_link_vectors
           ./build/mh_link_vectors
+      - name: Build and run nonce entropy vectors (H7-13)
+        working-directory: LifeTrac-v25/DESIGN-CONTROLLER/firmware/tractor_h7
+        run: |
+          mkdir -p build
+          cc -std=gnu11 -Wall -Wextra -Werror -Wpedantic -I. \
+            bench/h7_host_proto/lt_entropy_vectors.c \
+            lt_entropy.c \
+            -o build/lt_entropy_vectors
+          ./build/lt_entropy_vectors
       - name: Method G control-path SIL (H7-4)
         # Builds the real tractor_h7.ino for Method G against host fakes of
         # the Arduino core, the L072 (Serial3) and the Opta (Modbus), then
