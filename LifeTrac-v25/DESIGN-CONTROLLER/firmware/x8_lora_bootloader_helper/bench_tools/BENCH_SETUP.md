@@ -51,8 +51,8 @@ radio test.
    requests. If the radios must stay off, park them with
    `radio_park.py` (step 8). Its `0x80` readback is not a lasting guarantee
    while the firmware's scan is still running, so confirm a few minutes
-   later with the read-only `radio_state.py`. On the RS-12.21 image (built
-   2026-10-25, not flashed yet; VER capability bitmap `0x000000FF`)
+   later with the read-only `radio_state.py`. On the RS-12.21 image (on the
+   bench boards since 2026-10-25; VER capability bitmap `0x000000FF`)
    `radio_park.py` uses the firmware park command instead, which holds
    until a host RXCONT write, a profile activation or a reset (still
    confirm with `radio_state.py`).
@@ -303,15 +303,17 @@ until you flash the LifeTrac build.
 
 1. **Build** in PowerShell, in `LifeTrac-v25/DESIGN-CONTROLLER/firmware/murata_l072`:
    `mingw32-make bench` makes `build/firmware_bench_diag.bin`, md5
-   `e083ae46a64686031b39866eca42e094` (before #152: `0c1bb0a9`; from the
-   RS-12.21 source of 2026-10-25 on, `0daae27978089eb97ab35c18718b62b0`,
-   built but not flashed yet, so the flown `e083ae46` copy is in
-   [`RS_12_15…/firmware_flash/`](../../../bench-evidence/RS_12_15_reverse_delivery_2026-10-18/firmware_flash/)). Use
+   `0daae27978089eb97ab35c18718b62b0` (the RS-12.21 source of 2026-10-25,
+   on the bench boards since 2026-10-25; a copy of the flashed image is in
+   `bench-evidence/bench_session_2026-10-25/firmware_flash/`). The previous
+   build, `e083ae46a64686031b39866eca42e094` (#152; before it `0c1bb0a9`),
+   is the rollback image; its flown copy is in
+   [`RS_12_15…/firmware_flash/`](../../../bench-evidence/RS_12_15_reverse_delivery_2026-10-18/firmware_flash/). Use
    arm-none-eabi-gcc 12.2.1
    (Arm GNU Toolchain 12.2.MPACBTI-Rel1); the toolchain and the expected md5
    are in [`murata_l072/README.md`](../../murata_l072/README.md). The
-   committed `build/firmware.bin` (md5 `148de24e1f9acce417c46c2c69a5be6b`;
-   before #152: `589c1203`) is the production image. Do not put it on a bench board: it refuses the
+   committed `build/firmware.bin` (md5 `2c5e055abff95126309a62409fafc654`;
+   before RS-12.21: `148de24e`) is the production image. Do not put it on a bench board: it refuses the
    bench's diagnostic register writes.
 2. **Flash** with [`flash_l072.sh`](flash_l072.sh), which does
    [FLASH_RUNBOOK.md](../FLASH_RUNBOOK.md) §1–§2 from the PC and reads

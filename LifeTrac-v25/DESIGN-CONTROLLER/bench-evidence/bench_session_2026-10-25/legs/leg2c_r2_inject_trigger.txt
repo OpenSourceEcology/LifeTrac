@@ -1,0 +1,12 @@
+﻿14:49:05 PC armed on=fault:0x0D:final cmd=dual_inject.py 120 base=2D0A1209DABC240B
+14:49:37 PC tractor FAULT: 2026-10-06 07:38:29,649 WARNING image_tx_daemon: FAULT_URC: code=0x0D sub=0x00 name=RX_SCAN_FAILED attempt=0 final=0 warm=0 hw_suspect=0 crc_seen=0 basis=tx_id_not_in_flight tx_inflight=- uptime_ms=33565 raw=0d000000000000000000000000000000000000001d830000
+14:50:06 PC tractor FAULT: 2026-10-06 07:38:59,528 WARNING image_tx_daemon: FAULT_URC: code=0x0D sub=0x01 name=RX_SCAN_FAILED attempt=1 final=0 warm=0 hw_suspect=0 crc_seen=0 basis=tx_id_not_in_flight tx_inflight=- uptime_ms=63636 raw=0d0100000000000000000000000000000000000094f80000
+14:50:06 PC tractor FAULT: 2026-10-06 07:38:59,529 WARNING image_tx_daemon: FAULT during pipelined TX: code=0x0D sub=0x01 raw=0d0100000000000000000000000000000000000094f80000
+14:50:36 PC tractor FAULT: 2026-10-06 07:39:29,467 WARNING image_tx_daemon: FAULT_URC: code=0x0D sub=0x02 name=RX_SCAN_FAILED attempt=2 final=0 warm=0 hw_suspect=0 crc_seen=0 basis=tx_id_not_in_flight tx_inflight=- uptime_ms=93637 raw=0d02000000000000000000000000000000000000c56d0100
+14:50:36 PC tractor FAULT: 2026-10-06 07:39:29,469 WARNING image_tx_daemon: FAULT during pipelined TX: code=0x0D sub=0x02 raw=0d02000000000000000000000000000000000000c56d0100
+14:51:07 PC tractor FAULT: 2026-10-06 07:39:59,447 WARNING image_tx_daemon: FAULT_URC: code=0x0D sub=0x83 name=RX_SCAN_FAILED attempt=3 final=1 warm=0 hw_suspect=0 crc_seen=0 basis=tx_id_not_in_flight tx_inflight=- uptime_ms=123676 raw=0d830000000000000000000000000000000000001ce30100
+14:51:07 PC TRIGGER fault:0x0D:final at 113 s after MONITORING: started dual_inject.py 120 on the base (watcher pid 4458)
+14:51:08 PC saw on the base: INJECT_WATCH 14:51:07 1792939867 mode=now:fault:code=0x0D,sub=0x83 deadline_s=540 cmd=dual_inject.py 120
+14:51:08 PC saw on the base: INJECT_TRIGGER 14:51:07 1792939867 fault:code=0x0D,sub=0x83
+14:51:08 PC saw on the base: INJECT_START 14:51:07 1792939867 dual_inject.py 120
+INJECT finished (on=fault:0x0D:final cmd=dual_inject.py 120 started=14:51:07 exit=0; ran to its end) trigger: 14:51:07 fault:code=0x0D,sub=0x83

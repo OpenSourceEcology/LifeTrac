@@ -37,34 +37,35 @@ The build is reproducible byte for byte, but only with the exact toolchain:
 `C:\Program Files (x86)\Arm GNU Toolchain arm-none-eabi\12.2 mpacbti-rel1\`,
 with WinLibs `mingw32-make` run from PowerShell. The source now builds the
 RS-12.21 image (scan option (b) + L + d2, the firmware park command, the
-0x0D split; built 2026-10-25 and again after `mingw32-make clean`, **not
-flashed**). Its flash and the checks after it are planned step by step in
+0x0D split; built 2026-10-25 and again after `mingw32-make clean`). Its
+bench build is **on both boards since 2026-10-25**, flashed by
 [FHSS_SCAN_FAILED_OPTIONS.md](../murata_l072/FHSS_SCAN_FAILED_OPTIONS.md)
-section 6.1:
+section 6.1 (tractor then base, Verify OK, `flash_rc=0` on both; record and
+a copy of the image in
+[`bench_session_2026-10-25/firmware_flash/`](../../bench-evidence/bench_session_2026-10-25/firmware_flash/)):
 
 | build | md5 | size |
 |---|---|---|
-| bench `build/firmware_bench_diag.bin` (not flashed yet) | `0daae27978089eb97ab35c18718b62b0` | 25 324 B |
+| bench `build/firmware_bench_diag.bin` (on both boards since 2026-10-25) | `0daae27978089eb97ab35c18718b62b0` | 25 324 B |
 | production `build/firmware.bin` (committed) | `2c5e055abff95126309a62409fafc654` | 25 324 B |
 
-On the boards until it is flashed, at `13f20aa1` (#152, the RS-12.15
-reverse-delivery fix; merged as `main` `3c8ced60` with the
+On the boards before it, 2026-10-18 → 2026-10-25, at `13f20aa1` (#152, the
+RS-12.15 reverse-delivery fix; merged as `main` `3c8ced60` with the
 `firmware/murata_l072` source unchanged):
 
 | build | md5 | size |
 |---|---|---|
-| bench `build/firmware_bench_diag.bin` (on both boards since 2026-10-18) | `e083ae46a64686031b39866eca42e094` | 24 972 B |
+| bench `build/firmware_bench_diag.bin` (on both boards 2026-10-18 → 2026-10-25) | `e083ae46a64686031b39866eca42e094` | 24 972 B |
 | production `build/firmware.bin` | `148de24e1f9acce417c46c2c69a5be6b` | 24 972 B |
 
-Before #152 the pair was bench `0c1bb0a9573f813137f941dfa47177d0`, on both
-boards 2026-09-15 → 2026-10-18, and production
-`589c120323c2d5e7ef9f459d7a4ba42d`, 24 860 B each (reproduced at `main`
-`bb4a2071` and again at `f6e4b463`). The
-rollback copy of the bench build is
+The rollback copy of that bench build is
+[`firmware_bench_diag_e083ae46.bin`](../../bench-evidence/RS_12_15_reverse_delivery_2026-10-18/firmware_flash/firmware_bench_diag_e083ae46.bin),
+in the record of the 2026-10-18 flash of both boards (Verify OK,
+`flash_rc=0` on both). Before #152 the pair was bench
+`0c1bb0a9573f813137f941dfa47177d0`, on both boards 2026-09-15 →
+2026-10-18, and production `589c120323c2d5e7ef9f459d7a4ba42d`, 24 860 B
+each (reproduced at `main` `bb4a2071` and again at `f6e4b463`); its copy is
 [`firmware_bench_diag_0c1bb0a9.bin`](../../bench-evidence/RS_13_vector_scene_2026-09-26/firmware/firmware_bench_diag_0c1bb0a9.bin).
-The 2026-10-18 flash of both boards is recorded in
-[`RS_12_15_reverse_delivery_2026-10-18/firmware_flash/`](../../bench-evidence/RS_12_15_reverse_delivery_2026-10-18/firmware_flash/)
-(Verify OK, `flash_rc=0` on both), with a copy of the flashed image.
 
 Other compilers (Arduino's bundled 7-2017q4, which `build.ps1` picks first;
 Ubuntu's `gcc-arm-none-eabi`, which the main CI job uses) build working
@@ -162,8 +163,14 @@ log) → `prep_bridge` (unbind consumers, rmmod `x8h7_*`) → `run_flash_l072`
 (openocd holds BOOT0 high + NRST, AN3155 write + `Verify OK`, ~45 s) →
 `revive_bridge` up to `openocd reset run` (H7 back in its firmware) →
 `wdt_pet stop` (writes `'V'` then closes) → `systemctl reboot`. The board
-is back in 12–24 s. `PIPELINE-EXIT=0` and `flash_rc=0` in
-`/home/fio/pipeline_stamped.log` are the record.
+is back in 12–24 s. `Verify OK`, `flash_rc=0` and `DONE: prep=0 flash=0
+revive=0` in `/home/fio/pipeline_stamped.log` are the record.
+`PIPELINE-EXIT=0` is not in that log: the wrapper prints it to the console
+after the pipeline returns, and the reboot can cut the connection first
+(the tractor's adb console missed it on 2026-10-25; the base's ssh console
+had it). Over ssh `flash_l072.sh` can then hang on the dead session: once
+the board answers on a new connection, stop it; its exit status does not
+judge the flash.
 
 Why the reboot is deliberate: the old revive re-inserted the `x8h7`
 modules, which OOPSes the base's 6.1.24 kernel in `spi_probe →
@@ -232,7 +239,7 @@ bracket silently parses only the old fields.
 Park at the end of the session: `radio_park.py` → `PARK_OK
 {"opmode_readback": "0x80"}` on both boards.
 
-**On the RS-12.21 image** (2026-10-25, not flashed yet) the VER reply's
+**On the RS-12.21 image** (on both boards since 2026-10-25) the VER reply's
 capability bitmap reads `0x000000FF` (`0x0000007F` on `e083ae46` and
 earlier; VER's version and name stay `0.0.0` / `dev`, so this bit is how
 a host tells the images apart). `radio_park.py` then parks by the firmware
@@ -247,7 +254,9 @@ active, and on this image the scan of a node without authority never
 fails out: only the firmware park holds then, and one that does not hold
 is a firmware defect, not a timing matter. The flash-day plan:
 [FHSS_SCAN_FAILED_OPTIONS.md](../murata_l072/FHSS_SCAN_FAILED_OPTIONS.md)
-section 6.1.
+section 6.1; flown 2026-10-25, when both firmware parks held after the
+flash and after each leg
+([RESULTS](../../bench-evidence/bench_session_2026-10-25/RESULTS.md)).
 
 ## 5. First flash from a factory board
 
@@ -317,8 +326,9 @@ treat it as consolidated guidance and record what you see.
      `0xFFFF`). On the Murata factory part that NACKs, so it falls back to
      **page-by-page erase** of only the pages the image needs. The rest of
      the flash and the option bytes are untouched.
-   - Success means `Verify OK`, `flash_rc=0` and `PIPELINE-EXIT=0` in
-     `/home/fio/pipeline_stamped.log`. The X8 reboots
+   - Success means `Verify OK`, `flash_rc=0` and `DONE: prep=0 flash=0
+     revive=0` in `/home/fio/pipeline_stamped.log` (`PIPELINE-EXIT=0` is a
+     console line and can be lost at the reboot, section 2). The X8 reboots
      (`REVIVE_MODE=reboot`, section 2).
 3. After the reboot, follow section 4: re-stage `/tmp`, stop the tractor
    camera, run `rs116_health_probe.py`, and park the radio.

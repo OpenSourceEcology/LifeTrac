@@ -8,15 +8,34 @@
 #           operator leaves it any time with Esc; the window stays a normal
 #           window with its own close button. Never --kiosk.
 #   -Front  bring that window back to the front (it drops behind any app the
-#           operator clicks) and re-enter the player's fullscreen only if the
-#           window shows YouTube and is not already fullscreen.
+#           operator clicks; a refused focus change is retried once with the
+#           Alt-key workaround below) and re-enter the player's fullscreen only
+#           if the window shows YouTube and is not already fullscreen.
 #   -Close  close that instance only (the operator's own Firefox is untouched:
 #           the bench instance is found by its exact `-profile "<ProfileDir>"`
 #           argument on the command line, not by a substring).
 #
 # The "f" key goes out only when the bench window is confirmed to be the
-# foreground window (Windows may refuse SetForegroundWindow); otherwise the
-# script says so and the operator clicks the window and presses f.
+# foreground window. Windows may refuse SetForegroundWindow (focus-stealing
+# prevention; seen 2026-10-25): the script then says so and retries once with
+# a synthetic Alt press and release around SetForegroundWindow, the standard
+# workaround (no key but Alt is sent, and only the bench window is raised).
+# That Alt is global input: it goes to whatever window is in front at that
+# moment, normally the operator's app. If the retry is refused too, both the
+# press and the release land there, which in many apps moves keyboard focus to
+# its menu bar (Esc leaves it).
+# If the window is still not in front after the retry, "f" is not sent and
+# -Open / -Front exit 6 (NOT-IN-FRONT), whatever the fullscreen state: a camera
+# frame taken then could show another window (2026-10-25: a scene_check frame
+# taken so caught a non-bench window). scene_check.sh refuses on any non-zero
+# exit and takes no frame; the operator clicks the video window and re-runs.
+# The last line reports `player fullscreen:` (the window covers its screen; it
+# says nothing about z-order) and `in front:` (it is the foreground window).
+# Exit: 0 in front; 1 usage; 2 no bench window; 3 no Firefox; 4 -ProfileDir
+# refused; 6 not in front after the retry.
+# A bench profile that opens windows with no page (seen 2026-10-25) can be
+# renamed (e.g. ff_bench_youtube.bak-<date>) after -Close: -Open then creates
+# a fresh one.
 # -ProfileDir must be a dedicated folder: a drive root or a path shorter than
 # 10 characters is refused (it is matched against firefox.exe command lines).
 #
@@ -81,6 +100,7 @@ public class BenchWin {
   [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int n);
   [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out RECT r);
   [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+  [DllImport("user32.dll")] public static extern void keybd_event(byte vk, byte scan, uint flags, UIntPtr extra);
   public struct RECT { public int Left, Top, Right, Bottom; }
 }
 "@
@@ -99,6 +119,19 @@ function Raise($w) {
   [BenchWin]::BringWindowToTop($w.MainWindowHandle) | Out-Null
   [BenchWin]::SetForegroundWindow($w.MainWindowHandle) | Out-Null
   (New-Object -ComObject WScript.Shell).AppActivate($w.Id) | Out-Null
+}
+function Raise-WithAlt($w) {
+  # Focus-stealing prevention can refuse a plain SetForegroundWindow. A
+  # synthetic Alt press and release around the call is the standard workaround
+  # (2026-10-25 bench session). It sends no key but Alt and raises only the
+  # bench window. The Alt goes to the window in front when it is sent (see the
+  # header): if this call is refused too, the operator's app gets the press and
+  # the release.
+  [BenchWin]::ShowWindow($w.MainWindowHandle, 9) | Out-Null        # SW_RESTORE: a normal window
+  [BenchWin]::keybd_event(0x12, 0, 0, [UIntPtr]::Zero)              # Alt down
+  [BenchWin]::SetForegroundWindow($w.MainWindowHandle) | Out-Null
+  [BenchWin]::keybd_event(0x12, 0, 2, [UIntPtr]::Zero)              # Alt up (KEYEVENTF_KEYUP)
+  Start-Sleep -Milliseconds 300
 }
 function Is-PlayerFullscreen($w) {
   $r = New-Object BenchWin+RECT; [BenchWin]::GetWindowRect($w.MainWindowHandle, [ref]$r) | Out-Null
@@ -141,6 +174,10 @@ if ($Front) {
   if (-not $w) { "no bench video window (run -Open)"; exit 2 }
   Raise $w
   Start-Sleep -Milliseconds 600
+  if ([BenchWin]::GetForegroundWindow() -ne $w.MainWindowHandle) {
+    "Windows refused the focus change; retrying once with the Alt-key workaround"
+    Raise-WithAlt $w
+  }
   $isYouTube = ($w.MainWindowTitle -match 'YouTube')
   if ((-not $NoPlayerFullscreen) -and $isYouTube -and -not (Is-PlayerFullscreen $w)) {
     # SendKeys types into whatever has focus: send "f" only when the bench window
@@ -153,5 +190,15 @@ if ($Front) {
     }
   }
   $w = Get-BenchWindow
-  "window pid $($w.Id) '$($w.MainWindowTitle)' player fullscreen: $(Is-PlayerFullscreen $w)"
+  if (-not $w) { "no bench video window any more (run -Open)"; exit 2 }
+  # Is-PlayerFullscreen compares the window rectangle with the screen only; it
+  # does not say the window is in front. The camera sees the bench window only
+  # if it is the foreground window, so that is checked separately.
+  $inFront = ([BenchWin]::GetForegroundWindow() -eq $w.MainWindowHandle)
+  "window pid $($w.Id) '$($w.MainWindowTitle)' player fullscreen: $(Is-PlayerFullscreen $w) in front: $inFront"
+  if (-not $inFront) {
+    "NOT-IN-FRONT: the bench window is not the foreground window after the retry, so a camera frame now could show another window -- click the video window, then re-run"
+    exit 6
+  }
+  exit 0
 }

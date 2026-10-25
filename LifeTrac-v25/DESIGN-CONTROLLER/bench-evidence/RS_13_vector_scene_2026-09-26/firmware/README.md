@@ -3,20 +3,26 @@
 Everything here is a **bench build**: `mingw32-make bench`, with
 `HOST_ALLOW_REG_WRITE_DIAG=1` so the host may write radio registers such as the
 DTS carrier pin. None of it is the production binary. Production is the
-tracked `firmware/murata_l072/build/firmware.bin` (md5 `148de24e…` on `main`
-since #152; `589c1203…` before it), which refuses those register writes.
+tracked `firmware/murata_l072/build/firmware.bin` (md5 `2c5e055a…` on `main`
+since #168; `148de24e…` from #152; `589c1203…` before it), which refuses
+those register writes.
 Flash only with
 [FLASH_RUNBOOK.md](../../../firmware/x8_lora_bootloader_helper/FLASH_RUNBOOK.md)
 (`REVIVE_MODE=reboot`, so expect an X8 reboot and a `/tmp` re-push), and only on
 an explicit GO.
 
-**Since 2026-10-18 the boards run `e083ae46`**, the RS-12.15 reverse-delivery
-bench build (source `13f20aa1`, #152, merged as `main` `3c8ced60`). It is not
-in this folder: the copy flashed that day is
+**Since 2026-10-25 the boards run `0daae279`**, the RS-12.21 bench build
+(md5 `0daae27978089eb97ab35c18718b62b0`, 25 324 B; #168, `main` `d597b094`).
+It is not in this folder: the copy flashed that day is in
+`bench-evidence/bench_session_2026-10-25/firmware_flash/`, with both flash
+consoles. From 2026-10-18 to 2026-10-25 the boards ran `e083ae46`, the
+RS-12.15 reverse-delivery bench build (source `13f20aa1`, #152, merged as
+`main` `3c8ced60`), now the rollback image. It is not in this folder either:
+the copy flashed on 2026-10-18 is
 [`RS_12_15_reverse_delivery_2026-10-18/firmware_flash/firmware_bench_diag_e083ae46.bin`](../../RS_12_15_reverse_delivery_2026-10-18/firmware_flash/firmware_bench_diag_e083ae46.bin)
 (md5 `e083ae46a64686031b39866eca42e094`, 24 972 B), with both flash logs
 (Verify OK, `flash_rc=0`). `0c1bb0a9`, described next, is the build it
-replaced and the rollback image.
+replaced (the rollback image until 2026-10-25).
 
 ## What the boards ran 2026-09-15 → 2026-10-18 (`0c1bb0a9`)
 
@@ -61,7 +67,7 @@ replaced and the rollback image.
 
 | file | md5 | size | what it is | where it came from |
 |---|---|---|---|---|
-| `firmware_bench_diag_0c1bb0a9.bin` | `0c1bb0a9573f813137f941dfa47177d0` | 24 860 B | **On both boards** 2026-09-15 → 2026-10-18 (leg U, RS-1.4 leg V, all of RS-13.1); the rollback image since `e083ae46`. | PC build dir; rebuilt byte-identical from `main` before #152 |
+| `firmware_bench_diag_0c1bb0a9.bin` | `0c1bb0a9573f813137f941dfa47177d0` | 24 860 B | **On both boards** 2026-09-15 → 2026-10-18 (leg U, RS-1.4 leg V, all of RS-13.1); the rollback image from `e083ae46` until 2026-10-25. | PC build dir; rebuilt byte-identical from `main` before #152 |
 | `firmware_bench_diag_5a160e4a.bin` | `5a160e4a8c9296c7d2e49727bdfb8880` | 24 860 B | RS-12.15 v2 as **flown in legs R and T** (both boards, 2026-09-14 → 09-15). Source `6feca2c0`. It differs from `0c1bb0a9` only in the trust tier given to a leading grid, a case never seen on air. | Recovered from the PC's local git object store (blob `d877970b`, reachable only from a reflog entry of the amended commit `4de3afa2`, which expires ~2026-10-14) |
 | `firmware_bench_diag_e8ad8424.bin` | `e8ad842489d5acfc09f204c7807e4661` | 24 196 B | RS-12.10 corrected build: the **pre-clock-authority "old fw"** of the RS-12.15 A/B (legs L, Q, Q2, S), on both boards 09-12 → 09-14. Source `e02ab86e` (`main` `3a0cb524`). | The PC's `LifeTrac-oldfw` worktree build dir |
 | `firmware_bench_diag_8c112e6f.bin` | `8c112e6f8b42109aab38a69f2b0aa147` | 24 180 B | First RS-12.10 build (PR #117, `df997023`), legs D/E on 2026-09-12. It has the STATS-tail serializer bug fixed in `e8ad8424`; do not fly it. | Recovered from an unreachable blob (`cb877771`) in the PC's git store |
@@ -70,11 +76,13 @@ replaced and the rollback image.
 ## Every L072 build flashed to the bench, and where it is now
 
 Based on the bench-evidence records, git history and a scan of the PC on
-2026-10-04; the `e083ae46` row added 2026-10-18:
+2026-10-04; the `e083ae46` row added 2026-10-18, the `0daae279` row
+2026-10-25:
 
 | build (md5) | when / legs | status |
 |---|---|---|
-| `e083ae46` bench | 10-18 → now (RS-12.15 legs V, W, W2, X) | copy in [`RS_12_15_reverse_delivery_2026-10-18/firmware_flash/`](../../RS_12_15_reverse_delivery_2026-10-18/firmware_flash/) + source `13f20aa1` (`main` `3c8ced60`) |
+| `0daae279` bench (RS-12.21) | 10-25 → now (legs 2c_r1, 2c_r2) | copy in `bench-evidence/bench_session_2026-10-25/firmware_flash/` + source on `main` `d597b094` (#168) |
+| `e083ae46` bench | 10-18 → 10-25 (RS-12.15 legs V, W, W2, X; the 2026-10-19 and 2026-10-24 RS-13 legs) | copy in [`RS_12_15_reverse_delivery_2026-10-18/firmware_flash/`](../../RS_12_15_reverse_delivery_2026-10-18/firmware_flash/) + source `13f20aa1` (`main` `3c8ced60`); the rollback image |
 | `0c1bb0a9` bench | 09-15 → 10-18 (U, RS-1.4 V, RS-13.1) | **here** + reproducible from `main` before #152 |
 | `5a160e4a` bench | 09-14 → 09-15 (R, T) | **here** (recovered) + source `6feca2c0` |
 | `2ee69f9c` bench (RS-12.15 v1) | 09-14 (O, P) | binary lost; source `23ba5122` on `main` |

@@ -16,6 +16,11 @@
 #               exit 4 too when the camera gave no 10 s figure (NO-FRAMES, or no pair
 #               9 s or more apart)
 #   --no-front  do not touch the PC window (e.g. the still is shown some other way)
+#   Exit 5 (SCENE-CHECK-NOT-FRONT) before the camera is opened, with no frame taken,
+#   when youtube_window.ps1 -Front fails: the bench window is not confirmed in front
+#   after its retry (exit 6 there), or there is none (exit 2). The check is made once,
+#   before the grab: a window the operator clicks after it still comes in front of
+#   the camera. leg_prep.sh and step1_pass.sh abort on any non-zero exit of this script.
 # Inputs:  TRACTOR_SERIAL, TRACTOR_APP_IMAGE (has OpenCV), YOUTUBE_URL /
 #          FIREFOX_PROFILE_DIR (the window youtube_window.ps1 -Open started).
 # Writes:  $EVIDENCE_DIR/<tag>_scene.txt and <tag>_scene.jpg; tractor /tmp/scene_check.jpg
@@ -50,6 +55,14 @@ if [ $FRONT = 1 ]; then
   if command -v powershell.exe > /dev/null 2>&1; then
     powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(win_path "$LEGS_DIR/youtube_window.ps1")" -Front \
       -Url "$YOUTUBE_URL" -ProfileDir "$FIREFOX_PROFILE_DIR" 2>&1 | tr -d '\r'
+    frc=${PIPESTATUS[0]}
+    # No frame unless the bench window is confirmed in front: a frame of another window
+    # would be saved here, and on a leg that screen would go on the air into the base
+    # capture (2026-10-25). Any non-zero exit (6 = not in front, 2 = no window) stops here.
+    if [ "$frc" != 0 ]; then
+      echo "SCENE-CHECK-NOT-FRONT: youtube_window.ps1 -Front exit $frc: the bench video window is not confirmed in front, so no frame was taken. Click the video window (or run youtube_window.ps1 -Open), then re-run."
+      exit 5
+    fi
   else
     echo "(no powershell.exe: bring the bench video window to the front by hand)"
   fi
