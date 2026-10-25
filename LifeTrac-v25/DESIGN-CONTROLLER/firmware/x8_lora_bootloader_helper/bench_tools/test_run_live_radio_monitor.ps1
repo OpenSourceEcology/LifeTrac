@@ -21,6 +21,10 @@
     results and the daemons' SIGTERM shutdown lines, Get-LogWindowVerdict)
     and Invoke-DockerStop against a stub adb.
 
+    2026-10-24 (the 0x0D split, FHSS_SCAN_FAILED_OPTIONS.md section 7):
+    fault:0x0D:final fires only on the scan's last attempt (a valid scan sub
+    with attempt 3), and fault:0x0F (TX_FIFO_RB_MISMATCH) works.
+
         powershell -NoProfile -File bench_tools\test_run_live_radio_monitor.ps1
 
     Exit 0 = all passed, 1 = a failure (listed), 2 = the harness did not parse.
@@ -125,6 +129,43 @@ Check "settle FAULT_URC counts as a FAULT line" (Test-InjectFaultLine -Line $set
 Check "a non-FAULT line never fires" (-not (Test-InjectFaultLine -Line "INFO stats code=0x0D sub=0x83" -Spec $final))
 $xl = @(ConvertFrom-AdbOutput (CmdLines "$x0`n$x2`n$x3`n"))
 Check "grep output through cmd /c: the final line found" (@($xl | Where-Object { Test-InjectFaultLine -Line $_ -Spec $final }).Count -eq 1)
+
+# --- Test-InjectFaultLine after the 0x0D split (2026-10-24) ------------------------
+# fault:0x0D:final = the scan's last attempt: final bit, attempt 3, a valid scan sub
+# (include/sx1276_rx_scan_fail.h). TX_FIFO_RB_MISMATCH moved to 0x0F.
+function FaultLine([string]$Code, [string]$Sub) {
+    return "2026-10-25 09:23:03,425 WARNING image_tx_daemon: FAULT during pipelined TX: code=0x$Code sub=0x$Sub raw=$($Code.ToLower())$($Sub.ToLower())000000000000000000000000000000000000000016e30100"
+}
+foreach ($s in @("83", "A3", "C3", "E3", "93", "D3")) {
+    Check "final: attempt-3 scan sub 0x$s fires" (Test-InjectFaultLine -Line (FaultLine "0D" $s) -Spec $final)
+}
+foreach ($s in @("FE", "FD", "80", "84", "81", "82", "B3", "F3", "8F", "03", "A2")) {
+    Check "final: sub 0x$s (not the scan's last attempt) does not fire" (-not (Test-InjectFaultLine -Line (FaultLine "0D" $s) -Spec $final))
+}
+$cmdFifo = "2026-10-25 09:23:04,001 WARNING image_tx_daemon: FAULT_URC: code=0x0D sub=0xFE name=TX_FIFO_RB_MISMATCH tx_id=0xFE fw=old basis=not_scan_encoding tx_inflight=0xFE uptime_ms=123671 raw=0dfe00000000000000000000000000000000000017e30100"
+Check "final: a pre-split FIFO fault on the command tx_id 0xFE (bit 7) does not fire" (-not (Test-InjectFaultLine -Line $cmdFifo -Spec $final))
+$urcFinal = "2026-10-25 09:23:03,426 WARNING image_tx_daemon: FAULT_URC: code=0x0D sub=0xA3 name=RX_SCAN_FAILED attempt=3 final=1 warm=0 hw_suspect=1 crc_seen=0 basis=tx_id_not_in_flight tx_inflight=- uptime_ms=123670 raw=0da300000000000000000000000000000000000016e30100"
+Check "final: the FAULT_URC line of the scan's last attempt fires" (Test-InjectFaultLine -Line $urcFinal -Spec $final)
+$fifo0F = "2026-10-25 09:24:00,100 WARNING image_tx_daemon: FAULT_URC: code=0x0F sub=0x83 name=TX_FIFO_RB_MISMATCH tx_id=0x83 uptime_ms=180000 raw=0f8300000000000000000000000000000000000020bf0200"
+Check "final: a 0x0F line never fires fault:0x0D:final (sub 0x83 or not)" (-not (Test-InjectFaultLine -Line $fifo0F -Spec $final))
+$s0F = ConvertTo-InjectSpec -Cmd "dual_inject.py 120" -On "fault:0x0F"
+Check "fault:0x0F parses" ($s0F.On -eq "fault" -and $s0F.Code -eq 15 -and $s0F.Sub -eq -1 -and -not $s0F.Final -and $s0F.Label -eq "fault:0x0F") $s0F.Label
+Check "fault:0x0F fires on the 0x0F FAULT_URC line" (Test-InjectFaultLine -Line $fifo0F -Spec $s0F)
+Check "fault:0x0F fires on a legacy 0x0F line" (Test-InjectFaultLine -Line (FaultLine "0F" "02") -Spec $s0F)
+Check "fault:0x0F does not fire on a 0x0D line" (-not (Test-InjectFaultLine -Line $urcFinal -Spec $s0F) -and -not (Test-InjectFaultLine -Line $cmdFifo -Spec $s0F))
+$s0F2 = ConvertTo-InjectSpec -Cmd "dual_inject.py 120" -On "fault:0x0F:0x02"
+Check "fault:0x0F:0x02 fires only on tx_id 0x02" ((Test-InjectFaultLine -Line (FaultLine "0F" "02") -Spec $s0F2) -and -not (Test-InjectFaultLine -Line $fifo0F -Spec $s0F2))
+# 2026-10-24 review: final is RX_SCAN_FAILED's, so the parser refuses it on any
+# other code (it would run the whole leg without injecting) ...
+Check "fault:0x0F:final throws (final is code 0x0D's only)" (Throws { ConvertTo-InjectSpec -Cmd "dual_inject.py 120" -On "fault:0x0F:final" })
+Check "fault:0x0E:final throws" (Throws { ConvertTo-InjectSpec -Cmd "dual_inject.py 120" -On "fault:0E:final" })
+Check "fault:d:final (no 0x) parses" ((ConvertTo-InjectSpec -Cmd "dual_inject.py 120" -On "fault:d:final").Final)
+# ... and the matcher still never fires `final` off code 0x0D (a hand-built spec)
+$s0Ff = @{ On = "fault"; Code = 0x0F; Sub = -1; Final = $true; Label = "fault:0x0F:final" }
+Check "a code-0x0F final spec never fires" (-not (Test-InjectFaultLine -Line $fifo0F -Spec $s0Ff) -and -not (Test-InjectFaultLine -Line (FaultLine "0F" "A3") -Spec $s0Ff))
+$xl2 = @(ConvertFrom-AdbOutput (CmdLines "$x0`n$cmdFifo`n$x2`n$urcFinal`n$x3`n"))
+$hits = @($xl2 | Where-Object { Test-InjectFaultLine -Line $_ -Spec $final })
+Check "grep output with a 0xFE FIFO line ahead: the first hit is the scan's final" ($hits.Count -eq 2 -and $hits[0] -eq $urcFinal) "$($hits.Count) hit(s)"
 
 # --- Get-InjectSummary -----------------------------------------------------------
 $ok = CmdLines ("INJECT_WATCH 16:21:58 1792340518 mode=first_frame deadline_s=360 cmd=dual_inject.py 250`n" +

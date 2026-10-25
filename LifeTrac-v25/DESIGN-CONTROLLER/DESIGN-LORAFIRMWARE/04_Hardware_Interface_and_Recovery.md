@@ -75,6 +75,8 @@ Properties:
 | `0x02` | H→L | `UID_REQ` | request L072 96-bit unique device ID |
 | `0x82` | L→H | `UID_URC` | reply with UID |
 | `0x03` | H→L | `RESET` | soft reset request (firmware does an orderly NVIC_SystemReset) |
+| `0x04` | H→L | `RADIO_PARK_REQ` | firmware radio park (RS-12.21, 2026-10-24): modem to LoRa SLEEP, no RX arm path runs and TX is refused until a raw RXCONT write, a profile activation or a reset; refused while a TX is on air or queued (contract in `host_types.h`) |
+| `0x84` | L→H | `RADIO_PARK_URC` | reply: `{status 0 PARKED / 1 ALREADY / 2 REFUSED, RegOpMode readback}` |
 | `0x10` | H→L | `TX_FRAME` | transmit a v25 frame; payload is the on-air bytes (already encrypted if H7 owns crypto) plus a small header (channel hint, SF hint, profile hint, priority) |
 | `0x90` | L→H | `TX_DONE_URC` | TX completed; payload includes timing metadata |
 | `0x91` | L→H | `RX_FRAME_URC` | a frame was received; payload includes radio metadata + bytes |
@@ -87,7 +89,7 @@ Properties:
 | `0x41` | H→L | `STATS_DUMP` | request counter dump |
 | `0xC1` | L→H | `STATS_URC` | counter dump payload |
 | `0xF0` | L→H | `BOOT_URC` | sent once when the L072 finishes boot; carries safe-mode-was-considered flag, golden-jump-was-considered flag |
-| `0xF1` | L→H | `FAULT_URC` | unsolicited fault notification |
+| `0xF1` | L→H | `FAULT_URC` | unsolicited fault notification; codes `HOST_FAULT_CODE_*` in `host_types.h` (0x0D RX_SCAN_FAILED; TX_FIFO_RB_MISMATCH moved 0x0D → 0x0F on 2026-10-24, the 0x0D split) |
 | `0xFE` | L→H | `ERR_PROTO` | host sent something we don't understand; carries the offending type and ver |
 | `0xFF` | both | `RESERVED` | never sent |
 

@@ -47,7 +47,9 @@ instead of relying on the default.
   it with `mingw32-make bench` in [`../murata_l072/`](../murata_l072/). That
   gives `build/firmware_bench_diag.bin`, md5
   `e083ae46a64686031b39866eca42e094` (#152; the previous build `0c1bb0a9`
-  is the rollback image); toolchain and expected hashes are in
+  is the rollback image; the RS-12.21 source of 2026-10-25 builds
+  `0daae27978089eb97ab35c18718b62b0`, not flashed yet); toolchain and
+  expected hashes are in
   [`../murata_l072/README.md`](../murata_l072/README.md). Saved copies of
   the earlier flashed bench builds are in
   [`bench-evidence/RS_13_vector_scene_2026-09-26/firmware/`](../../bench-evidence/RS_13_vector_scene_2026-09-26/firmware/README.md);

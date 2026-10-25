@@ -1,6 +1,13 @@
 # FHSS scan FAILED: options for a node that cannot recover
 
-**Status:** decision memo. No option adopted. Nothing flashed, no radio used.
+**Status:** decision memo, **adopted by the design owner (Dorkmo) on
+2026-10-24**: the option (b) package of section 5 item 2 (b + L + d2, the
+RS-12.21 park command in the same image, the 0x0D split of section 7), with
+the decay-window trade-off of section 5 item 3 accepted
+([`DECISIONS.md`](../../DECISIONS.md) D-FHSS1). Implemented on branch
+`fhss-scan-recovery-2026-10-24` and built 2026-10-25 (bench `0daae279`,
+production `2c5e055a`, section 9). **Not flashed; no radio used.** The
+flash and the first radio checks are planned in section 6.1.
 **Date:** 2026-10-24 (main `5d00dac2`).
 **Decision owner:** the design owner (Dorkmo).
 **Rows:** RS-12.21 and RS-12.15 in [`../../TODO.md`](../../TODO.md).
@@ -44,7 +51,8 @@ including the variants without L, `noL`, that section 4 quotes).
 - Four fix options were prototyped in the SIL only. (a), (b) and a host
   watchdog (c) all recover leg 6 in 100/100 replays. (d), a longer dwell,
   makes FAILED rarer but does not recover from it.
-- **Recommendation for the design owner (section 5):** option (b) with the
+- **Recommendation for the design owner (section 5; adopted 2026-10-24,
+  built 2026-10-25, not flashed):** option (b) with the
   loss-timer fix L and a 2 s dwell, flashed together with the RS-12.21 park
   command it needs and a new code for one of the two 0x0D faults. L and
   the 2 s dwell also change the tractor's normal RS-12.15 decay window
@@ -378,7 +386,33 @@ the change in section 5, item 3.
 
 ## 5. Recommendation (for the design owner, Dorkmo)
 
-This is a recommendation, not a decision.
+This was a recommendation, not a decision. **Decision, 2026-10-24:** the
+design owner adopted item 2 as written (b + L + d2, the park command and
+the 0x0D split in one image) and accepted the decay-window trade-off of
+item 3 (more own-grid renumbering for more commands received; closing the
+decay window stays the open RS-12.15 grid-policy change). Recorded as
+[`DECISIONS.md`](../../DECISIONS.md) D-FHSS1. Implemented 2026-10-25 on
+branch `fhss-scan-recovery-2026-10-24`, built, **not flashed**:
+
+- scan: (b) in `radio/sx1276_rx.c` (the pure policy is unchanged, vector 16
+  still pins "FAILED absorbs" there), L in `scan_drive`, d2 as a fixed
+  2000 ms `SX1276_RX_SCAN_DWELL_MS`; the acceptance check is
+  `check-rx-scan-failed-follower` (name kept), and the shared simulation
+  now checks (b)'s rule, the walk order and L in every reverse-delivery
+  scenario. Its `-e` / `-e3` output on the real sources is byte-identical
+  to the b+L+d2 prototype's, so the figures in this section and in
+  section 4 stand for the built image;
+- park: `HOST_TYPE_RADIO_PARK_REQ` 0x04, answered by `RADIO_PARK_URC` 0x84
+  {status 0 PARKED / 1 already parked / 2 refused, RegOpMode readback};
+  VER/READY capability bit 7 (`HOST_CAP_RADIO_PARK`, bitmap 0xFF; 0x7F
+  before); pinned by `check-radio-park`;
+- fault codes: section 7's proposal, items 1-3 (TX_FIFO_RB_MISMATCH on
+  0x0F; `HOST_PROTOCOL_VER` and `HOST_WIRE_SCHEMA_VER` unchanged, the
+  contract of item 5);
+- hosts: `radio_park.py` (the firmware path on a bit-7 image),
+  `rs12_leg_report.py` / `rs13_probe_score.py` (`--scan-image`: on this
+  image a final 0x0D is a 30 s report, not FAILED), the 0x0D decode and
+  the `-InjectOn fault:0x0D:final` rule of item 4 (section 7).
 
 1. **Now, no radio, no flash.**
    - Make the base's scan visible: log FAULT URCs in `image_rx_daemon.py`
@@ -471,6 +505,149 @@ deploy to the X8s, which is also the operator's call.
 | T4 tractor twin | main, then fix | a 2026-10-18 leg-X shape (scan FAILED first) with 2.5 s camera stalls and commands; on the fix, the same stalls before FAILED too (the decay window, section 5, item 3) | main: commands received drop after the first stall with a command heard in it; fix: tractor `clk_demotion_*` counters move and delivery returns to the fix image's own pre-FAILED level (SIL-E3, b+L+d2: 59.7 % out of FAILED, 59.1 % before it, main 53.2 % before it) |
 | T5 fault codes | fix | the 0x0D split | scan faults arrive as 0x0D only; `tx_fifo_rb_bad` 0 and no 0x0F |
 
+### 6.1 Flash and verify plan (the next radio day)
+
+Written 2026-10-25 with both radios off, for the round after it. Both
+boards run `e083ae46` until step 6. Each step that flashes or opens
+`/dev/ttymxc3` needs the operator's GO: the flash GO covers steps 6-10
+(steps 4-5 touch no radio beyond the power-up guard's read and park, the
+GO rule's exception), and the rollback and each leg need their own. Commands and variables (`$BT`, `$BASE`,
+`$TRAC`, `$R`, `$BI`, `$TI`) as in
+[`BENCH_QUICKSTART.md`](../x8_lora_bootloader_helper/bench_tools/BENCH_QUICKSTART.md)
+§3, §5 and §6; flashing in
+[`FLASH_RUNBOOK.md`](../x8_lora_bootloader_helper/FLASH_RUNBOOK.md).
+
+**Before the GO (no radio).**
+
+1. Fly from a checkout that holds this work (the merged `main`, or this
+   branch), with its `bench.env` and a new dated `EVIDENCE_DIR`. The
+   harness pushes the daemons and probe helpers from the checkout it runs
+   in, so the FAULT decode, the base's VER capability line and
+   `radio_park.py`'s firmware path ride with it.
+2. PowerShell, in `firmware/murata_l072`: `mingw32-make check` (every
+   target `[PASS]`, `check-radio-park`, `check-rx-scan-failed-follower` and
+   `check-rx-reverse-delivery` among them), then `mingw32-make clean`,
+   `mingw32-make`, `mingw32-make bench`. Want bench
+   `build/firmware_bench_diag.bin` md5 `0daae27978089eb97ab35c18718b62b0`
+   and production `build/firmware.bin` `2c5e055abff95126309a62409fafc654`,
+   25 324 B each (section 9). Another md5 means another toolchain or
+   source: stop.
+3. `powershell -NoProfile -File bench_tools\test_run_live_radio_monitor.ps1`
+   (in `x8_lora_bootloader_helper`): 0 failed.
+
+**Flash (the flash GO; a flash is a radio-on event).**
+
+4. Power-up guard and staging as every session (`legs/power_up_guard.sh`,
+   `legs/stage_boards.sh`). On `e083ae46` the new `radio_park.py` reports
+   `"cap_bitmap": "0x0000007F"`, `"park_cmd": "unknown_type"` and
+   `"path": "register"`: the fallback, as expected.
+5. Stage and preflight each board without `--go`:
+   `bash "$BT/flash_l072.sh" tractor "$FW"`, with
+   `FW=$DC/firmware/murata_l072/build/firmware_bench_diag.bin`. Want the
+   `image:` line `25324 B  md5 0daae279...` followed by `RS-12.21 bench
+   build (...)`, then `PREFLIGHT-OK`. The same for `base` (over ssh).
+6. Flash the tractor, then the base, one at a time:
+   `bash "$BT/flash_l072.sh" tractor "$FW" --go`, then `base`. Success:
+   `Verify OK`, `flash_rc=0` and `PIPELINE-EXIT=0` in
+   `/home/fio/pipeline_stamped.log`; the board reboots in 12-24 s and
+   `/tmp` is wiped. Keep the consoles and a copy of the image in a
+   `firmware_flash/` folder of the session, as on 2026-10-18
+   (`bench-evidence/RS_12_15_reverse_delivery_2026-10-18/firmware_flash/`).
+   Never put the production bin on a bench board.
+
+**After the flash (same GO; nothing transmits).**
+
+7. Stop the tractor's camera unit and container, `fuser /dev/ttymxc3`
+   empty, and re-stage `/tmp/lifetrac_strict` (`legs/stage_boards.sh`).
+   Do not use `legs/power_up_guard.sh` here: it parks the radio, and
+   steps 8 and 9 expect an unparked one. (If it was used anyway, step 8
+   reads `radio_state=1` (SLEEP) and step 9 reports
+   `"park_status": "ALREADY"` with both readbacks `0x80`; that is also a
+   pass.)
+8. `rs116_health_probe.py` on both: `STATS-OK`,
+   `RS115-INSTRUMENTED-FIRMWARE=YES`, `RS12-URC-COUNTERS=YES`,
+   `RS12-10-COUNTERS=YES` (the STATS layout did not change),
+   `tx_fifo_rb_bad` 0, `radio_state=4`.
+9. Image and park in one step: `radio_park.py` on both. VER_URC still says
+   `0.0.0` / `dev`; the image shows in its capability bitmap. Want the last
+   line `PARK_OK` with `"cap_bitmap": "0x000000FF"`, `"path": "firmware"`,
+   `"park_status": "PARKED"`, `"persistent": true` and both readbacks
+   `0x80`. `"path": "register"` or `0x0000007F` means the old image is
+   still on the chip: stop.
+10. The park holds: at least 2 min after step 9, read both with the
+    read-only `radio_state.py` (or `legs/power_up_guard.sh --check-only`):
+    `0x80`. Right after a flash the L072 is on its boot profile (fixed
+    915 MHz, FHSS not initialised, no scan), so this proves the command
+    and the image. The test of the gate against the scan (T3's park
+    clause) is R1's leg-end park below, with profile 1 still active: on
+    `e083ae46` such a park held only after the scan had failed out, and on
+    this image the scan of a node without authority never stops. Anything
+    but `0x80` after a firmware `PARK_OK` is an arm path the gate missed:
+    stop radio work and power both boards down (tractor `systemctl
+    poweroff`; base `systemctl poweroff`, then remove its power).
+11. Rollback, only if needed and on its own GO: the flown `e083ae46` copy,
+    `bench-evidence/RS_12_15_reverse_delivery_2026-10-18/firmware_flash/firmware_bench_diag_e083ae46.bin`,
+    with `flash_l072.sh`.
+
+**First legs (each on its own GO).** Each leg's daemon start activates
+profile 1, which ends the park; `leg_post.sh` parks again at the end.
+
+- **R1: cold-start acquisition and the fault codes (T3's cold start, T5).**
+  The 2026-10-24 command-delivery shape: `legs/leg_prep.sh 2c_<tag>
+  image_bw250 --reactive-fire 1` (`mono_g4`, profile 1, 2 fps, 300 s,
+  `-ProbeEcho 0 -TxBatch 0 -LogFragArrivals 1 -StopDrainS 4`), then
+  `legs/leg_post.sh`. Confirm:
+  - the base's `rx_daemon.log` has `L072 VER warm-up ok (attempt N)
+    cap=0x000000FF`;
+  - `leg<X>_report.txt`: the `acquisition:` line within 120 s (2026-10-24
+    legs 1-5: 15-75 s; SIL-E2 at 2 fps: 1.3 % of cold starts not locked
+    by 120 s) and `confirmed acquisition: ACQUIRED`, with the image read
+    from the capability line (no "image not identified" note);
+  - every `code=0x0D` line on either board is `name=RX_SCAN_FAILED` with
+    its attempt fields, none carries `fw=old` (a pre-split FIFO fault);
+    no `code=0x0F` line and Δ`tx_fifo_rb_bad` 0 on both (the FIFO fault
+    has never fired; a first 0x0F must match a `tx_fifo_rb_bad` step);
+  - a base 0x0D, if any, comes before its first lock, about 30 s apart; a
+    final one (attempt 3) is followed by more finals 30 s apart until the
+    lock (scan option (b)), and the report reads it as a late
+    acquisition, not FAILED;
+  - `leg<X>_deltas.txt`: no `!! BASE NEVER LOCKED`, base
+    Δ`clk_demotion_reset` ≥ 1, the RS-12.15 criteria as on 2026-10-24,
+    probe delivery in line with that round (`mono_g4` 542/543);
+  - `leg<X>_park.txt`: `PARK_OK` with `"path": "firmware"` on both at the
+    first attempt (no 60 s retries), and `power_up_guard.sh
+    --check-only` at least 2 min later reads `0x80` on both (T3's park
+    clause: profile 1 is still active, so without the gate the scan would
+    re-arm RXCONT every 2 s dwell);
+  - STOP: `!! ACQUISITION FAILED` or `!! BASE NEVER LOCKED` on this image.
+    Park, do not re-fly, and read the base's 0x0D lines first.
+- **R2: the injector trigger and the tractor in FAILED (T4's first
+  half).** The 2026-10-18 leg-X shape: profile 1, 480 s, KF requests off:
+  `legs/leg_prep.sh 2c_<tag> image_bw250 --duration 480`, with
+  `--reactive-fire` left at 0 (the base's PROBEs would lock the tractor's
+  scan before it fails out; `leg_prep.sh` already writes
+  `-KfRequestDisable 1`), and `-InjectCmd "dual_inject.py 120" -InjectOn
+  fault:0x0D:final` added to the harness line it prints. Confirm: the tractor's 0x0D `name=RX_SCAN_FAILED`
+  lines for attempts 0, 1 and 2, then attempt 3 final, about 30 s apart
+  (leg X: 0x00 0x01 0x02 0x83); `INJECT ... trigger: fault:0x0D:final` on
+  that attempt-3 line and on no earlier one; the base's commands heard with
+  the tractor in FAILED (leg X: 36/36); the RS-12.15 bracket criteria as
+  on 2026-10-18. A tractor that keeps streaming holds FAILED (it has
+  authority). If its stream stalls for 1 s or more it restarts its scan
+  under (b), so on this image a later final 0x0D and moving
+  `clk_demotion_*` counters are normal.
+- **Later, not on the first day:** T1 (the base silent for ≥ 125 s, then
+  the stream) needs a harness option that delays the tractor's stream,
+  which is not built (build and test it offline first); T2 (a set of about
+  10 cold starts); T4 with camera stalls.
+
+After the round: record it in the session's RESULTS.md, then update the
+"on the boards" records (`murata_l072/README.md` "Expected md5s",
+`FLASH_RUNBOOK.md`, `BENCH_BOARDS.md`, `BENCH_RUNBOOK.md` "Board facts",
+`flash_l072.sh`'s build list) and the TODO.md RS-12.21 and RS-12.15 rows.
+End the session with both radios parked by the firmware path and the
+`--check-only` reading.
+
 ## 7. Side item: FAULT code 0x0D means two faults
 
 `HOST_FAULT_CODE_TX_FIFO_RB_MISMATCH` and `HOST_FAULT_CODE_RX_SCAN_FAILED`
@@ -538,6 +715,16 @@ non-final scan attempt.
 5. The FAULT_URC frame format is unchanged; only a code value moves, as in
    the 2026-05-19 §13.1 #7 contract. Both md5s change: flash GO, md5
    tables (`.github/workflows/l072-bench-md5.yml`, `README.md`).
+
+**Adopted 2026-10-24, implemented 2026-10-25 (not flashed).** Items 1-3 as
+proposed (`include/host_types.h`; the duplicate check covers every
+HOST_FAULT_CODE_*). Item 4: the hosts name a 0x0D with a valid scan sub
+RX_SCAN_FAILED on any image and keep the in-flight test only as a `basis=`
+token; any other 0x0D sub is an old image's FIFO fault and gets `fw=old`;
+0x0F is TX_FIFO_RB_MISMATCH. The version gate is the VER capability bit 7
+(`HOST_CAP_RADIO_PARK`), which the same image added with the park command;
+`-InjectOn fault:0x0D:final` fires on a valid scan sub at attempt 3 only.
+Item 5: no `HOST_PROTOCOL_VER` / `HOST_WIRE_SCHEMA_VER` bump.
 
 Moving RX_SCAN_FAILED instead would touch more host code and leave every
 archived 0x0D needing version-gated decoding.
@@ -681,6 +868,15 @@ one CRC error (R:490-492).
   `noL` to leave L out). With b, d2 and d10 also continue the walk across
   b's two restarts (b+d10r and plain b restart at channel 0, as their
   retries do).
-- Unchanged by this work: the bench image (md5 `e083ae46a64686031b39866eca42e094`)
-  and the production image (md5 `148de24e1f9acce417c46c2c69a5be6b`), both
-  rebuilt and checked on 2026-10-24.
+- Unchanged by the analysis of 2026-10-24: the bench image (md5
+  `e083ae46a64686031b39866eca42e094`) and the production image (md5
+  `148de24e1f9acce417c46c2c69a5be6b`), both rebuilt and checked that day;
+  `e083ae46` stays on both boards until the flash of section 6.1.
+- The adopted image (section 5, 2026-10-25; branch
+  `fhss-scan-recovery-2026-10-24`, built, not flashed): bench
+  `build/firmware_bench_diag.bin` md5 `0daae27978089eb97ab35c18718b62b0`,
+  production `build/firmware.bin` md5 `2c5e055abff95126309a62409fafc654`,
+  25 324 B each (APP 25 324 / 188 416 B, RAM 6 748 / 17 920 B,
+  `tools/check_size_budget.py` PASS), with arm-none-eabi-gcc 12.2.1 (Arm
+  GNU Toolchain 12.2.MPACBTI-Rel1). The same md5s from a clean copy of the
+  tree and again after `mingw32-make clean` in the worktree.

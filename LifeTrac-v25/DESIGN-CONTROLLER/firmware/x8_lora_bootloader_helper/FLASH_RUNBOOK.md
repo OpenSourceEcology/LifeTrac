@@ -35,14 +35,26 @@ The build is reproducible byte for byte, but only with the exact toolchain:
 **Arm GNU Toolchain 12.2.MPACBTI-Rel1** (`arm-none-eabi-gcc --version` →
 `12.2.1 20230214`). On the bench PC it is installed at
 `C:\Program Files (x86)\Arm GNU Toolchain arm-none-eabi\12.2 mpacbti-rel1\`,
-with WinLibs `mingw32-make` run from PowerShell. Expected md5s at `13f20aa1`
-(#152, the RS-12.15 reverse-delivery fix; merged as `main` `3c8ced60` with
-the `firmware/murata_l072` source unchanged):
+with WinLibs `mingw32-make` run from PowerShell. The source now builds the
+RS-12.21 image (scan option (b) + L + d2, the firmware park command, the
+0x0D split; built 2026-10-25 and again after `mingw32-make clean`, **not
+flashed**). Its flash and the checks after it are planned step by step in
+[FHSS_SCAN_FAILED_OPTIONS.md](../murata_l072/FHSS_SCAN_FAILED_OPTIONS.md)
+section 6.1:
+
+| build | md5 | size |
+|---|---|---|
+| bench `build/firmware_bench_diag.bin` (not flashed yet) | `0daae27978089eb97ab35c18718b62b0` | 25 324 B |
+| production `build/firmware.bin` (committed) | `2c5e055abff95126309a62409fafc654` | 25 324 B |
+
+On the boards until it is flashed, at `13f20aa1` (#152, the RS-12.15
+reverse-delivery fix; merged as `main` `3c8ced60` with the
+`firmware/murata_l072` source unchanged):
 
 | build | md5 | size |
 |---|---|---|
 | bench `build/firmware_bench_diag.bin` (on both boards since 2026-10-18) | `e083ae46a64686031b39866eca42e094` | 24 972 B |
-| production `build/firmware.bin` (committed) | `148de24e1f9acce417c46c2c69a5be6b` | 24 972 B |
+| production `build/firmware.bin` | `148de24e1f9acce417c46c2c69a5be6b` | 24 972 B |
 
 Before #152 the pair was bench `0c1bb0a9573f813137f941dfa47177d0`, on both
 boards 2026-09-15 → 2026-10-18, and production
@@ -219,6 +231,23 @@ bracket silently parses only the old fields.
 
 Park at the end of the session: `radio_park.py` → `PARK_OK
 {"opmode_readback": "0x80"}` on both boards.
+
+**On the RS-12.21 image** (2026-10-25, not flashed yet) the VER reply's
+capability bitmap reads `0x000000FF` (`0x0000007F` on `e083ae46` and
+earlier; VER's version and name stay `0.0.0` / `dev`, so this bit is how
+a host tells the images apart). `radio_park.py` then parks by the firmware
+command: its JSON says `"cap_bitmap": "0x000000FF"`, `"path": "firmware"`,
+`"park_status": "PARKED"` and `"persistent": true`, and the park holds
+until a host RXCONT write, a profile activation (any daemon start) or a
+reset. Run `rs116_health_probe.py` before the park, and confirm the park
+with the read-only `radio_state.py` at least 2 min later: `0x80`. Right
+after a flash the L072 is on its boot profile (FHSS not initialised, no
+scan; the old register park held there too). After a leg, profile 1 stays
+active, and on this image the scan of a node without authority never
+fails out: only the firmware park holds then, and one that does not hold
+is a firmware defect, not a timing matter. The flash-day plan:
+[FHSS_SCAN_FAILED_OPTIONS.md](../murata_l072/FHSS_SCAN_FAILED_OPTIONS.md)
+section 6.1.
 
 ## 5. First flash from a factory board
 

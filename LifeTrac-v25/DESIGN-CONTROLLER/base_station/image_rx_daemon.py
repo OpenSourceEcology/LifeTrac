@@ -124,6 +124,7 @@ from method_h_stage2_tx_probe_v2 import (  # noqa: E402
     configure_regulatory_profile_if_needed,
     verify_modem_matches_profile,
     install_fault_urc_logger,
+    parse_version,
     read_reg,
     write_reg,
     SX1276_REG_OP_MODE,
@@ -472,8 +473,16 @@ class ImageRxDaemon:
         last_exc = None
         for attempt in range(1, 6):
             try:
-                link.request(HOST_TYPE_VER_REQ, HOST_TYPE_VER_URC, timeout=2.0)
-                LOG.info("L072 VER warm-up ok (attempt %d)", attempt)
+                ver = link.request(HOST_TYPE_VER_REQ, HOST_TYPE_VER_URC, timeout=2.0)
+                # 2026-10-24 review: the capability bitmap names the image
+                # (bit 7 HOST_CAP_RADIO_PARK: the RS-12.21 image, whose scan
+                # restarts after a final RX_SCAN_FAILED); rs12_leg_report.py
+                # reads it off this line for the acquisition rule.
+                try:
+                    cap = f"0x{parse_version(ver['payload'])['cap_bitmap']:08X}"
+                except Exception:                             # noqa: BLE001
+                    cap = "?"
+                LOG.info("L072 VER warm-up ok (attempt %d) cap=%s", attempt, cap)
                 last_exc = None
                 break
             except Exception as exc:

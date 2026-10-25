@@ -76,6 +76,9 @@ bool sx1276_modes_to_tx(void) { return true; }
 uint8_t sx1276_modes_get_state(void) { return 0U; }
 void sx1276_rx_arm(uint8_t mode) { (void)mode; }
 void sx1276_rx_disarm(void) {}
+/* RS-12.21 (2026-10-24): sx1276_tx_begin() refuses while the host has the
+ * radio parked; this test never parks (check-radio-park covers it). */
+bool sx1276_rx_parked(void) { return false; }
 void sx1276_set_frequency_hz(uint32_t freq) { (void)freq; }
 bool lora_pkt_hdr_pack(const lora_pkt_hdr_t *in, uint8_t *out) {
     (void)in; (void)out; return true;

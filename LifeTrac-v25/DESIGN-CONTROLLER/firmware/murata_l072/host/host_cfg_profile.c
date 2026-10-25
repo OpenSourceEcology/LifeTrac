@@ -186,6 +186,10 @@ host_cfg_profile_reject_t host_cfg_profile_activate(void) {
         return HOST_CFG_PROFILE_REJECT_NOT_STAGED;
     }
     s_active    = s_staged;
+    /* RS-12.21 (2026-10-24): an activation ends a firmware radio park
+     * (HOST_TYPE_RADIO_PARK_REQ) -- the host is configuring the radio for
+     * use again. Every branch below then resets the scan machine. */
+    sx1276_rx_unpark();
     /* D2: RegModemConfig writes require SLEEP/STANDBY (Semtech DS §4.1;
      * sx1276_apply_profile_full() sequences the same way). Activation
      * can be requested while the RX daemon has RXCONT armed. */
@@ -219,7 +223,10 @@ host_cfg_profile_reject_t host_cfg_profile_activate(void) {
          * budget on an empty band at boot, parks in the absorbing
          * FAILED state (standby), and no later activation ever
          * re-arms the receiver — fhss_rx_probe evidence 2026-07-24:
-         * 75 s under active TX hopping, zero RX_FRAME, zero FAULT. */
+         * 75 s under active TX hopping, zero RX_FRAME, zero FAULT.
+         * (RS-12.21 (b), 2026-10-24: FAILED no longer parks a node without
+         * originator authority, so this is no longer its only way out; it
+         * is still the fresh acquisition an activation needs.) */
         sx1276_rx_scan_reset();
     } else if (s_active.profile_id == REG_PROFILE_FCC_15_247_DTS_BW500) {
         /* 2026-07-25 run-23 deafness: activation must fully DEFINE the

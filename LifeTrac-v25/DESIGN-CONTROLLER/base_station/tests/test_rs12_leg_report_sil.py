@@ -1908,9 +1908,13 @@ class Acquisition(unittest.TestCase):
         self.assertEqual(lines[3], "  !! the base's final RX_SCAN_FAILED at +30.0 s (rx_daemon.log "
                                    "line 9, sub 0x80): its scan entered FAILED there")
         self.assertEqual(len(lines), 4)                 # nothing read as TX_FIFO_RB_MISMATCH
+        # a final named AMBIGUOUS, as PR #166's daemons wrote it (before the 0x0D
+        # split) when its sub was an in-flight tx_id
+        amb = (121.4, urc(0xA3, "AMBIGUOUS", " attempt=3 final=1 warm=0 hw_suspect=1 "
+                                             "crc_seen=0 tx_id=0xA3"))
         with tempfile.TemporaryDirectory() as d:
             lines = rep.format_acquisition(self._acq(Path(d), base_extra=[
-                named(31.4, 0x20), named(121.4, 0xA3, frozenset({0xA3}))]))
+                named(31.4, 0x20), amb]))
         self.assertIn("attempt 3 at +120.0 s (line 11, sub 0xA3: final, hw_suspect, AMBIGUOUS "
                       "with TX_FIFO_RB_MISMATCH)", lines[2])
         self.assertEqual(lines[3], "  !! the base's final RX_SCAN_FAILED at +120.0 s "
@@ -1918,6 +1922,27 @@ class Acquisition(unittest.TestCase):
                                    "TX_FIFO_RB_MISMATCH): its scan entered FAILED there if this "
                                    "URC was the scan's (the daemon could not rule out a TX FIFO "
                                    "readback mismatch on a TX with that tx_id)")
+        # 2026-10-24, the 0x0D split: the decoder now names that URC RX_SCAN_FAILED
+        # (the in-flight tx_id stays in basis=), so the report reads a plain final
+        self.assertIn("name=RX_SCAN_FAILED attempt=3 final=1 warm=0 hw_suspect=1 "
+                      "crc_seen=0 basis=tx_id_in_flight tx_inflight=0xA3 ",
+                      named(121.4, 0xA3, frozenset({0xA3}))[1])
+        with tempfile.TemporaryDirectory() as d:
+            lines = rep.format_acquisition(self._acq(Path(d), base_extra=[
+                named(31.4, 0x20), named(121.4, 0xA3, frozenset({0xA3}))]))
+        self.assertIn("attempt 3 at +120.0 s (line 11, sub 0xA3: final, hw_suspect)", lines[2])
+        self.assertEqual(lines[3], "  !! the base's final RX_SCAN_FAILED at +120.0 s "
+                                   "(rx_daemon.log line 11, sub 0xA3): its scan entered "
+                                   "FAILED there")
+        # a split image's FIFO fault is code 0x0F: never one of the base's scan faults
+        with tempfile.TemporaryDirectory() as d:
+            payload = bytes([0x0F, 0xFD, 0, 0]) + bytes(16) + (61400).to_bytes(4, "little")
+            acq = self._acq(Path(d), base_extra=[
+                named(31.4, 0x20),
+                (61.4, "WARNING image_rx_daemon: " + mg.format_fault_urc_line(
+                    payload, frozenset({0xFD})))])
+        self.assertEqual([(f["code"], f["sub"]) for f in acq["faults"]], [(0x0D, 0x20)])
+        self.assertNotIn("TX_FIFO_RB_MISMATCH", "\n".join(rep.format_acquisition(acq)))
         # a sub outside today's layout that the daemon still names RX_SCAN_FAILED (a
         # firmware that raised its retry budget) reads as a scan fault, not a FIFO one
         with tempfile.TemporaryDirectory() as d:
@@ -1948,6 +1973,188 @@ class Acquisition(unittest.TestCase):
         self.assertEqual(acq["status"], rep.FAILED)
         self.assertTrue(acq["basis"].startswith("the base's final RX_SCAN_FAILED at +120.0 s"),
                         acq["basis"])
+
+
+class AcquisitionOnTheRestartImage(unittest.TestCase):
+    """2026-10-24 review: on the RS-12.21 image (scan option (b), VER capability
+    bit 7) a final RX_SCAN_FAILED is a 30 s report and the scan goes on, so the
+    absorbing-FAILED rule of every older image must not decide the leg."""
+
+    VER_FIX = (1.0, "INFO image_rx_daemon: L072 VER warm-up ok (attempt 1) cap=0x000000FF")
+    VER_OLD = (1.0, "INFO image_rx_daemon: L072 VER warm-up ok (attempt 1) cap=0x0000007F")
+
+    @staticmethod
+    def urc(pc, sub):
+        return (pc, f"WARNING image_rx_daemon: FAULT_URC: code=0x0D sub=0x{sub:02X} "
+                    f"name=RX_SCAN_FAILED basis=x tx_inflight=- uptime_ms=1 raw=0d")
+
+    def _acq(self, image="auto", **kw) -> dict:
+        with tempfile.TemporaryDirectory() as d:
+            arch, _ = _two_board_leg(Path(d), capture=False, mask=True, **kw)
+            return rep.acquisition(_read(arch / "rx_daemon.log"),
+                                   _read(arch / "tx_daemon.log"), image=image)
+
+    def test_a_cold_final_then_a_lock_is_a_late_acquisition(self) -> None:
+        # memo section 6 T3: the base silent for 125 s sends a cold final at
+        # +120 s (sub 0xA3) and then LOCKs on the stream (here from +138 s on,
+        # 343 of the tractor's 606 fragments): ACQUIRED, late
+        late = dict(heard=range(264, 607), base_extra=[self.urc(121.4, 0xA3)])
+        acq = self._acq(**dict(late, base_extra=[self.VER_FIX] + late["base_extra"]))
+        self.assertIs(acq["restarts"], True)
+        self.assertIn("logs the L072's VER capability bitmap 0x000000FF, bit 7 "
+                      "(HOST_CAP_RADIO_PARK, the RS-12.21 image) set", acq["image"])
+        self.assertEqual((acq["status"], acq["failed"]), (rep.ACQUIRED, False))
+        self.assertTrue(acq["basis"].startswith(
+            "the base decoded 343 of the tractor's 606 fragments on air (56.6 %)"),
+            acq["basis"])
+        self.assertIn("; a late acquisition: the base's final RX_SCAN_FAILED at +120.0 s "
+                      "(rx_daemon.log line ", acq["basis"])
+        self.assertIn("is cold (warm=0): the base's L072 had not locked since it booted, "
+                      "but on this image a final is a 30 s report, not a stop (RS-12.21 "
+                      "scan option (b): the scan restarts at once and reports again every "
+                      "30 s until a LOCK; ", acq["basis"])
+        self.assertTrue(acq["basis"].endswith(
+            "; the last final is cold (warm=0: no lock since the L072 booted), so the lock "
+            "shown came after +120.0 s"), acq["basis"])
+        lines = rep.format_acquisition(acq)
+        self.assertTrue(lines[1].startswith("  confirmed acquisition: ACQUIRED: "), lines[1])
+        self.assertIn("its scan reported FAILED there and scanned on (this image restarts "
+                      "it at once and reports every 30 s until a LOCK, RS-12.21 (b))",
+                      lines[-1])
+        self.assertNotIn("!! ACQUISITION FAILED", "\n".join(lines))
+        # the same log read by the absorbing rule: FAILED, as before -- with the
+        # image not identified (no VER line) the report says so and how to change it
+        acq = self._acq(**late)
+        self.assertIsNone(acq["restarts"])
+        self.assertEqual(acq["status"], rep.FAILED)
+        lines = rep.format_acquisition(acq)
+        self.assertIn("The base's image was not identified (rx_daemon.log logs no VER "
+                      "capability bitmap", lines[1])
+        self.assertIn("run again with --scan-image restarts.", lines[1])
+        self.assertIn("its scan entered FAILED there", lines[-1])
+        # --scan-image restarts on that log, and an older image's bitmap (bit 7 clear)
+        self.assertEqual(self._acq(image="restarts", **late)["status"], rep.ACQUIRED)
+        acq = self._acq(**dict(late, base_extra=[self.VER_OLD] + late["base_extra"]))
+        self.assertIs(acq["restarts"], False)
+        self.assertEqual(acq["status"], rep.FAILED)
+        self.assertNotIn("not identified", "\n".join(rep.format_acquisition(acq)))
+        self.assertEqual(self._acq(image="absorbing", **dict(
+            late, base_extra=[self.VER_FIX] + late["base_extra"]))["status"], rep.FAILED)
+        with self.assertRaises(ValueError):
+            self._acq(image="b", **late)
+
+    def test_finals_to_the_end_of_the_log_are_a_failed_acquisition(self) -> None:
+        # a final every 30 s up to 16.6 s before the log ends, and no lock shown
+        finals = [self.urc(121.4 + 30.0 * k, 0xA3) for k in range(7)]
+        acq = self._acq(heard=(40, 300, 560), base_extra=[self.VER_FIX] + finals)
+        self.assertEqual(acq["status"], rep.FAILED)
+        self.assertIn("; 7 final reports in a row, the last at +300.0 s (rx_daemon.log line ",
+                      acq["basis"])
+        self.assertTrue(acq["basis"].endswith(
+            "; nothing shows a lock after the last final (the log ends 16.6 s after the last "
+            "final, within the 35 s a next report may take)"), acq["basis"])
+        lines = rep.format_acquisition(acq)
+        self.assertIn(". This image restarts the scan after each final RX_SCAN_FAILED "
+                      "(RS-12.21 scan option (b)), so the base was not stranded on one "
+                      "channel, but it never locked onto the tractor's hop grid in the "
+                      "window: this leg's loss and command figures measure an unacquired "
+                      "base, not the link. The tractor logged 606 frame(s) on air.", lines[1])
+        self.assertNotIn("absorbing", lines[1])
+        # warm finals from an early one on, with a lock shown that nothing places
+        # after the last: not determined
+        warm = [self.urc(122.0 + 30.0 * k, 0xC3) for k in range(7)]
+        acq = self._acq(heard=range(139, 607), base_extra=[self.VER_FIX] + warm)
+        self.assertEqual(acq["status"], rep.UNDETERMINED)
+        self.assertIn("came less than 122 s after the activation", acq["basis"])
+        self.assertIn("(a lock resets the attempt count but on this image anchors the loss "
+                      "timer at the locking frame (RS-12.21 L), so a locked scan drops back",
+                      acq["basis"])
+        self.assertIn("; nothing places the lock shown after the last final (the log ends "
+                      "16.0 s after the last final, within the 35 s a next report may take), "
+                      "and its evidence spans the leg: the base decoded 468 of",
+                      acq["basis"])
+
+    def test_a_sign_of_a_lock_after_the_finals(self) -> None:
+        # a non-final attempt after the final: the attempt count restarts only at a
+        # LOCK, so the scan locked in between -- itself a lock shown
+        acq = self._acq(heard=(40, 300, 560), base_extra=[
+            self.VER_FIX, self.urc(121.4, 0xA3), self.urc(251.4, 0x60)])
+        self.assertEqual(acq["status"], rep.ACQUIRED)
+        self.assertTrue(acq["basis"].startswith(
+            "the base's RX_SCAN_FAILED at +250.0 s (rx_daemon.log line "), acq["basis"])
+        self.assertIn(", sub 0x60) is attempt 0, not final: the attempt count restarts only "
+                      "at a LOCK; a late acquisition: ", acq["basis"])
+        self.assertTrue(acq["basis"].endswith(
+            "; the scan locked between +120.0 s and +250.0 s"), acq["basis"])
+        # a warm early final, a lock shown, and no fault in the 196 s after it:
+        # this image would have reported again within 30 s without a LOCK
+        acq = self._acq(heard=range(264, 607), base_extra=[self.VER_FIX,
+                                                            self.urc(122.0, 0xC3)])
+        self.assertEqual(acq["status"], rep.ACQUIRED)
+        self.assertTrue(acq["basis"].endswith(
+            "; no RX_SCAN_FAILED followed the last final in the 196.0 s the log runs past "
+            "it, so the lock shown came within 30 s of +120.6 s"), acq["basis"])
+        # two finals and no VER line: the second shows the image restarts its scan.
+        # The log runs 166.6 s past it with no report and no lock shown: a LOCK is
+        # likely (or the URCs were lost), so not determined, never FAILED
+        acq = self._acq(heard=(40, 300, 560), base_extra=[self.urc(121.4, 0xA3),
+                                                         self.urc(151.4, 0xA3)])
+        self.assertIs(acq["restarts"], True)
+        self.assertIn("after its final one at line ", acq["image"])
+        self.assertIn("which only an image that restarts its scan does", acq["image"])
+        self.assertEqual(acq["status"], rep.UNDETERMINED)
+        self.assertIn("; no RX_SCAN_FAILED followed the last final in the 166.6 s the log "
+                      "runs past it, which on this image means a LOCK within 30 s of it "
+                      "unless its FAULT URCs were lost, but nothing else shows one",
+                      acq["basis"])
+        # the same two at the log's end: FAILED
+        acq = self._acq(heard=(40, 300, 560), base_extra=[self.urc(271.4, 0xA3),
+                                                         self.urc(301.4, 0xA3)])
+        self.assertEqual((acq["restarts"], acq["status"]), (True, rep.FAILED))
+        self.assertIn("This image restarts the scan", rep.format_acquisition(acq)[1])
+        # two legacy lines of one URC (no FAULT_URC line, so both count) are not a
+        # second report: the image stays unidentified, and on the restart image
+        # they are one report
+        twin = [(121.4, "WARNING image_rx_daemon: FAULT during pipelined TX: code=0x0D "
+                        "sub=0xA3 raw=0da3"),
+                (121.41, "WARNING image_rx_daemon: FAULT: code=0x0D sub=0xA3 raw=0da3")]
+        acq = self._acq(heard=(40, 300, 560), base_extra=twin)
+        self.assertEqual((len(acq["faults"]), acq["restarts"]), (2, None))
+        acq = self._acq(image="restarts", heard=(40, 300, 560),
+                        base_extra=[(271.4, twin[0][1]), (271.41, twin[1][1])])
+        self.assertEqual(acq["status"], rep.FAILED)
+        self.assertNotIn("final reports in a row", acq["basis"])
+
+    def test_silence_counts_over_the_whole_window(self) -> None:
+        # leg 6's first frame at +138.1 s is past the 120 s budget: FAILED on an
+        # absorbing image, but on this image the scan does not strand
+        acq = self._acq(heard=LEG6, base_extra=[self.VER_FIX])
+        self.assertEqual(acq["status"], rep.UNDETERMINED)
+        self.assertTrue(acq["basis"].startswith("a frame received is not a lock"),
+                        acq["basis"])
+        self.assertEqual(self._acq(heard=LEG6)["status"], rep.FAILED)
+        # nothing in the whole window: FAILED
+        acq = self._acq(heard=(), base_extra=[self.VER_FIX])
+        self.assertEqual(acq["status"], rep.FAILED)
+        self.assertEqual(acq["basis"], "the base's stats counter still read rx_frames=0 at "
+                                       "+315.6 s (rx_daemon.log line 13), its last stats line "
+                                       "in the window (always on, it counts every image "
+                                       "fragment, logged or not): no image fragment reached "
+                                       "the base in the 316.6 s window, and its scan locks "
+                                       "only on a frame it decodes")
+
+    def test_the_report_takes_scan_image(self) -> None:
+        with tempfile.TemporaryDirectory() as d:
+            arch, _ = _two_board_leg(Path(d), capture=False, mask=True, heard=range(264, 607),
+                                     base_extra=[self.urc(121.4, 0xA3)])
+            auto = _run([arch])
+            fix = _run([arch, "--scan-image", "restarts"])
+        self.assertIn("!! ACQUISITION FAILED (see the acquisition line below)", auto)
+        self.assertIn("The base's image was not identified", auto)
+        self.assertNotIn("ACQUISITION FAILED", fix)
+        self.assertIn("  confirmed acquisition: ACQUIRED: the base decoded 343 of", fix)
+        self.assertIn("; a late acquisition: ", fix)
+        self.assertIn("--scan-image restarts given", fix)
 
 
 class LegReportEndToEnd(unittest.TestCase):

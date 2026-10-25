@@ -788,6 +788,37 @@ class ProbeScoreAcquisitionTests(unittest.TestCase):
         self.assertEqual(plain.split("pooled FHSS")[0], void.split("voided by")[0])
         self.assertLess(void.index("voided by"), void.index("pooled FHSS"))
 
+    def test_scan_image_reads_the_restart_image(self) -> None:
+        # 2026-10-24 review: on the RS-12.21 image (--scan-image restarts) a first
+        # frame past the budget is no failure -- its scan does not strand -- so the
+        # leg is not voided; a base that caught nothing in the whole window still
+        # fails, for that image's reason
+        with tempfile.TemporaryDirectory() as root:
+            legs = self._round(root, _fhss_log(range(1, 6), 138.1),
+                               _streamed(_tractor_log([1, 2, 4, 5])))
+            rc0, out0 = _run(ps.main, ["--void-unlocked", "--scan-image", "restarts"] + legs)
+            none = _archive(root, "Fv7", self.FHSS, _fhss_log([], None), _tractor_log([]))
+            rc1, out1 = _run(ps.main, ["--void-unlocked", "--scan-image", "restarts",
+                                       none, legs[0]])
+        self.assertEqual(rc0, 0, out0)
+        self.assertNotIn("voided", out0)
+        self.assertIn("  base acquisition: NOT DETERMINED; first image reception 138.1 s after "
+                      "the base's profile-1 activation, past the 120 s FHSS scan budget; "
+                      "evidence: a frame received is not a lock", out0)
+        self.assertIn("pooled FHSS VECTOR 13/15 = 86.7 %", out0)
+        self.assertEqual(rc1, 0, out1)
+        self.assertIn("  !! base ACQUISITION FAILED; no image reception in the 299.5 s the base "
+                      "log covers after its profile-1 activation, past the 120 s FHSS scan "
+                      "budget; evidence: the base's stats counter still read rx_frames=0 at "
+                      "+289.5 s (rx_daemon.log line ", out1)
+        self.assertIn("its last stats line in the window (always on, it counts every image "
+                      "fragment, logged or not): no image fragment reached the base in the "
+                      "299.5 s window, and its scan locks only on a frame it decodes. Its scan "
+                      "scanned on (the RS-12.21 image restarts it after each final "
+                      "RX_SCAN_FAILED) but never locked onto the hop grid", out1)
+        self.assertNotIn("parked on", out1)
+        self.assertIn("left out of the pool: Fv7.", out1)
+
     def test_void_unlocked_keeps_legs_whose_acquisition_is_not_a_failure(self) -> None:
         # review 2026-10-24: only a failed acquisition voids. A log shorter than the
         # budget with no frame (not determined) and a log without the activation line

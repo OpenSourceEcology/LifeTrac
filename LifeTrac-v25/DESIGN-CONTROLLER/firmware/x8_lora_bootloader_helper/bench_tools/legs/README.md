@@ -231,6 +231,11 @@ that board with sudo and re-run (BENCH_RUNBOOK, "A leg").
   least ~2 min after the daemons stopped: a park readback taken right after
   the stop is not authoritative (the scan can still re-arm the receiver;
   BENCH_RUNBOOK, `radio_park.py`).
+- On the RS-12.21 image (built 2026-10-25, not flashed yet) `radio_park.py`
+  parks by the firmware command (`"path": "firmware"` in `leg<X>_park.txt`),
+  which holds at the first attempt; a retry or a `PARK NOT CONFIRMED` there
+  is a fault to report, not a scan still walking. The `--check-only`
+  reading stays.
 
 **Not flying after the prep after all** (no GO, the harness refused, the
 round was aborted)? `leg_prep.sh` has woken both receivers (RXCONT) and left

@@ -86,6 +86,8 @@ MD5=$(md5sum "$IMG" | cut -d' ' -f1)
 # 192 KB flash, of which the last 8 KB is the CFG region (include/memory_map.h).
 [ "$SIZE" -le $((184 * 1024)) ] || die "$IMGNAME is $SIZE B, larger than the 184 KB APP region"
 case "$MD5" in
+  0daae27978089eb97ab35c18718b62b0) KIND="RS-12.21 bench build (scan option (b) + L + d2, firmware park command, 0x0D split; built 2026-10-25)" ;;
+  2c5e055abff95126309a62409fafc654) KIND="RS-12.21 PRODUCTION build: refuses diag register writes, so -ForceFrfHz and channel_survey_sniff.py fail on it -- bench boards normally run the bench build" ;;
   e083ae46a64686031b39866eca42e094) KIND="bench build on both boards since 2026-10-18 (RS-12.15 reverse delivery, #152)" ;;
   148de24e1f9acce417c46c2c69a5be6b) KIND="PRODUCTION build (main 3c8ced60): refuses diag register writes, so -ForceFrfHz and channel_survey_sniff.py fail on it -- bench boards normally run the bench build" ;;
   0c1bb0a9573f813137f941dfa47177d0) KIND="previous bench build, on both boards 2026-09-15 -> 2026-10-18 (RS-12.15 v2; the rollback image)" ;;

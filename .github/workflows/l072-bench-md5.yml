@@ -28,10 +28,12 @@ env:
   # checked 2026-10-10 against Arm's published .sha256asc (170 644 784 B).
   ARM_TOOLCHAIN_URL: https://developer.arm.com/-/media/Files/downloads/gnu/12.2.mpacbti-rel1/binrel/arm-gnu-toolchain-12.2.mpacbti-rel1-x86_64-arm-none-eabi.tar.xz
   ARM_TOOLCHAIN_SHA256: 17455a06c816031cc2c66243c117cba48463cd6a3a3fdfac7275b4e9c40eb314
-  # murata_l072/README.md "Expected md5s" (13f20aa1, the RS-12.15 reverse-delivery
-  # fix). Update both when the firmware source changes and the new pair is recorded.
-  EXPECTED_BENCH_MD5: e083ae46a64686031b39866eca42e094
-  EXPECTED_PROD_MD5: 148de24e1f9acce417c46c2c69a5be6b
+  # murata_l072/README.md "Expected md5s" (the RS-12.21 image: scan option (b) +
+  # L + d2, the firmware park command, the 0x0D split; built 2026-10-25, not yet
+  # flashed). Update both when the firmware source changes and the new pair is
+  # recorded.
+  EXPECTED_BENCH_MD5: 0daae27978089eb97ab35c18718b62b0
+  EXPECTED_PROD_MD5: 2c5e055abff95126309a62409fafc654
   L072_DIR: LifeTrac-v25/DESIGN-CONTROLLER/firmware/murata_l072
 
 jobs:
@@ -94,13 +96,13 @@ jobs:
             echo "| production \`firmware.bin\` | \`$prod\` | README \`$EXPECTED_PROD_MD5\` | $(verdict "$prod" "$EXPECTED_PROD_MD5") |"
             echo "| production \`firmware.bin\` | \`$prod\` | committed \`$committed\` | $(verdict "$prod" "$committed") |"
             echo
-            echo "A source change since bb4a2071 moves both README md5s; record the new"
-            echo "pair in murata_l072/README.md and in this workflow's env."
+            echo "A source change after the recorded pair moves both README md5s; record"
+            echo "the new pair in murata_l072/README.md and in this workflow's env."
           } >> "$GITHUB_STEP_SUMMARY"
           echo "bench      built=$bench expected=$EXPECTED_BENCH_MD5"
           echo "production built=$prod expected=$EXPECTED_PROD_MD5 committed=$committed"
           if [ "$bench" != "$EXPECTED_BENCH_MD5" ]; then
-            echo "::warning title=L072 bench md5 differs::firmware_bench_diag.bin md5 $bench != README $EXPECTED_BENCH_MD5 (source changed since 13f20aa1, or this Linux build of 12.2.MPACBTI-Rel1 is not byte-identical to the bench PC build)"
+            echo "::warning title=L072 bench md5 differs::firmware_bench_diag.bin md5 $bench != README $EXPECTED_BENCH_MD5 (source changed after the recorded pair, or this Linux build of 12.2.MPACBTI-Rel1 is not byte-identical to the bench PC build)"
           fi
           if [ "$prod" != "$EXPECTED_PROD_MD5" ]; then
             echo "::warning title=L072 production md5 differs::firmware.bin md5 $prod != README $EXPECTED_PROD_MD5"

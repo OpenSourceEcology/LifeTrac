@@ -240,9 +240,10 @@ param(
     #                          polled every 0.5 s on the base from rx_smoke's log;
     #   fault:<code>           the first tractor tx_smoke FAULT line with that
     #                          code; fault:<code>:<sub> also needs that sub byte,
-    #                          fault:<code>:final needs sub bit 7 (the
-    #                          RX_SCAN_FAILED that enters FAILED: fault:0x0D:final
-    #                          is RS-12.15 leg X). Polled from the PC every ~2 s.
+    #                          fault:0x0D:final needs the RX_SCAN_FAILED sub of
+    #                          the scan's last attempt (final bit, attempt 3;
+    #                          Test-InjectFaultLine): RS-12.15 leg X. Polled from
+    #                          the PC every ~2 s.
     [string]$InjectOn     = "",
     # Bench kit (2026-10-19): seconds between stopping the frame source and
     # stopping tx_smoke at leg end, so the frames already queued go on air and
@@ -311,6 +312,13 @@ function ConvertTo-InjectSpec {
         $spec.Code = [Convert]::ToInt32($Matches[1], 16)
         $spec.Label = "fault:0x{0:X2}" -f $spec.Code
         if ($Matches[2]) {
+            # 2026-10-24 review: `final` is RX_SCAN_FAILED's (Test-InjectFaultLine
+            # fires it on code 0x0D only); on any other code it would run the
+            # whole leg without injecting.
+            if ($spec.Code -ne 0x0D) {
+                throw ("-InjectOn '$o': final is RX_SCAN_FAILED's, code 0x0D only " +
+                       "(fault:0x0D:final); give a sub byte (fault:<code>:<sub>) or none.")
+            }
             $spec.Final = $true
             $spec.Label += ":final"
         } elseif ($Matches[3]) {
@@ -326,16 +334,28 @@ function ConvertTo-InjectSpec {
 function Test-InjectFaultLine {
     # True when a tx_smoke log line is a FAULT matching the fault: spec. The
     # daemon prints `code=0x%02X sub=0x%02X` (method_g_stage1_probe.py
-    # format_fault_payload). Code 0x0D means both TX_FIFO_RB_MISMATCH (sub =
-    # fragment index) and RX_SCAN_FAILED (host_types.h); `final` tests sub
-    # bit 7, which only RX_SCAN_FAILED sets (fragment indexes stay < 0x80).
+    # format_fault_payload, and format_fault_urc_line's `FAULT_URC:` line).
+    # 2026-10-24 0x0D split (FHSS_SCAN_FAILED_OPTIONS.md section 7): 0x0D is
+    # RX_SCAN_FAILED, TX_FIFO_RB_MISMATCH (sub = the host tx_id) is 0x0F; an
+    # image from before the split sends both as 0x0D. `final` is the scan's
+    # last attempt: code 0x0D and a sub in the scan layout
+    # (include/sx1276_rx_scan_fail.h) with the final bit AND attempt 3
+    # (SX1276_RX_SCAN_MAX_RETRIES), never hw_suspect (0x20) with crc_seen
+    # (0x10). Bit 7 alone was not enough: the tractor's command tx_id 0xFE
+    # (the base's 0xFD) has it, so a pre-split FIFO fault on a command frame
+    # fired the old test. The NULL-input marker 0x80 (attempt 0, a firmware
+    # caller bug, not the fourth failed attempt) does not fire; with any
+    # other code `final` never fires.
     param([string]$Line, [hashtable]$Spec)
     if ($Line -notmatch 'FAULT') { return $false }
     if ($Line -notmatch 'code=0x([0-9A-Fa-f]{2}) sub=0x([0-9A-Fa-f]{2})') { return $false }
     $code = [Convert]::ToInt32($Matches[1], 16)
     $sub = [Convert]::ToInt32($Matches[2], 16)
     if ($code -ne $Spec.Code) { return $false }
-    if ($Spec.Final) { return (($sub -band 0x80) -ne 0) }
+    if ($Spec.Final) {
+        return (($code -eq 0x0D) -and (($sub -band 0x80) -ne 0) -and
+                (($sub -band 0x0F) -eq 3) -and (($sub -band 0x30) -ne 0x30))
+    }
     if ($Spec.Sub -ge 0) { return ($sub -eq $Spec.Sub) }
     return $true
 }

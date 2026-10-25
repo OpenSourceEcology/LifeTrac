@@ -44,7 +44,11 @@
 
 /* Reset the walker to its starting channel (idx=0). Idempotent.
  * Called by the A6c-2-c dispatcher on every BEGIN_SCAN edge so a
- * recovery re-scan (A6c-3 non-final retry) starts cleanly. */
+ * recovery re-scan (A6c-3 non-final retry) starts cleanly.
+ * RS-12.21 d2 (2026-10-24): BEGIN_SCAN is now only a fresh acquisition
+ * (BOOT, a LOCKED loss demotion). A retry and RS-12.21 (b)'s restarts out
+ * of FAILED continue the walk: at the 2 s scan dwell an attempt covers
+ * 15 channels, and successive attempts must cover all 50. */
 void sx1276_rx_scan_walker_reset(void);
 
 /* Return the next (channel_idx, center_hz) to listen on and advance

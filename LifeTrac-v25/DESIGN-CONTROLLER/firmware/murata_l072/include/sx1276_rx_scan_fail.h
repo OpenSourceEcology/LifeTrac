@@ -12,6 +12,13 @@
  *       whether to retry (SCANNING re-entry with anchor reset) or
  *       absorb in FAILED.
  *
+ * RS-12.21 (b) (2026-10-24): `is_final` now means "the retry budget is
+ * spent" and nothing more. The dispatcher absorbs in FAILED only a node
+ * that holds originator authority (it follows its own clock); any other
+ * node re-enters SCANNING without counting a retry, so every later FAIL
+ * is final as well (attempt nibble at MAX) until a LOCK resets the count.
+ * The bit layout below is unchanged; "absorbing" in it reads "final".
+ *
  * Concern split mirrors the A6c-1 (policy) / A6c-2 (counters TU) /
  * A6c-2-c (HW dispatch) split:
  *

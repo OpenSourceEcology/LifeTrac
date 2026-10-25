@@ -132,15 +132,23 @@ TI=$TRACTOR_PROBE_IMAGE                                 # tractor probe image
 ## 3. Radio firmware (L072)
 
 Both boards run the bench build **`e083ae46`** (since 2026-10-18). The
-production `build/firmware.bin` (`148de24e`) refuses the bench carrier pin,
-so do not put it on a bench board.
+production `build/firmware.bin` refuses the bench carrier pin, so do not put
+it on a bench board. The source now builds the RS-12.21 image (scan option
+(b) + L + d2, the firmware park command, the 0x0D split): bench
+**`0daae279`**, production `2c5e055a` (25 324 B, built 2026-10-25). It is
+**built, not flashed**; flashing it needs its own GO
+([Expected md5s](../../murata_l072/README.md#expected-md5s)). The flash and
+the checks after it are planned step by step in
+[FHSS_SCAN_FAILED_OPTIONS.md](../../murata_l072/FHSS_SCAN_FAILED_OPTIONS.md)
+§6.1. On that image the VER capability bitmap reads `0x000000FF` (step 8:
+the firmware park).
 
 ```powershell
 # PowerShell (mingw32-make does not work from Git Bash)
 cd LifeTrac-v25\DESIGN-CONTROLLER\firmware\murata_l072
 mingw32-make check
 mingw32-make bench
-(Get-FileHash build\firmware_bench_diag.bin -Algorithm MD5).Hash   # E083AE46A64686031B39866ECA42E094
+(Get-FileHash build\firmware_bench_diag.bin -Algorithm MD5).Hash   # 0DAAE27978089EB97AB35C18718B62B0 (e083ae46 before RS-12.21)
 ```
 
 A different md5 means a different toolchain; see the toolchain section of
@@ -517,14 +525,29 @@ void or re-fly it only as the pass rule written before leg 1 says (the
 template's "never locks" row is a proposal until the operator agrees it). A
 re-fly needs a GO. Details: BENCH_RUNBOOK, "A leg", Base acquisition.
 
+On the RS-12.21 image (built 2026-10-25, not flashed yet) the base's scan
+does not stay in FAILED: after its fourth failed attempt it scans on and
+sends a final RX_SCAN_FAILED every 30 s until it locks, so a final there is
+a 30 s report and a lock after it is a late acquisition. The report and
+`rs13_probe_score.py` tell the images apart by `--scan-image` (default
+`auto`: the base daemon's `L072 VER warm-up ok ... cap=0x000000FF` line);
+give `--scan-image restarts` or `absorbing` when the log cannot say.
+
 **FAULT lines** (2026-10-24; not yet flown). Both daemon logs now carry one
 `FAULT_URC: code=0x.. sub=0x.. name=...` line per FAULT the L072 sends
 (WARNING; INFO for 0x09 and 0x0C), with `uptime_ms=`, the L072's uptime.
-Code 0x0D is either a failed scan attempt (`name=RX_SCAN_FAILED`, with
-`attempt=` and `final=`; `final=1` means the scan went FAILED) or a TX FIFO
-readback mismatch (`name=TX_FIFO_RB_MISMATCH`); `name=AMBIGUOUS` when the
-daemon cannot tell. Count faults on these lines only: the same URC can also
-leave an older line. Details: BENCH_RUNBOOK, "A leg", FAULT lines.
+Code 0x0D is a failed scan attempt (`name=RX_SCAN_FAILED`, with `attempt=`
+and `final=`; `final=1` means the retries are spent: FAILED on `e083ae46`,
+another final every 30 s on the RS-12.21 image). The TX FIFO readback
+mismatch is code **0x0F** (`name=TX_FIFO_RB_MISMATCH tx_id=0x..`) on the
+RS-12.21 image, which split the two; `e083ae46` and older still send it as
+0x0D, and the daemon then writes `name=TX_FIFO_RB_MISMATCH tx_id=0x..
+fw=old` (any 0x0D sub that is not a scan encoding). `name=AMBIGUOUS` comes
+only from the daemons of 2026-10-24 before the split. Count faults on these
+lines only: the same URC can also leave an older line. The harness trigger
+`-InjectOn fault:0x0D:final` fires on the scan's attempt-3 fault only
+(not on bit 7 alone). Details: BENCH_RUNBOOK, "A leg", FAULT lines and
+command injectors.
 
 `bracket_deltas.py <legs> <leg>` scores the L072 counter brackets (reset-aware,
 cross-checked against `leg<X>_gaps.txt`; the RS-12.15 criteria on FHSS legs
@@ -565,20 +588,32 @@ so (BENCH_RUNBOOK, `rs13_probe_score.py`).
 
 ## 8. Park and power down
 
-About 2 minutes after the daemons stop, park both radios with
-[`radio_park.py`](radio_park.py). The firmware's scan needs that long to fail
-out. `leg_post.sh` does this at the end of a leg; by hand:
+Park both radios with [`radio_park.py`](radio_park.py). `leg_post.sh` does
+this at the end of a leg; by hand:
 
 ```bash
 $BASE "sudo $R $BI -u /work/radio_park.py"      # want PARK_OK, both readbacks 0x80
 $TRAC "sudo -n $R $TI -u /work/radio_park.py"
 ```
 
-`PARK_TRANSIENT` (exit 5) means the scan was still walking: wait 60 s and
-repeat. The park readback does not guarantee the radio stays off, so before
-you call the bench off, re-check both boards with the read-only
-[`radio_state.py`](radio_state.py) (same command line), or run
-`bash "$BT/legs/power_up_guard.sh" --check-only`.
+The script picks one of two paths from the VER reply (its JSON says which,
+`"path"`):
+
+- **firmware** (the RS-12.21 image, `"cap_bitmap": "0x000000FF"`; built
+  2026-10-25, not flashed yet): the park command. The L072 stops every
+  receiver re-arm and sleeps until a host RXCONT write, a profile
+  activation (the next daemon start) or a reset: `"persistent": true`. It
+  works at once, with no wait. A `PARK_FAIL` (no answer, or refused while a
+  TX is on air) or a `PARK_TRANSIENT` on this path is a fault to report,
+  not something to wait out.
+- **register** (`e083ae46` and older, `"cap_bitmap": "0x0000007F"`): the
+  old SLEEP write, which holds only once the firmware's scan has failed out,
+  about 2 minutes after the daemons stop. Park after that. `PARK_TRANSIENT`
+  (exit 5) means the scan was still walking: wait 60 s and repeat.
+
+Either way, before you call the bench off, re-check both boards at least
+2 minutes later with the read-only [`radio_state.py`](radio_state.py) (same
+command line), or run `bash "$BT/legs/power_up_guard.sh" --check-only`.
 
 To power down:
 

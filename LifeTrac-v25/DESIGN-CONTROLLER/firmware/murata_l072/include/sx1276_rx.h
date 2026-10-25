@@ -110,9 +110,10 @@ void sx1276_rx_retune_counter_record(sx1276_rx_retune_decision_t dec);
  * event=TICK; records the (state, action) pair in the A6c-2-a
  * counters TU; and updates the file-static anchors per the
  * returned action (BEGIN_SCAN anchors both, ADVANCE_CHANNEL
- * anchors channel only, REANCHOR anchors both, HOLD/LOCK/FAIL
- * leave anchors alone). The next_state is stored back as the
- * file-static state.
+ * anchors channel only, REANCHOR anchors both, LOCK anchors
+ * channel only -- RS-12.21 L, 2026-10-24: the loss timer starts
+ * at the locking frame -- and HOLD/FAIL leave anchors alone). The
+ * next_state is stored back as the file-static state.
  *
  * A6c-2-b SCOPE: bookkeeping + counters only. NO HW action is
  * driven by any scan-SM action. The existing γ-1 sx1276_rx_tick()
@@ -130,6 +131,15 @@ void sx1276_rx_retune_counter_record(sx1276_rx_retune_decision_t dec);
  * DWELL_MS = 100 ms and FAIL firing at cold_elapsed >=
  * REDESIGN_MS = 30 000 ms — no frame-event histograms until
  * A6c-2-c.
+ *
+ * RS-12.21 (2026-10-24; the dwell is 2 s, scan HW dispatch long since
+ * wired): FAILED is held only while the node holds originator authority.
+ * A final FAIL on any other node, and the first tick of a node in FAILED
+ * whose authority has decayed, re-enter SCANNING for a fresh 30 s attempt
+ * that continues the channel walk -- recorded as (FAILED, BEGIN_SCAN) --
+ * and the scan never parks the receiver (only the host's firmware park,
+ * sx1276_rx_park() below, does; it freezes this tick). See
+ * sx1276_rx_scan_policy.h.
  *
  * When LIFETRAC_FHSS_TX_ROUTED is NOT defined, this is a no-op.
  */
@@ -160,13 +170,50 @@ void sx1276_rx_slot_follow(uint32_t now_ms);
  * reached the absorbing FAILED state before the peer started radiating
  * (30 s empty-band budget at boot) stays parked in standby FOREVER and
  * the receiver is deaf regardless of later profile activations.
+ * RS-12.21 (b) (2026-10-24): FAILED no longer parks a node without
+ * originator authority, so this is no longer its only way out; it is
+ * still the fresh acquisition (walker at channel 0, retry budget, clock,
+ * authority and adoption cleared) an activation needs.
  * No-op when LIFETRAC_FHSS_TX_ROUTED is not defined.
  */
 void sx1276_rx_scan_reset(void);
 
 /* RS-12.10 (2026-09-12): the host raw-armed RX (RegOpMode 0x85/0x86) behind
  * the mode tracker's back — reset the FIFO-skip tracker so the first packet
- * after the re-arm is not scored as a hole. */
+ * after the re-arm is not scored as a hole. RS-12.21 (2026-10-24): a host
+ * raw RX arm also ends a firmware park (sx1276_rx_unpark below). */
 void sx1276_rx_note_external_arm(void);
+
+/*
+ * RS-12.21 (2026-10-24): the firmware radio park (HOST_TYPE_RADIO_PARK_REQ,
+ * host_types.h; host/host_cmd.c answers it). sx1276_rx_park() sets the
+ * host_parked flag, puts the modem to SLEEP and clears its IRQ flags; it
+ * returns true when this call parked the radio, false when it was parked
+ * already (SLEEP is re-applied either way). The caller refuses the park
+ * while a TX is keyed or queued. While parked:
+ *   - sx1276_rx_arm() refuses, modem untouched: the backstop for every arm
+ *     path, sx1276_tx.c's post-TX re-arm included;
+ *   - the scan machine is frozen (scan ticks and frame events do nothing:
+ *     no walker step, no FAIL fault, no option-(b) restart), and the slot
+ *     follower and the gamma-1 retune return before they touch the modem,
+ *     so it stays in SLEEP;
+ *   - sx1276_rx_service() drops a DIO0 edge latched before the park;
+ *   - sx1276_tx_begin() refuses (nothing goes on air).
+ * sx1276_rx_unpark() ends it (a no-op when not parked): called by
+ * sx1276_rx_note_external_arm() (a host raw RX arm) and by
+ * host_cfg_profile_activate(); a reset clears the zero-initialised flag.
+ * A SCANNING node's anchors move on by the time parked, so it resumes where
+ * it stood: the parked time counts against neither its dwell nor its 30 s
+ * attempt. A LOCKED node's are left alone (2026-10-24 review): its 2 s loss
+ * timer counts the parked time, as the FHSS clock's F6 freshness does
+ * (FRESH_MS == LOCK_LOSS_MS), so after a park longer than LOCK_LOSS_MS it
+ * demotes on the first tick instead of following a grid that drifted while
+ * it slept. FAILED re-anchors at its next tick anyway (an activation
+ * restarts the scan in every state).
+ * check-radio-park (bench/host_proto/radio_park.c) pins all of it.
+ */
+bool sx1276_rx_park(void);
+void sx1276_rx_unpark(void);
+bool sx1276_rx_parked(void);
 
 #endif /* LIFETRAC_MURATA_L072_SX1276_RX_H */

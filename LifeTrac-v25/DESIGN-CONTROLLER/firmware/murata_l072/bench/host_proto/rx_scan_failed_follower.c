@@ -1,53 +1,50 @@
 /*
- * RS-12.21 / FHSS leg 6 (2b_f3, 2026-10-24): a node in the absorbing scan
- * FAILED state, system-in-the-loop -- CHARACTERISATION OF KNOWN DEFECTS:
+ * RS-12.21 / FHSS leg 6 (2b_f3, 2026-10-24): ACCEPTANCE CHECK of the scan
+ * FAILED fix, system-in-the-loop against the real firmware. The fix is
+ * option (b) + L + d2 of firmware/murata_l072/FHSS_SCAN_FAILED_OPTIONS.md
+ * (section 5 item 2; adopted by the design owner on 2026-10-24):
+ *   (b)  scan FAILED is held only while the node holds originator
+ *        authority (it follows its own clock): a final FAIL on any other
+ *        node, and the first scan tick of a node in FAILED whose authority
+ *        has decayed, re-enter SCANNING for a fresh 30 s attempt;
+ *   L    a LOCK starts the LOCKED loss timer at the locking frame;
+ *   d2   a 2 s scan dwell, the channel walk continuing across the retries
+ *        and (b)'s restarts.
+ * It replaces the characterisation of the two defects the fix removes
+ * (PR #167, `git log` of this file):
  *   (1) a FOLLOWER (the base) whose cold-start scan ran out into FAILED
- *       never hops again (leg 6);
- *   (2) an ORIGINATOR (the tractor) in FAILED that adopts a grid it heard
- *       loses originator authority, and with it self-follow, for good.
- *
- * THESE CHECKS PIN THE CURRENT, DEFECTIVE BEHAVIOUR. A PASS does not mean
- * the behaviour is right: it means main still behaves as characterised
- * here. A FAIL means that behaviour changed: a firmware fix (the options,
- * their SIL results and the recommendation are in
- * firmware/murata_l072/FHSS_SCAN_FAILED_OPTIONS.md, sections 4-5; first
- * listed in bench-evidence/bench_session_2026-10-24/RESULTS.md, "Next
- * steps" 3), or an unrelated change -- to the scan constants, the walker,
- * the TX path's timing or the shared simulation (rx_reverse_delivery.c).
- * Read which check failed before replacing anything; the PR that lands a fix
- * replaces these assertions with the fix's own acceptance checks (`-e`
- * below prints the recovery measures to start from). They characterise
- * the FIRMWARE path only: no host-side recovery runs in them, so a
- * daemon-side watchdog (option (c)) never flips them.
+ *       never hopped again (leg 6): parked in STANDBY on the walker's last
+ *       channel, re-armed there by the daemon's raw RXCONT and later on each
+ *       PROBE's channel, it adopted the grid but never LOCKed or followed it
+ *       and heard a few percent of the stream;
+ *   (2) an ORIGINATOR (the tractor) in FAILED that adopted a grid heard in a
+ *       camera stall's decay window lost originator authority, and with it
+ *       self-follow, for good: in FAILED nothing LOCKs, so nothing demotes,
+ *       so nothing clears the adoption.
+ * Every check marked [main fails] below fails against the pre-fix
+ * sx1276_rx.c and 500 ms dwell (shown 2026-10-24 in a scratch copy), and
+ * every run here also passes the shared simulation's structural checks
+ * (rx_reverse_delivery.c check_structure), which include RS-12.21's own:
+ * FAILED never survives a scan tick without authority, every FAIL is held
+ * or left by (b)'s rule with each exit recorded, the walker steps through
+ * the channel table in order, and no LOCK demotes sooner than 2 s after
+ * its last anchor.
  *
  * WHY (1). On leg 6 the base heard 5 of the tractor's 606 frames, on
  * channels consistent with a receiver parked on the scan walker's last
- * channel (ch 9) and then on each PROBE's TX channel (44, 6, 6, 18, 18);
- * base d(fhss_dec_aligned) 0, d(fhss_dec_snapped) 3, d(rej_epoch_drift) 2,
- * d(clk_demotion_reset) 0; post radio_state 4 (RX_CONT). Leading
- * hypothesis H1: the scan used its 4 x 30 s budget without a catch and
- * entered scan FAILED, which absorbs (sx1276_rx_scan_policy.c); there a
- * valid frame cannot LOCK, and the slot follower runs only when LOCKED on
- * an adopted grid or under originator authority, which a follower never
- * holds (sx1276_rx_grid_policy.c, sx1276_rx_slot_follow()). The base keeps
- * transmitting on hop channels (its PROBEs) while its receiver no longer
- * follows the hop sequence: the "synced receivers" requirement in the
- * 15.247(a)(1) row of the FCC notes (AI NOTES/2026-05-19_FCC_Part15_902-
- * 928_Compliance_Notes), so this is a compliance-relevant state as well as
- * a delivery defect.
- *
+ * channel and then on each PROBE's TX channel; base d(fhss_dec_aligned) 0,
+ * d(clk_demotion_reset) 0; post radio_state 4 (RX_CONT). Hypothesis H1:
+ * the scan used its 4 x 30 s budget without a catch and entered FAILED,
+ * which absorbed. The base kept transmitting on hop channels (its PROBEs)
+ * while its receiver no longer followed the hop sequence -- the "synced
+ * receivers" of the FCC 15.247(a)(1) row in the FCC notes (AI NOTES/
+ * 2026-05-19_FCC_Part15_902-928_Compliance_Notes) -- so it was a compliance
+ * state as well as a delivery defect.
  * WHY (2). On 2026-10-18 legs W/X the tractor's scan also ran out into
- * FAILED, harmlessly: an originator follows its own clock in any scan
- * state. But an accepted header is adopted whatever the scan state
- * (sx1276_rx_service(): grid.adopt is 1 for a node without authority, with
- * UNANCHORED health while nothing is adopted), only a LOCKED -> SCANNING
- * demotion or a reset clears the adoption (sx1276_rx_grid_on_demotion()),
- * FAILED never LOCKs so it never demotes, and no node holds authority
- * while a grid is adopted (sx1276_fhss_authority_is_originator()). So one
- * camera stall (authority decays 1 s after the last own TX) and one base
- * command heard in it end self-follow for the rest of the session. The
- * RS-12.15 open question is therefore not only whether self-follow should
- * run in FAILED: adoption in FAILED is irreversible and strips authority.
+ * FAILED, harmlessly while it streamed: an originator follows its own clock
+ * in any scan state. (b) keeps exactly that, and restarts the scan once the
+ * authority decays, so a command heard in the decay window LOCKs and the
+ * LOCK's demotion clears the adoption, as before FAILED.
  *
  * WHAT. Reuses the simulated SX1276, clock, air and main-loop driver of
  * check-rx-reverse-delivery (rx_reverse_delivery.c is #included with
@@ -69,79 +66,65 @@
  *   300 s of commands with a 2.5 s camera stall every 9 s; and the same run
  *   without stalls as the control.
  *
- * (1) ASSUMED -- built into the scenario, not observed on leg 6:
- *   - no frame reaches the base for the whole scan budget: the stream is
- *     withheld until 1 s after the final FAIL (to the firmware the same as
- *     a stream whose frames never land on a dwelled channel). FAILED at
- *     +120 s and the fault sub-bytes 20 21 22 a3 follow from that by
- *     construction: they are H1's predictions, not leg-6 observations
- *     (leg 6 logged no base FAULT URC; image_rx_daemon.py drops them at
- *     DEBUG);
- *   - 0 ppm between the boards (E1 also runs 2750 ppm);
- *   - fixed 200 B frames keyed 13.4 ms into the slot, so a PROBE (~30 ms of
- *     daemon latency after the frame) always lands in the NEXT slot: the
- *     model cannot produce leg 6's same-slot PROBEs (PROBE 3 at (17,22),
- *     PROBE 5 at (24,43)). That needs variable frame sizes and clock drift
- *     in the originator model;
- *   - no model of the tractor's side of the link.
- * (1) ASSERTED -- checks 1-5, the mechanism, for any seed (-s):
- *   1  four RX_SCAN_FAILED faults, sub 0x20 0x21 0x22 0xA3, the final one
- *      120 s after activation; the modem is parked in STANDBY on the
- *      walker's last channel (dwell 60 = index 59 mod 50 = 9) and the
- *      daemon's raw RXCONT re-arms it there, without a retune;
- *   2  then valid frames: the scan never LOCKs and never demotes (FAILED
- *      absorbs); the first frame heard is on that channel, SNAPPED, and its
- *      grid adopted; neither the slot follower nor the walker ever retunes
- *      the receiver, and the shared scheduler moves only on an own TX or a
- *      SNAP;
- *   3  each reactive PROBE is keyed in the originator's slot it claims (the
- *      adopted grid), and the firmware's post-TX re-arm leaves the
- *      receiver in RX_CONT on the PROBE's channel: every later frame heard
- *      is on the channel of the PROBE before it;
- *   4  consider_remote() compares against a scheduler epoch frozen at the
- *      last own TX or SNAP: never ALIGNED; a catch within one epoch of it
- *      is SNAPPED, two or more is REJECTED_EPOCH_DRIFT, and
- *      REJECTED_LOCKED_OUT only while the adopted clock is at most
- *      SX1276_FHSS_CLOCK_FRESH_MS (2 s) old (anchored by the last SNAP or
- *      own TX);
- *   5  so the base hears a few percent of the stream, and the run ends in
- *      RX_CONT, still FAILED.
- *   Independently of any seed these match leg 6: the first catch on the
- *   walker's last channel, ch 9 (from the constants); every later catch on
- *   the previous PROBE's channel (the post-TX re-arm); 0 ALIGNED, 0
- *   demotions, ends in RX_CONT. Seeds 1-1000 pass checks 1-5 except 558
- *   (one catch in 180 s; checks 2-4 need two).
- * (1) SEED-FITTED -- a soft check, default seed 852 only, printed as a NOTE
- *   when it no longer holds and never failed: leg 6's first two catches
- *   slot for slot -- (13,17) on ch 9, PROBE (13,18) on ch 44, (14,40) on
- *   ch 44 -- and its counters: 5 heard, 5 PROBEs, 3 SNAPPED, 2 EPOCH_DRIFT,
- *   0 LOCKED_OUT. (The stream's grid starts at epoch 13 so its slots carry
- *   leg 6's channels.) Over seeds 1-1000 that split comes up in 35,
- *   exactly 5 catches in 139, and 1-14 catches in all.
- * (1) NOT REPRODUCED: leg 6's catches 3-5 -- SIL (16,29) (17,8) (25,15),
- *   leg 6 (17,22) (18,2) (24,43) -- and PROBE channels 3-5 (SIL 37, 49, 22;
- *   leg 6 6, 18, 18: its repeats are the same-slot PROBEs above); the first
- *   catch comes at +124.6 s, on leg 6 at +138 s.
+ * (1) ASSUMED, as for the characterisation: no frame reaches the base for
+ *   the whole 120 s scan budget (the stream starts 1 s after the first
+ *   final FAIL); 0 ppm between the boards; fixed 200 B frames. The stream
+ *   runs 180 s, and on to 60 s past the LOCK (300 s at most). Default seed
+ *   852 (the characterisation's: it reproduced leg 6's first two catches
+ *   under the defect); `-s <seed>` runs another -- seeds 1-1000 all pass.
+ * (1) ASSERTED -- leg-6 replay:
+ *   A1 the scan budget runs out as before -- four RX_SCAN_FAILED faults, sub
+ *      0x20 0x21 0x22 0xA3, the final 120 s after activation -- but the
+ *      follower does not stay FAILED: in the same pass it is SCANNING again
+ *      (the edge recorded), its receiver in RX_CONT on the walker's next
+ *      channel, (4 x REDESIGN/DWELL) mod 50 = 10 [main fails: STANDBY on
+ *      the walker's last channel];
+ *   A2 then the stream: the scan LOCKs on a frame heard on a walker channel
+ *      (SNAPPED onto the stream's grid, adopted); every FAIL between the
+ *      stream start and the LOCK is final (0xA3), 30 s after the one before
+ *      [main fails: FAILED absorbs, no LOCK];
+ *   A3 the base follows the hop grid from the LOCK on: still LOCKED at the
+ *      end, never demoted, no further FAIL; on every pass in mid-slot its
+ *      clock is on the originator's slot and its receiver, when listening,
+ *      on that slot's channel; every frame heard after the LOCK was tuned
+ *      by the slot follower and is ALIGNED; it hears >= 95 % of the frames
+ *      keyed from 1 s after the LOCK; every PROBE is keyed in the
+ *      originator's slot its header claims [main fails];
+ *   A4 the receiver is never left out of RX (no pass ends outside RX_CONT
+ *      with no TX keyed) and the daemon's raw RXCONT never has to re-arm it:
+ *      the fix does not lean on a host re-arm [main fails].
+ * (1b) ASSERTED -- a silent follower, 305 s, no stream: one RX_SCAN_FAILED
+ *   every 30 s (sub 0x20 0x21 0x22, then 0xA3 every time; the warm bit,
+ *   sticky for the boot, aside), each a restart
+ *   into SCANNING, never FAILED on a scan tick; the walk covers all 50
+ *   channels (d2: it continues across the restarts -- the first prototype
+ *   restarted it at channel 0 and rescanned channels 0-14 for ever); never
+ *   out of RX, never re-armed by the daemon [main fails].
  *
  * (2) ASSERTED -- default seed (scenario 7's); `-e` measures other seeds:
- *   T1 no command for 150 s: the scan runs out into FAILED (one final FAIL,
- *      no LOCK), nothing adopted, the tractor holds authority;
+ *   T1 no command for 150 s: the streaming tractor's scan runs out into
+ *      FAILED (one final FAIL, no LOCK) and holds it -- it holds authority;
+ *      nothing adopted;
  *   T2 control, no stalls: authority on every pass from then on, no
  *      adoption, no LOCK, the own grid never renumbered, self-follow keeps
- *      running, and every clean command sent while it held authority is
- *      received (scenario 8's property);
- *   T3 with stalls: a command heard in a stall's decay window is adopted
- *      (UNANCHORED: any epoch accepted) and nothing undoes it: no LOCK, no
- *      demotion, still adopted and still FAILED at the end; the clock is
- *      never reset (tx_first_anchor 1) nor the own grid renumbered (a TX
- *      more than one slot off the grid of the TX before it);
- *   T4 from that adoption on: no authority on any pass, no self-follow, no
- *      LOCKED follow, and fewer than half of the commands received.
+ *      running, every clean command sent while it held authority received,
+ *      and FAILED held throughout (no restart) -- 2026-10-18 legs W/X;
+ *   T3 with stalls: the first decay of authority in FAILED restarts the scan
+ *      on the next tick, and the walker is back within one dwell of every
+ *      decay; a command heard in a decay window LOCKs and is adopted, and a
+ *      LOCK's demotion resets the adopted clock [main fails: adopted in
+ *      FAILED for good, no LOCK, no demotion];
+ *   T4 after the first adoption the tractor holds authority again and
+ *      self-follows again, and it receives at least half of the commands
+ *      sent from then on [main fails: no authority, no self-follow, fewer
+ *      than half received].
+ *   What T3/T4 recover to is the decay window before FAILED, which the 2 s
+ *   dwell and L move (memo section 5 item 3, accepted with the fix): own-
+ *   grid renumbering and phase restarts are not asserted here.
  *
  * `rx_scan_failed_follower -v` prints the runs (catches, PROBEs, counters).
- * `rx_scan_failed_follower -e` skips the characterisations and runs the
- * evaluation used to compare fix options (built against patched copies of
- * the firmware, SIL only); it prints and never fails (`-e3`: E3 only):
+ * `rx_scan_failed_follower -e` skips the checks and runs the evaluation the
+ * memo's numbers come from; it prints and never fails (`-e3`: E3 only):
  *   E1  leg-6 replay, seeded trials: silent for the scan budget, the
  *       stream from 1 s after the final FAIL on a random grid phase: does
  *       the base LOCK, how long after the stream starts, and what share of
@@ -150,7 +133,8 @@
  *       610-1400 ppm slow vs its host, tractor grid ~+1600 ppm);
  *   E1w E1 with a host watchdog model, option (c): the rx daemon re-sends
  *       REG_PROFILE=1 (profile activation: sx1276_fhss_init +
- *       sx1276_rx_scan_reset) 200 ms after a final RX_SCAN_FAILED fault;
+ *       sx1276_rx_scan_reset) 200 ms after each final RX_SCAN_FAILED fault
+ *       (not adopted; kept for comparison with the memo);
  *   E2  cold start, the stream already on at activation (random grid
  *       phase): P(no LOCK within the 120 s budget), the attempt that
  *       catches, the per-attempt catch probability, at 2 fps and 1 fps;
@@ -158,13 +142,16 @@
  *       in how many authority never returns after the first adoption, the
  *       authority share of the phase's passes, commands received, LOCKs,
  *       demotions, phase restarts (tx_first_anchor > 1) and own-grid
- *       renumbering; with stalls, the control without, and main's
- *       behaviour before FAILED (commands from 5 s, so the scan LOCKs on
- *       them and never fails out: scenario 7's decay window);
- *   E3w E3 with option (c)'s watchdog on the TRACTOR too. Not proposed --
- *       (c) runs on the base only, which leaves E3 as it is on main -- but
- *       it shows why: a re-activation restarts the originator's own grid
- *       at epoch 0 under the base (renumbered by hundreds of slots).
+ *       renumbering; with stalls, the control without, and the decay
+ *       window before FAILED (commands from 5 s, so the scan LOCKs on them
+ *       and never fails out: scenario 7's shape);
+ *   E3w E3 with option (c)'s watchdog on the TRACTOR too: a re-activation
+ *       restarts the originator's own grid at epoch 0 under the base
+ *       (renumbered by hundreds of slots) -- why (c) was never proposed
+ *       there.
+ * Memo numbers, 2026-10-24 (b+L+d2): E1 100/100, median 17.9 s, p90
+ * 56.3 s, 99.8 % heard (2750 ppm: 100/100, 99.9 %); E2 1.3 % at 2 fps,
+ * 10.7 % at 1 fps; E3 with stalls: authority back in 50/50.
  */
 
 #define RX_REVERSE_DELIVERY_SIM_ONLY 1
@@ -175,6 +162,12 @@
 #pragma GCC diagnostic pop
 
 #include <stdlib.h>
+
+/* The acceptance figures and the memo's evaluation are for this dwell; a
+ * different one needs `-e` re-run (and check-rx-reverse-delivery scenario
+ * 6's 6 s window rescaled for a dwell of 6 s or more). */
+_Static_assert(SX1276_RX_SCAN_DWELL_MS == 2000U,
+               "RS-12.21 d2: the acceptance check is sized for a 2 s scan dwell");
 
 /* ------------------------------------------------------------------ */
 /* Originator (tractor) model: a camera stream on its own grid         */
@@ -294,9 +287,6 @@ typedef struct {
     uint32_t probes;
     uint32_t arms_idle, arms_after_tx;
     uint32_t reactivations;
-    uint64_t first_idle_arm_us; /* first raw arm (after the final FAIL) */
-    uint32_t first_idle_arm_hz;
-    uint8_t  first_idle_arm_tuner;
 } rxd_t;
 static rxd_t g_rxd;
 
@@ -350,14 +340,7 @@ static void rxd_tick(void) {
     }
     if (g_now_us >= g_rxd.next_idle_us) {
         g_rxd.next_idle_us += RXD_IDLE_CHECK_US;
-        if (rxd_ensure_rxcont() != 0U) {
-            ++g_rxd.arms_idle;
-            if (g_rxd.first_idle_arm_us == 0U) {
-                g_rxd.first_idle_arm_us = g_now_us;
-                g_rxd.first_idle_arm_hz = g_radio.freq_hz;
-                g_rxd.first_idle_arm_tuner = (uint8_t)g_tuner;
-            }
-        }
+        g_rxd.arms_idle += rxd_ensure_rxcont();
     }
     if (g_rxd.watchdog != 0U) {
         if (g_final_fail_us != 0U && g_final_fail_us != g_rxd.seen_final_us) {
@@ -376,19 +359,19 @@ static void rxd_tick(void) {
 /* One run: activation, scan budget, stream                            */
 /* ------------------------------------------------------------------ */
 
-#define L6_MAX_CATCH 256U
+#define L6_MAX_CATCH 1024U   /* every frame of a 300 s stream at 2 fps */
 #define L6_DEC_DIM   SX1276_RX_CONSIDER_REMOTE_COUNT_DIM
+/* Mid-slot window for the on-grid check: both clocks are within a few ms
+ * of each other (ms-quantised anchors), so stay clear of the boundary. */
+#define L6_GRID_GUARD_US 10000ULL
 
 typedef struct {
     uint64_t t_us;
     uint32_t abs;
     uint32_t hz;
-    uint32_t local_epoch;      /* scheduler epoch before the frame        */
-    uint32_t parked_hz;        /* where the receiver had been left        */
     uint8_t  dec;
     uint8_t  tuner;            /* who had tuned the synth for it          */
-    uint8_t  adopted_before;
-    uint8_t  fresh_before;     /* adopted clock <= FRESH_MS old before it */
+    uint8_t  locked_before;    /* scan LOCKED before the frame            */
 } l6_catch_t;
 
 typedef struct {
@@ -398,7 +381,10 @@ typedef struct {
     uint8_t  stream_at_activation;   /* E2: stream on from activation */
     uint32_t start_abs;              /* E1: 0 = random                */
     uint32_t run_after_start_ms;     /* E1 */
+    uint32_t after_lock_ms;          /* and at least this past the LOCK
+                                      * (no LOCK: up to L6_STREAM_CAP_MS) */
     uint32_t cap_ms;                 /* E2: give up after this        */
+    uint32_t silent_ms;              /* (1b): no stream at all        */
     uint8_t  watchdog;
     uint8_t  stop_at_lock;
 } l6_cfg_t;
@@ -407,36 +393,27 @@ typedef struct {
     uint32_t act_ms;
     uint64_t act_us;
     uint64_t start_us;          /* stream start (0 = not yet)              */
-    uint64_t final_pass_us;     /* pass that saw the final FAIL            */
+    uint64_t final_pass_us;     /* pass that saw the first final FAIL      */
     uint8_t  final_mode;        /* modem state right after it              */
     uint32_t final_hz;
     uint8_t  final_tuner;
+    uint8_t  final_scan;        /* scan state (mirror) right after it      */
     uint64_t lock_us;           /* first LOCK (0 = none)                   */
     uint32_t fails_before_lock;
-    uint64_t follow_us;         /* first slot-follow retune after the start */
-    uint32_t parked_hz;         /* receiver channel left by walker / own TX */
+    uint8_t  lock_dec, lock_tuner;
+    uint32_t adoptions_at_lock;
     uint32_t ncatch;
     l6_catch_t catches[L6_MAX_CATCH];
     uint32_t dec[L6_DEC_DIM];
-    uint32_t tx_done, tx_rearm_on_tx_ch, tx_on_grid;
+    uint32_t tx_done, tx_on_grid;
     uint32_t tx_hz[L6_MAX_CATCH];
     uint32_t tx_abs[L6_MAX_CATCH];
-    uint32_t sched_unexplained;
-    uint32_t walker_at_start, follow_at_start, locks_at_start, dem_at_start;
+    uint32_t pass_not_rx;       /* passes ending outside RX, no TX keyed   */
+    uint32_t grid_checked, grid_off;  /* after the LOCK, mid-slot passes   */
 } l6_t;
 static l6_t g_l6;
 
-static uint8_t chan_of_hz(uint32_t hz) {
-    for (uint8_t i = 0U; i < SX1276_FHSS_CHANNEL_COUNT; ++i) {
-        if (sx1276_fhss_chantab_center_hz(i) == hz) {
-            return i;
-        }
-    }
-    return 0xFFU;
-}
-
-static void l6_on_catch(uint32_t local_epoch, uint8_t adopted_before,
-                        uint8_t fresh_before) {
+static void l6_on_catch(uint8_t locked_before) {
     const uint16_t seq = (uint16_t)(g_frame.payload[1] |
                                     ((uint16_t)g_frame.payload[2] << 8));
     if (seq >= g_os.sent) {
@@ -452,12 +429,9 @@ static void l6_on_catch(uint32_t local_epoch, uint8_t adopted_before,
         k->t_us = g_now_us;
         k->abs = g_os.log[seq].abs;
         k->hz = g_os.log[seq].hz;
-        k->local_epoch = local_epoch;
-        k->parked_hz = g_l6.parked_hz;
         k->dec = g_last_dec;
         k->tuner = (uint8_t)g_heard_tuner;
-        k->adopted_before = adopted_before;
-        k->fresh_before = fresh_before;
+        k->locked_before = locked_before;
     }
     ++g_l6.ncatch;
 }
@@ -470,17 +444,11 @@ static void l6_on_tx_done(void) {
     }
     {
         const uint32_t abs = sx1276_fhss_clock_abs_of(h.epoch, h.hop_idx);
-        const uint32_t hz = hop_hz(abs);
         if (g_l6.tx_done < L6_MAX_CATCH) {
-            g_l6.tx_hz[g_l6.tx_done] = hz;
+            g_l6.tx_hz[g_l6.tx_done] = hop_hz(abs);
             g_l6.tx_abs[g_l6.tx_done] = abs;
         }
         ++g_l6.tx_done;
-        /* The firmware's own post-TX re-arm (sx1276_tx_cleanup): RX_CONT,
-         * on the channel it just transmitted on. */
-        if (g_radio.mode == SX1276_STATE_RX_CONT && g_radio.freq_hz == hz) {
-            ++g_l6.tx_rearm_on_tx_ch;
-        }
         /* Keyed in the originator's slot its header claims. */
         if (g_os.on != 0U && g_radio.tx_start_us >= g_os.t0_us &&
             os_abs_at(g_radio.tx_start_us) == abs) {
@@ -490,55 +458,52 @@ static void l6_on_tx_done(void) {
 }
 
 static void l6_pass(void) {
-    const uint32_t ep0 = sx1276_fhss_current_epoch();
-    const uint8_t  sl0 = sx1276_fhss_current_slot();
     const uint32_t frames0 = g_sc.frames_recv;
     const uint32_t txok0 = g_sc.fw_tx_ok;
-    const uint64_t txstart0 = g_radio.tx_start_us;
-    const uint8_t  adopted0 = sx1276_rx_grid_adopted();
-    /* The grid policy hands consider_remote FRESH (-> LOCKED_OUT) only for
-     * an adopted, valid clock at most FRESH_MS old at the frame; its age
-     * then is at least the age here (a REJECTED frame does not re-anchor;
-     * platform_now_ms() does not advance the simulated clock). */
-    const uint8_t  fresh0 = (uint8_t)(adopted0 != 0U &&
-        sx1276_fhss_clock_valid() != 0U &&
-        sx1276_fhss_clock_age_ms(platform_now_ms()) <= SX1276_FHSS_CLOCK_FRESH_MS);
     const uint32_t locks0 = g_sc.locks;
-    const uint32_t follow0 = g_sc.follow_locked + g_sc.follow_own;
-    uint8_t snapped_now = 0U;
+    const uint8_t  locked0 = (uint8_t)(g_scan_mirror == SX1276_RX_SCAN_STATE_LOCKED);
 
     os_tick();
     fw_pass();
 
     if (g_sc.frames_recv != frames0) {
-        l6_on_catch(ep0, adopted0, fresh0);
-        snapped_now = (uint8_t)(g_last_dec == SX1276_FHSS_SNAP_DEC_SNAPPED);
+        l6_on_catch(locked0);
     }
     if (g_sc.fw_tx_ok != txok0) {
         l6_on_tx_done();
     }
-    /* Who left the receiver where: the walker, or an own TX (a slot-follow
-     * retune is tracked by its own counter). */
-    if (g_tuner == CTX_SCAN || g_tuner == CTX_HOST || g_tuner == CTX_MAILBOX) {
-        g_l6.parked_hz = g_last_freq;
-    }
-    if ((sx1276_fhss_current_epoch() != ep0 || sx1276_fhss_current_slot() != sl0) &&
-        snapped_now == 0U && g_radio.tx_start_us == txstart0) {
-        ++g_l6.sched_unexplained;
-    }
     if (g_sc.locks != locks0 && g_l6.lock_us == 0U) {
         g_l6.lock_us = g_now_us;
         g_l6.fails_before_lock = g_sc.scan_fail_urc;
-    }
-    if (g_l6.start_us != 0U && g_l6.follow_us == 0U &&
-        g_sc.follow_locked + g_sc.follow_own != follow0) {
-        g_l6.follow_us = g_now_us;
+        g_l6.lock_dec = g_last_dec;
+        g_l6.lock_tuner = (uint8_t)g_heard_tuner;
+        g_l6.adoptions_at_lock = g_sc.adoptions;
     }
     if (g_final_fail_us != 0U && g_l6.final_pass_us == 0U) {
         g_l6.final_pass_us = g_now_us;
         g_l6.final_mode = (uint8_t)g_radio.mode;
         g_l6.final_hz = g_radio.freq_hz;
         g_l6.final_tuner = (uint8_t)g_tuner;
+        g_l6.final_scan = (uint8_t)g_scan_mirror;
+    }
+    if (g_radio.mode != SX1276_STATE_RX_CONT && !sx1276_tx_busy()) {
+        ++g_l6.pass_not_rx;
+    }
+    /* From the LOCK on, in mid-slot: the clock on the originator's slot and
+     * the receiver, when listening, on that slot's channel. */
+    if (g_l6.lock_us != 0U && g_os.on != 0U && g_now_us >= g_os.t0_us &&
+        g_scan_mirror == SX1276_RX_SCAN_STATE_LOCKED) {
+        const uint32_t abs = os_abs_at(g_now_us);
+        const uint64_t in_slot = g_now_us - os_boundary_us(abs - g_os.abs0);
+        if (in_slot >= L6_GRID_GUARD_US && in_slot + L6_GRID_GUARD_US < SLOT_US) {
+            ++g_l6.grid_checked;
+            if (sx1276_fhss_clock_valid() == 0U ||
+                sx1276_fhss_clock_abs_slot(platform_now_ms()) != abs ||
+                (g_radio.mode == SX1276_STATE_RX_CONT &&
+                 g_radio.freq_hz != hop_hz(abs))) {
+                ++g_l6.grid_off;
+            }
+        }
     }
     rxd_tick();
 }
@@ -551,10 +516,27 @@ static void l6_start_stream(const l6_cfg_t *c, uint64_t t_us) {
     os_start(t_us + (uint64_t)rnd_range(0U, (uint32_t)SLOT_US - 1U), abs0,
              c->ppm, c->period_ms, (uint8_t)OS_FRAME_LEN);
     g_l6.start_us = g_now_us;
-    g_l6.walker_at_start = g_sc.walker_retunes;
-    g_l6.follow_at_start = g_sc.follow_locked + g_sc.follow_own;
-    g_l6.locks_at_start = g_sc.locks;
-    g_l6.dem_at_start = g_sc.demotions;
+}
+
+#define L6_STREAM_CAP_MS 300000U
+
+/* Keep the stream running? run_after_start_ms after its start, then (with
+ * after_lock_ms) until that long after the LOCK, or the cap without one. */
+static uint8_t l6_more(const l6_cfg_t *c) {
+    const uint64_t t = g_now_us - g_l6.start_us;
+    if (c->stop_at_lock != 0U && g_l6.lock_us != 0U) {
+        return 0U;
+    }
+    if (t < (uint64_t)c->run_after_start_ms * 1000ULL) {
+        return 1U;
+    }
+    if (c->after_lock_ms == 0U) {
+        return 0U;
+    }
+    if (g_l6.lock_us == 0U) {
+        return (uint8_t)(t < (uint64_t)L6_STREAM_CAP_MS * 1000ULL);
+    }
+    return (uint8_t)(g_now_us < g_l6.lock_us + (uint64_t)c->after_lock_ms * 1000ULL);
 }
 
 static void l6_run(const char *name, const l6_cfg_t *c) {
@@ -567,6 +549,12 @@ static void l6_run(const char *name, const l6_cfg_t *c) {
     g_rxd.next_idle_us = g_now_us + (uint64_t)rnd_range(0U, 4999U) * 1000ULL;
     g_l6.act_us = g_now_us;
     g_l6.act_ms = platform_now_ms();
+    if (c->silent_ms != 0U) {
+        while (g_now_us < g_l6.act_us + (uint64_t)c->silent_ms * 1000ULL) {
+            l6_pass();
+        }
+        return;
+    }
     if (c->stream_at_activation != 0U) {
         l6_start_stream(c, g_now_us);
         while (g_now_us < g_l6.act_us + (uint64_t)c->cap_ms * 1000ULL &&
@@ -575,8 +563,8 @@ static void l6_run(const char *name, const l6_cfg_t *c) {
         }
         return;
     }
-    /* Silent for the scan budget; the stream starts 1 s after the final
-     * FAIL (or at +121 s if a variant never reports one). */
+    /* Silent for the scan budget; the stream starts 1 s after the first
+     * final FAIL (or at +121 s if a variant never reports one). */
     while (g_l6.start_us == 0U) {
         l6_pass();
         if ((g_final_fail_us != 0U && g_now_us >= g_final_fail_us + 1000000ULL) ||
@@ -584,14 +572,13 @@ static void l6_run(const char *name, const l6_cfg_t *c) {
             l6_start_stream(c, g_now_us);
         }
     }
-    while (g_now_us < g_l6.start_us + (uint64_t)c->run_after_start_ms * 1000ULL &&
-           !(c->stop_at_lock != 0U && g_l6.lock_us != 0U)) {
+    while (l6_more(c) != 0U) {
         l6_pass();
     }
 }
 
 /* ------------------------------------------------------------------ */
-/* The characterisation (leg 6 on main)                                */
+/* The acceptance check, base: leg 6 replayed, and a silent follower   */
 /* ------------------------------------------------------------------ */
 
 static const char *dec_name(uint8_t d) {
@@ -604,220 +591,216 @@ static const char *dec_name(uint8_t d) {
     }
 }
 
-/* The default seed's camera timing reproduces leg 6's catches 1 and 2 slot
- * for slot -- (13,17) on ch 9, PROBE (13,18) on ch 44, (14,40) on ch 44 --
- * and its counters: 5 heard, 5 PROBEs, 3 SNAPPED, 2 EPOCH_DRIFT, 0 ALIGNED,
- * 0 LOCKED_OUT. A soft check (a NOTE, never a failure): a harness change
- * that moves the random sequence needs a new default (scan seeds with
- * -s -v). `-s <seed>` runs another seed against checks 1-5 only. */
 #define L6_LEG6_SEED 852U
 static uint32_t g_l6_seed = L6_LEG6_SEED;
 
-/* "<n> us after <ref>", or "none" when t is unset or before ref. */
-static const char *us_after(char *buf, size_t n, uint64_t t_us, uint64_t ref_us) {
-    if (t_us == 0U || t_us < ref_us) {
-        snprintf(buf, n, "none");
-    } else {
-        snprintf(buf, n, "%llu us", (unsigned long long)(t_us - ref_us));
-    }
-    return buf;
-}
+/* Scan attempts in the budget, and the walker channel after them: each
+ * attempt dwells on REDESIGN / DWELL channels and the walk continues. */
+#define L6_ATTEMPTS        (SX1276_RX_SCAN_MAX_RETRIES + 1U)
+#define L6_DWELLS_PER_TRY  (SX1276_RX_SCAN_REDESIGN_MS / SX1276_RX_SCAN_DWELL_MS)
 
-static void test_leg6_characterisation(void) {
-    /* Leg 6's first catch was (epoch 13, hop 17) on ch 9; start the grid
-     * at epoch 13 so the same slots carry the same channels. */
+static void test_leg6_recovers(void) {
+    /* Leg 6's first catch was (epoch 13, hop 17); start the grid at epoch
+     * 13 as the characterisation did. */
     const l6_cfg_t c = {
         .seed = g_l6_seed, .ppm = 0, .period_ms = 500U,
         .stream_at_activation = 0U,
         .start_abs = 13U * SX1276_FHSS_CHANNEL_COUNT,
-        .run_after_start_ms = 180000U, .cap_ms = 0U,
+        .run_after_start_ms = 180000U, .after_lock_ms = 60000U,
+        .cap_ms = 0U, .silent_ms = 0U,
         .watchdog = 0U, .stop_at_lock = 0U,
     };
-    /* With a dwell restart at channel 0 on every attempt, the walker's last
-     * channel is dwell (REDESIGN / DWELL) - 1, mod 50: index 9 on main. */
-    const uint8_t walker_last = (uint8_t)(((SX1276_RX_SCAN_REDESIGN_MS
-                                            / SX1276_RX_SCAN_DWELL_MS) - 1U)
+    const uint8_t walker_next = (uint8_t)((L6_ATTEMPTS * L6_DWELLS_PER_TRY)
                                           % SX1276_FHSS_CHANNEL_COUNT);
-    uint32_t heard = 0U, n_snap_near = 0U, n_drift_far = 0U, n_locked_out = 0U;
-    uint32_t bad_dec = 0U, bad_park = 0U, bad_tuner = 0U;
-    char arm_buf[32];
+    uint32_t after_follow = 0U, after_aligned = 0U, after_n = 0U;
+    uint32_t late_sent = 0U, late_heard = 0U;
+    uint32_t fails_unlocked_bad = 0U;
 
-    l6_run("leg 6: follower in scan FAILED", &c);
-    /* A PROBE may be on air when the run ends: let it finish (its post-TX
-     * re-arm is part of the mechanism checked below). */
+    l6_run("leg 6 replay: follower recovers", &c);
+    /* A PROBE may be on air when the run ends: let it finish. */
     for (int i = 0; i < 1000 && sx1276_tx_busy(); ++i) {
         l6_pass();
     }
-    heard = g_l6.ncatch;   /* every frame heard, past L6_MAX_CATCH too */
     print_scenario();
     check_structure();
 
-    /* 1  the scan budget runs out into FAILED and the modem is parked. */
-    CHECK(g_sc.scan_fail_urc == 4U && g_sc.fail_final == 1U &&
-          g_fail_sub[0] == 0x20U && g_fail_sub[1] == 0x21U &&
-          g_fail_sub[2] == 0x22U && g_fail_sub[3] == 0xA3U,
-          "[%s] scan faults: %u (final %u), sub %02x %02x %02x %02x"
-          " (expect 4: 20 21 22 a3)", g_sc.name, g_sc.scan_fail_urc,
-          g_sc.fail_final, g_fail_sub[0], g_fail_sub[1], g_fail_sub[2],
-          g_fail_sub[3]);
+    /* A1  the budget runs out as before, but FAILED does not hold. */
+    CHECK(g_sc.scan_fail_urc >= 4U && g_fail_sub[0] == 0x20U &&
+          g_fail_sub[1] == 0x21U && g_fail_sub[2] == 0x22U &&
+          g_fail_sub[3] == 0xA3U,
+          "[%s] scan faults: %u, sub %02x %02x %02x %02x (expect >= 4: 20 21 22"
+          " a3)", g_sc.name, g_sc.scan_fail_urc, g_fail_sub[0], g_fail_sub[1],
+          g_fail_sub[2], g_fail_sub[3]);
     CHECK((uint32_t)(g_fail_ms[3] - g_l6.act_ms) >= 120000U &&
           (uint32_t)(g_fail_ms[3] - g_l6.act_ms) < 120100U,
           "[%s] final FAIL %u ms after activation (expect 120 s)", g_sc.name,
           (unsigned)(g_fail_ms[3] - g_l6.act_ms));
-    CHECK(g_l6.final_mode == (uint8_t)SX1276_STATE_STANDBY &&
+    CHECK(g_l6.final_scan == (uint8_t)SX1276_RX_SCAN_STATE_SCANNING &&
+          g_l6.final_mode == (uint8_t)SX1276_STATE_RX_CONT &&
           g_l6.final_tuner == (uint8_t)CTX_SCAN &&
-          chan_of_hz(g_l6.final_hz) == walker_last,
-          "[%s] after the final FAIL: mode %u (expect STANDBY %u), on ch %u"
-          " (expect the walker's last, %u), last tuned by ctx %u",
-          g_sc.name, g_l6.final_mode, (unsigned)SX1276_STATE_STANDBY,
-          chan_of_hz(g_l6.final_hz), walker_last, g_l6.final_tuner);
-    CHECK(g_rxd.first_idle_arm_us > g_l6.final_pass_us &&
-          g_rxd.first_idle_arm_us <= g_l6.final_pass_us + RXD_IDLE_CHECK_US &&
-          g_rxd.first_idle_arm_hz == g_l6.final_hz &&
-          g_rxd.first_idle_arm_tuner == (uint8_t)CTX_SCAN,
-          "[%s] the daemon's raw RXCONT did not re-arm the parked receiver in"
-          " place (first raw arm: %s after the final FAIL, ch %u, tuner %u)",
-          g_sc.name,
-          us_after(arm_buf, sizeof(arm_buf), g_rxd.first_idle_arm_us,
-                   g_l6.final_pass_us),
-          chan_of_hz(g_rxd.first_idle_arm_hz), g_rxd.first_idle_arm_tuner);
+          chan_of_hz(g_l6.final_hz) == walker_next,
+          "[%s] after the final FAIL: scan state %u (expect SCANNING %u), mode"
+          " %u (expect RX_CONT %u), on ch %u (expect the walker's next, %u),"
+          " last tuned by ctx %u", g_sc.name, g_l6.final_scan,
+          (unsigned)SX1276_RX_SCAN_STATE_SCANNING, g_l6.final_mode,
+          (unsigned)SX1276_STATE_RX_CONT, chan_of_hz(g_l6.final_hz),
+          walker_next, g_l6.final_tuner);
 
-    /* 2  no LOCK, no demotion, no follow, no walk; scheduler frozen. */
-    CHECK(g_sc.locks == 0U && g_sc.demotions == 0U && g_sc.dem_reset == 0U &&
-          g_scan_mirror == SX1276_RX_SCAN_STATE_FAILED,
-          "[%s] FAILED did not absorb: locks=%u demotions=%u clk_demotion_reset=%u"
-          " scan state %u", g_sc.name, g_sc.locks, g_sc.demotions,
-          g_sc.dem_reset, (unsigned)g_scan_mirror);
-    CHECK(g_sc.walker_retunes == g_l6.walker_at_start &&
-          g_sc.follow_locked + g_sc.follow_own == g_l6.follow_at_start &&
-          g_sc.follow_locked + g_sc.follow_own == 0U,
-          "[%s] the receiver was retuned by the walker (%u) or the slot follower"
-          " (%u) once the stream ran", g_sc.name,
-          g_sc.walker_retunes - g_l6.walker_at_start,
-          g_sc.follow_locked + g_sc.follow_own);
-    CHECK(g_l6.sched_unexplained == 0U,
-          "[%s] the shared scheduler moved %u times without an own TX or a SNAP",
-          g_sc.name, g_l6.sched_unexplained);
-    CHECK(g_l6.ncatch >= 2U && sx1276_rx_grid_adopted() != 0U &&
-          g_sc.adoptions >= 1U && g_sc.adopt_via_walker == 1U,
-          "[%s] catches=%u adopted=%u adoptions=%u (via walker %u)", g_sc.name,
-          g_l6.ncatch, sx1276_rx_grid_adopted(), g_sc.adoptions,
-          g_sc.adopt_via_walker);
+    /* A2  the stream: a LOCK on a walker channel; FAILs before it final. */
+    for (uint32_t i = 4U; i < g_l6.fails_before_lock && i < FAIL_LOG; ++i) {
+        if (g_fail_sub[i] != 0xA3U ||
+            (uint32_t)(g_fail_ms[i] - g_fail_ms[i - 1U]) <
+                SX1276_RX_SCAN_REDESIGN_MS ||
+            (uint32_t)(g_fail_ms[i] - g_fail_ms[i - 1U]) >=
+                SX1276_RX_SCAN_REDESIGN_MS + 100U) {
+            ++fails_unlocked_bad;
+        }
+    }
+    CHECK(g_l6.lock_us != 0U && g_l6.lock_us >= g_l6.start_us &&
+          g_l6.lock_tuner == (uint8_t)CTX_SCAN &&
+          g_l6.lock_dec == (uint8_t)SX1276_FHSS_SNAP_DEC_SNAPPED &&
+          g_l6.adoptions_at_lock == 1U && fails_unlocked_bad == 0U,
+          "[%s] no LOCK on the stream: LOCK %s, on a channel tuned by ctx %u"
+          " (expect the walker, %u), decision %s (expect SNAPPED), adoptions"
+          " %u (expect 1); %u of the FAILs before it not final 30 s apart",
+          g_sc.name, (g_l6.lock_us != 0U) ? "yes" : "never", g_l6.lock_tuner,
+          (unsigned)CTX_SCAN, dec_name(g_l6.lock_dec), g_l6.adoptions_at_lock,
+          fails_unlocked_bad);
 
+    /* A3  from the LOCK on, the base follows the hop grid. */
     for (uint32_t i = 0U; i < g_l6.ncatch && i < L6_MAX_CATCH; ++i) {
         const l6_catch_t *k = &g_l6.catches[i];
-        const uint32_t ep = sx1276_fhss_clock_epoch_of(k->abs);
-        const int32_t d = (int32_t)(ep - k->local_epoch);
-        const uint32_t ad = (uint32_t)((d < 0) ? -d : d);
-        if (k->hz != k->parked_hz) {
-            ++bad_park;
-        }
-        /* first: on the walker's channel; later: on the last PROBE's. */
-        if (i == 0U) {
-            if (k->tuner != (uint8_t)CTX_SCAN || chan_of_hz(k->hz) != walker_last ||
-                k->dec != SX1276_FHSS_SNAP_DEC_SNAPPED || k->adopted_before != 0U) {
-                ++bad_tuner;
-            }
+        if (k->locked_before == 0U) {
             continue;
         }
-        if (k->tuner != (uint8_t)CTX_HOST && k->tuner != (uint8_t)CTX_MAILBOX) {
-            ++bad_tuner;
-        }
-        if (k->dec == SX1276_FHSS_SNAP_DEC_SNAPPED && ad <= 1U) {
-            ++n_snap_near;
-        } else if (k->dec == SX1276_FHSS_SNAP_DEC_REJECTED_EPOCH_DRIFT && ad >= 2U) {
-            ++n_drift_far;
-        } else if (k->dec == SX1276_FHSS_SNAP_DEC_REJECTED_LOCKED_OUT &&
-                   k->fresh_before != 0U) {
-            ++n_locked_out;
-        } else {
-            ++bad_dec;
+        ++after_n;
+        after_follow += (uint32_t)(k->tuner == (uint8_t)CTX_FOLLOW);
+        after_aligned += (uint32_t)(k->dec == (uint8_t)SX1276_FHSS_SNAP_DEC_ALIGNED);
+    }
+    for (uint32_t i = 0U; i < g_os.sent; ++i) {
+        if (g_l6.lock_us != 0U && g_os.log[i].key_us >= g_l6.lock_us + 1000000ULL) {
+            ++late_sent;
+            late_heard += g_os.log[i].heard;
         }
     }
-    CHECK(bad_tuner == 0U && bad_park == 0U,
-          "[%s] %u catches not where the walker / the last PROBE left the"
-          " receiver, %u off the parked channel", g_sc.name, bad_tuner, bad_park);
+    CHECK(g_l6.lock_us != 0U && g_scan_mirror == SX1276_RX_SCAN_STATE_LOCKED &&
+          g_sc.demotions == 0U && g_sc.scan_fail_urc == g_l6.fails_before_lock,
+          "[%s] after the LOCK: scan state %u (expect LOCKED), demotions %u,"
+          " FAILs %u after it (expect 0 0)", g_sc.name, (unsigned)g_scan_mirror,
+          g_sc.demotions, g_sc.scan_fail_urc - g_l6.fails_before_lock);
+    CHECK(g_l6.grid_checked > 1000U && g_l6.grid_off == 0U,
+          "[%s] off the originator's hop grid on %u of %u mid-slot passes after"
+          " the LOCK (clock slot, or the receiver's channel)", g_sc.name,
+          g_l6.grid_off, g_l6.grid_checked);
+    CHECK(after_n >= 100U && after_follow == after_n && after_aligned == after_n,
+          "[%s] frames heard after the LOCK: %u, tuned by the slot follower %u,"
+          " ALIGNED %u (expect all)", g_sc.name, after_n, after_follow,
+          after_aligned);
+    CHECK(late_sent != 0U && late_heard * 100U >= late_sent * 95U,
+          "[%s] heard %u of the %u frames keyed from 1 s after the LOCK"
+          " (expect >= 95 %%)", g_sc.name, late_heard, late_sent);
+    CHECK(g_l6.tx_done >= 10U && g_l6.tx_on_grid == g_l6.tx_done,
+          "[%s] PROBEs %u, keyed in the originator's slot they claim %u"
+          " (expect all, >= 10)", g_sc.name, g_l6.tx_done, g_l6.tx_on_grid);
 
-    /* 3  PROBEs keyed on the adopted grid; post-TX re-arm on their channel. */
-    CHECK(g_l6.tx_done >= 2U && g_l6.tx_rearm_on_tx_ch == g_l6.tx_done &&
-          g_l6.tx_on_grid == g_l6.tx_done && g_rxd.arms_after_tx == 0U,
-          "[%s] PROBEs=%u: re-armed on their channel %u, on the originator's slot"
-          " %u, re-armed by the daemon after TX %u", g_sc.name, g_l6.tx_done,
-          g_l6.tx_rearm_on_tx_ch, g_l6.tx_on_grid, g_rxd.arms_after_tx);
-
-    /* 4  frozen scheduler epoch: never ALIGNED; SNAPPED near, DRIFT far,
-     *    LOCKED_OUT only on a clock at most FRESH_MS old. */
-    CHECK(g_l6.dec[SX1276_FHSS_SNAP_DEC_ALIGNED] == 0U && bad_dec == 0U &&
-          n_snap_near + n_drift_far >= 1U,
-          "[%s] consider_remote: aligned=%u snapped=%u (%u within one epoch)"
-          " epoch_drift=%u (%u two or more) locked_out=%u (%u on a fresh clock),"
-          " %u unexplained", g_sc.name, g_l6.dec[SX1276_FHSS_SNAP_DEC_ALIGNED],
-          g_l6.dec[SX1276_FHSS_SNAP_DEC_SNAPPED], n_snap_near,
-          g_l6.dec[SX1276_FHSS_SNAP_DEC_REJECTED_EPOCH_DRIFT], n_drift_far,
-          g_l6.dec[SX1276_FHSS_SNAP_DEC_REJECTED_LOCKED_OUT], n_locked_out,
-          bad_dec);
-
-    /* 5  a few percent heard; ends in RX_CONT, still FAILED. */
-    CHECK(heard * 10U < g_os.sent && g_radio.mode == SX1276_STATE_RX_CONT,
-          "[%s] heard %u of %u frames, final mode %u (expect < 10 %%, RX_CONT)",
-          g_sc.name, heard, g_os.sent, (unsigned)g_radio.mode);
-
-    /* Leg 6's fingerprint, for the default seed: a soft check. */
-    if (g_l6_seed == L6_LEG6_SEED) {
-        const uint32_t leg6_abs1 = 13U * SX1276_FHSS_CHANNEL_COUNT + 17U;
-        const uint32_t leg6_abs2 = 14U * SX1276_FHSS_CHANNEL_COUNT + 40U;
-        const uint8_t match = (uint8_t)(
-              g_l6.ncatch == 5U && g_l6.tx_done == 5U &&
-              g_l6.dec[SX1276_FHSS_SNAP_DEC_SNAPPED] == 3U &&
-              g_l6.dec[SX1276_FHSS_SNAP_DEC_REJECTED_EPOCH_DRIFT] == 2U &&
-              g_l6.dec[SX1276_FHSS_SNAP_DEC_REJECTED_LOCKED_OUT] == 0U &&
-              g_l6.catches[0].abs == leg6_abs1 && chan_of_hz(g_l6.catches[0].hz) == 9U &&
-              g_l6.tx_abs[0] == leg6_abs1 + 1U && chan_of_hz(g_l6.tx_hz[0]) == 44U &&
-              g_l6.catches[1].abs == leg6_abs2 && chan_of_hz(g_l6.catches[1].hz) == 44U);
-        if (match == 0U || g_verbose != 0) {
-            printf("    %s leg-6 fingerprint (seed %u, soft check, never a"
-                   " failure): heard %u PROBEs %u snapped %u epoch_drift %u"
-                   " locked_out %u (leg 6: 5 5 3 2 0); catch 1 (%u,%u) ch %u,"
-                   " PROBE 1 ch %u, catch 2 (%u,%u) ch %u (leg 6: (13,17) ch 9,"
-                   " ch 44, (14,40) ch 44)\n",
-                   (match != 0U) ? "[MATCH]" : "[NOTE] no", (unsigned)g_l6_seed,
-                   g_l6.ncatch, g_l6.tx_done,
-                   g_l6.dec[SX1276_FHSS_SNAP_DEC_SNAPPED],
-                   g_l6.dec[SX1276_FHSS_SNAP_DEC_REJECTED_EPOCH_DRIFT],
-                   g_l6.dec[SX1276_FHSS_SNAP_DEC_REJECTED_LOCKED_OUT],
-                   sx1276_fhss_clock_epoch_of(g_l6.catches[0].abs),
-                   (unsigned)sx1276_fhss_clock_hop_of(g_l6.catches[0].abs),
-                   chan_of_hz(g_l6.catches[0].hz), chan_of_hz(g_l6.tx_hz[0]),
-                   sx1276_fhss_clock_epoch_of(g_l6.catches[1].abs),
-                   (unsigned)sx1276_fhss_clock_hop_of(g_l6.catches[1].abs),
-                   chan_of_hz(g_l6.catches[1].hz));
-        }
-    }
+    /* A4  never out of RX, never re-armed by the daemon. */
+    CHECK(g_l6.pass_not_rx == 0U && g_rxd.arms_idle == 0U &&
+          g_rxd.arms_after_tx == 0U,
+          "[%s] receiver out of RX at the end of %u passes with no TX keyed;"
+          " the daemon's raw RXCONT re-armed it %u times idle, %u after a TX"
+          " (expect 0 0 0)", g_sc.name, g_l6.pass_not_rx, g_rxd.arms_idle,
+          g_rxd.arms_after_tx);
 
     if (g_verbose != 0) {
-        printf("    activation -> final FAIL %u ms; parked on ch %u (%s), daemon"
-               " re-armed it: %s later; stream from +%llu ms, %u frames sent,"
-               " %u heard (%.1f%%)\n",
+        char lock_buf[32];
+        if (g_l6.lock_us != 0U) {
+            snprintf(lock_buf, sizeof(lock_buf), "+%.2f s",
+                     (double)(g_l6.lock_us - g_l6.start_us) / 1e6);
+        } else {
+            snprintf(lock_buf, sizeof(lock_buf), "never");
+        }
+        printf("    activation -> final FAIL %u ms, then SCANNING on ch %u;"
+               " stream from +%llu ms, LOCK %s after it (after %u FAILs);"
+               " %u frames sent, %u heard; after the LOCK %u heard (%u of %u"
+               " keyed from 1 s after it), %u mid-slot passes checked on grid;"
+               " PROBEs %u\n",
                (unsigned)(g_fail_ms[3] - g_l6.act_ms), chan_of_hz(g_l6.final_hz),
-               (g_l6.final_mode == (uint8_t)SX1276_STATE_STANDBY) ? "STANDBY" : "?",
-               us_after(arm_buf, sizeof(arm_buf), g_rxd.first_idle_arm_us,
-                        g_l6.final_pass_us),
                (unsigned long long)((g_l6.start_us - g_l6.act_us) / 1000ULL),
-               g_os.sent, heard, 100.0 * heard / (double)g_os.sent);
-        for (uint32_t i = 0U; i < g_l6.ncatch && i < L6_MAX_CATCH; ++i) {
+               lock_buf, g_l6.fails_before_lock, g_os.sent, g_l6.ncatch, after_n,
+               late_heard, late_sent, g_l6.grid_checked, g_l6.tx_done);
+        for (uint32_t i = 0U; i < g_l6.ncatch && i < 3U; ++i) {
             const l6_catch_t *k = &g_l6.catches[i];
-            printf("    catch %u at +%.2f s: (%u,%u) ch %u, scheduler epoch %u ->"
-                   " %s; then PROBE (%u,%u) ch %u\n", i + 1U,
-                   (double)(k->t_us - g_l6.act_us) / 1e6,
+            printf("    catch %u at +%.2f s: (%u,%u) ch %u -> %s, tuned by ctx %u\n",
+                   i + 1U, (double)(k->t_us - g_l6.act_us) / 1e6,
                    sx1276_fhss_clock_epoch_of(k->abs),
                    (unsigned)sx1276_fhss_clock_hop_of(k->abs), chan_of_hz(k->hz),
-                   k->local_epoch, dec_name(k->dec),
-                   (i < g_l6.tx_done) ? sx1276_fhss_clock_epoch_of(g_l6.tx_abs[i]) : 0U,
-                   (i < g_l6.tx_done) ? (unsigned)sx1276_fhss_clock_hop_of(g_l6.tx_abs[i]) : 0U,
-                   (i < g_l6.tx_done) ? chan_of_hz(g_l6.tx_hz[i]) : 0U);
+                   dec_name(k->dec), k->tuner);
         }
         printf("    daemon: probes=%u raw arms idle=%u after-TX=%u\n",
                g_rxd.probes, g_rxd.arms_idle, g_rxd.arms_after_tx);
+    }
+}
+
+#define SILENT_MS 305000U   /* ten 30 s attempts */
+
+static void test_silent_follower(void) {
+    const l6_cfg_t c = {
+        .seed = g_l6_seed, .ppm = 0, .period_ms = 500U,
+        .stream_at_activation = 0U, .start_abs = 0U,
+        .run_after_start_ms = 0U, .after_lock_ms = 0U, .cap_ms = 0U,
+        .silent_ms = SILENT_MS,
+        .watchdog = 0U, .stop_at_lock = 0U,
+    };
+    const uint32_t expect_fails = SILENT_MS / SX1276_RX_SCAN_REDESIGN_MS;
+    uint32_t bad_sub = 0U, bad_gap = 0U, seen = 0U;
+
+    l6_run("silent follower: report and keep scanning", &c);
+    print_scenario();
+    check_structure();
+
+    for (uint32_t i = 0U; i < g_sc.scan_fail_urc && i < FAIL_LOG; ++i) {
+        /* The warm bit is sticky for the boot (sx1276_rx_scan_reset keeps
+         * it), so it is set here when an earlier run in this process
+         * LOCKed: compare without it, and require it unchanged. */
+        const uint8_t warm = (uint8_t)(1U << SX1276_RX_SCAN_FAIL_SUB_BIT_WARM);
+        const uint8_t want = (i < L6_ATTEMPTS - 1U)
+            ? (uint8_t)(0x20U | i)
+            : (uint8_t)(0xA0U | (L6_ATTEMPTS - 1U));
+        bad_sub += (uint32_t)((g_fail_sub[i] & (uint8_t)~warm) != want ||
+                              (g_fail_sub[i] & warm) != (g_fail_sub[0] & warm));
+        if (i != 0U &&
+            ((uint32_t)(g_fail_ms[i] - g_fail_ms[i - 1U]) < SX1276_RX_SCAN_REDESIGN_MS ||
+             (uint32_t)(g_fail_ms[i] - g_fail_ms[i - 1U]) >=
+                 SX1276_RX_SCAN_REDESIGN_MS + 100U)) {
+            ++bad_gap;
+        }
+    }
+    for (uint8_t i = 0U; i < SX1276_FHSS_CHANNEL_COUNT; ++i) {
+        seen += (uint32_t)((g_sc.walker_seen >> i) & 1ULL);
+    }
+    CHECK(g_sc.scan_fail_urc == expect_fails && bad_sub == 0U && bad_gap == 0U &&
+          g_sc.fail_final == expect_fails - (L6_ATTEMPTS - 1U) &&
+          g_sc.final_restarts == g_sc.fail_final && g_sc.tick_restarts == 0U,
+          "[%s] FAILs %u (expect %u, one per 30 s: %u off the 20 21 22 a3 a3 ..."
+          " sequence, %u not 30 s after the one before), final %u, each a"
+          " restart into SCANNING %u, restarts on a tick %u (expect 0)",
+          g_sc.name, g_sc.scan_fail_urc, expect_fails, bad_sub, bad_gap,
+          g_sc.fail_final, g_sc.final_restarts, g_sc.tick_restarts);
+    CHECK(seen == SX1276_FHSS_CHANNEL_COUNT,
+          "[%s] the walk covered %u of %u channels in %u s (d2: it must continue"
+          " across the restarts)", g_sc.name, seen,
+          (unsigned)SX1276_FHSS_CHANNEL_COUNT, SILENT_MS / 1000U);
+    CHECK(g_l6.pass_not_rx == 0U && g_rxd.arms_idle == 0U &&
+          g_scan_mirror == SX1276_RX_SCAN_STATE_SCANNING,
+          "[%s] receiver out of RX at the end of %u passes, re-armed by the"
+          " daemon %u times, scan state %u at the end (expect 0 0 SCANNING)",
+          g_sc.name, g_l6.pass_not_rx, g_rxd.arms_idle, (unsigned)g_scan_mirror);
+    if (g_verbose != 0) {
+        printf("    FAIL sub-bytes:");
+        for (uint32_t i = 0U; i < g_sc.scan_fail_urc && i < FAIL_LOG; ++i) {
+            printf(" %02x", g_fail_sub[i]);
+        }
+        printf("; walker channels %u/%u\n", seen, (unsigned)SX1276_FHSS_CHANNEL_COUNT);
     }
 }
 
@@ -965,10 +948,10 @@ static void check_tr_silent_phase(void) {
           g_tr.adoptions0, g_tr.auth0);
 }
 
-static void test_tractor_failed_adoption(void) {
+static void test_tractor_failed_recovers(void) {
     tr_cfg_t c = { .seed = TR_SEED, .stalls = 0U, .watchdog = 0U };
 
-    /* T1 + T2: the control. */
+    /* T1 + T2: the control -- FAILED held while the tractor streams. */
     tr_run("tractor in scan FAILED, no stalls (control)", &c);
     print_scenario();
     check_structure();
@@ -985,6 +968,12 @@ static void test_tractor_failed_adoption(void) {
           g_sc.auth_passes - g_tr.auth_passes0,
           g_sc.passes - g_tr.passes0, g_sc.follow_own - g_tr.follow_own0,
           g_sc.sent - g_tr.sent0, g_sc.covered_clean, g_sc.covered_clean_recv);
+    CHECK(g_scan_mirror == SX1276_RX_SCAN_STATE_FAILED &&
+          g_sc.tick_restarts == 0U && g_sc.final_restarts == 0U,
+          "[%s] control: scan state %u at the end (expect FAILED, held under"
+          " authority), restarts out of FAILED %u on a tick, %u at the final"
+          " FAIL (expect 0 0)", g_sc.name, (unsigned)g_scan_mirror,
+          g_sc.tick_restarts, g_sc.final_restarts);
     if (g_verbose != 0) {
         printf("    phase: cmds sent=%u recv=%u, authority on %u/%u passes\n",
                g_sc.sent - g_tr.sent0, g_sc.recv - g_tr.recv0,
@@ -997,34 +986,32 @@ static void test_tractor_failed_adoption(void) {
     print_scenario();
     check_structure();
     check_tr_silent_phase();
-    CHECK(g_tr.adopt_us != 0U && g_sc.adoptions == 1U &&
-          sx1276_rx_grid_adopted() != 0U && g_sc.locks == 0U &&
-          g_sc.demotions == 0U && g_sc.dem_reset == 0U &&
-          g_sc.first_anchor == 1U && g_tr.renumbers == 0U &&
-          g_scan_mirror == SX1276_RX_SCAN_STATE_FAILED,
-          "[%s] adoption in FAILED: adopted %s into the phase, adoptions %u,"
-          " still adopted %u, locks %u demotions %u clk_demotion_reset %u,"
-          " tx_first_anchor %u, own grid renumbered %u times, scan state %u"
-          " (expect adopted, 1, 1, 0 0 0, 1, 0, FAILED)", g_sc.name,
-          (g_tr.adopt_us != 0U) ? "yes" : "never", g_sc.adoptions,
-          sx1276_rx_grid_adopted(), g_sc.locks, g_sc.demotions, g_sc.dem_reset,
-          g_sc.first_anchor, g_tr.renumbers, (unsigned)g_scan_mirror);
-    CHECK(g_tr.adopt_us != 0U && g_sc.passes > g_tr.passes_at_adopt &&
-          g_sc.auth_passes == g_tr.auth_at_adopt &&
-          g_sc.follow_own == g_tr.follow_own_at_adopt &&
-          g_sc.follow_locked == 0U &&
-          (g_sc.recv - g_tr.recv_at_adopt) * 2U < g_sc.sent - g_tr.sent_at_adopt,
-          "[%s] after the adoption: authority on %u of %u passes, self-follow"
-          " retunes %u, LOCKED follow %u, cmds received %u of %u (expect 0, 0,"
-          " 0, fewer than half)", g_sc.name,
+    CHECK(g_sc.tick_restarts >= 1U && g_sc.walker_after_decay_viol == 0U,
+          "[%s] restarts out of FAILED on a tick %u (expect >= 1: the first"
+          " decay of authority), walker later than one dwell after a decay"
+          " %u times (expect 0)", g_sc.name, g_sc.tick_restarts,
+          g_sc.walker_after_decay_viol);
+    CHECK(g_tr.adopt_us != 0U && g_sc.locks >= 1U && g_sc.demotions >= 1U &&
+          g_sc.dem_reset >= 1U,
+          "[%s] a command heard in a decay window: adopted %s, locks %u,"
+          " demotions %u, adopted clock reset at a demotion %u (expect yes,"
+          " >= 1 each)", g_sc.name, (g_tr.adopt_us != 0U) ? "yes" : "never",
+          g_sc.locks, g_sc.demotions, g_sc.dem_reset);
+    CHECK(g_tr.adopt_us != 0U && g_sc.auth_passes > g_tr.auth_at_adopt &&
+          g_sc.follow_own > g_tr.follow_own_at_adopt &&
+          (g_sc.recv - g_tr.recv_at_adopt) * 2U >= g_sc.sent - g_tr.sent_at_adopt,
+          "[%s] after the first adoption: authority on %u of %u passes,"
+          " self-follow retunes %u, cmds received %u of %u (expect > 0, > 0,"
+          " at least half)", g_sc.name,
           g_sc.auth_passes - g_tr.auth_at_adopt,
           g_sc.passes - g_tr.passes_at_adopt,
-          g_sc.follow_own - g_tr.follow_own_at_adopt, g_sc.follow_locked,
+          g_sc.follow_own - g_tr.follow_own_at_adopt,
           g_sc.recv - g_tr.recv_at_adopt, g_sc.sent - g_tr.sent_at_adopt);
     if (g_verbose != 0) {
         printf("    phase: adopted at +%.1f s; before it cmds sent=%u recv=%u,"
                " authority on %u/%u passes; after it cmds sent=%u recv=%u,"
-               " authority on %u/%u passes\n",
+               " authority on %u/%u passes; own grid renumbered %u times (max"
+               " %u slots)\n",
                (g_tr.adopt_us != 0U)
                    ? (double)(g_tr.adopt_us - g_tr.phase_us) / 1e6 : -1.0,
                g_tr.sent_at_adopt - g_tr.sent0, g_tr.recv_at_adopt - g_tr.recv0,
@@ -1032,12 +1019,13 @@ static void test_tractor_failed_adoption(void) {
                g_tr.passes_at_adopt - g_tr.passes0,
                g_sc.sent - g_tr.sent_at_adopt, g_sc.recv - g_tr.recv_at_adopt,
                g_sc.auth_passes - g_tr.auth_at_adopt,
-               g_sc.passes - g_tr.passes_at_adopt);
+               g_sc.passes - g_tr.passes_at_adopt, g_tr.renumbers,
+               g_tr.renumber_max);
     }
 }
 
 /* ------------------------------------------------------------------ */
-/* Evaluation (-e): fix options, SIL only                              */
+/* Evaluation (-e): the memo's measures, SIL only                      */
 /* ------------------------------------------------------------------ */
 
 #define EV_MAX 1000U
@@ -1089,7 +1077,8 @@ static void eval_e1(const char *label, uint32_t n, int32_t ppm, uint8_t watchdog
         const l6_cfg_t c = {
             .seed = 0xE1000001U + t * 7919U, .ppm = ppm, .period_ms = 500U,
             .stream_at_activation = 0U, .start_abs = 0U,
-            .run_after_start_ms = 300000U, .cap_ms = 0U,
+            .run_after_start_ms = 300000U, .after_lock_ms = 0U, .cap_ms = 0U,
+            .silent_ms = 0U,
             .watchdog = watchdog, .stop_at_lock = 0U,
         };
         l6_run(label, &c);
@@ -1124,8 +1113,9 @@ static void eval_e2(const char *label, uint32_t n, uint32_t period_ms) {
         const l6_cfg_t c = {
             .seed = 0xE2000001U + t * 104729U + period_ms, .ppm = 0,
             .period_ms = period_ms, .stream_at_activation = 1U,
-            .start_abs = 0U, .run_after_start_ms = 0U, .cap_ms = 300000U,
-            .watchdog = 0U, .stop_at_lock = 1U,
+            .start_abs = 0U, .run_after_start_ms = 0U, .after_lock_ms = 0U,
+            .cap_ms = 300000U,
+            .silent_ms = 0U, .watchdog = 0U, .stop_at_lock = 1U,
         };
         l6_run(label, &c);
         if (g_l6.lock_us != 0U) {
@@ -1218,7 +1208,7 @@ static void eval_e3(const char *label, uint32_t n, uint8_t stalls, uint8_t watch
 
 static void run_eval_tractor(void) {
     /* Commands from 5 s: the scan LOCKs on them and never fails out --
-     * main's decay-window behaviour before FAILED (scenario 7's shape). */
+     * the decay window before FAILED (scenario 7's shape). */
     eval_e3("tractor SCANNING + stalls", 50U, 1U, 0U, 5000U);
     eval_e3("tractor FAILED, no stalls (control)", 20U, 0U, 0U, 0U);
     eval_e3("tractor FAILED + stalls", 50U, 1U, 0U, 0U);
@@ -1255,20 +1245,23 @@ int main(int argc, char **argv) {
         run_eval();
         return 0;
     }
-    test_leg6_characterisation();
-    test_tractor_failed_adoption();
+    test_leg6_recovers();
+    test_silent_follower();
+    test_tractor_failed_recovers();
     if (g_failures != 0) {
         fprintf(stderr, "[FAIL] rx_scan_failed_follower: %d failure(s) -- the"
-                " characterised scan-FAILED behaviour changed: a firmware fix"
-                " for RS-12.21 (then replace these checks with its acceptance"
-                " checks) or an unrelated change to the scan constants, the"
-                " walker, the TX path or the shared sim (rx_reverse_delivery.c)"
-                " -- see which check failed\n", g_failures);
+                " RS-12.21 scan fix ((b) + L + d2) does not hold: a node without"
+                " originator authority stays in, or does not recover from, scan"
+                " FAILED (or an unrelated change to the scan constants, the"
+                " walker, the TX path or the shared sim, rx_reverse_delivery.c"
+                " -- see which check failed)\n", g_failures);
         return 1;
     }
-    printf("[PASS] rx_scan_failed_follower: KNOWN DEFECTS still present"
-           " (RS-12.21, firmware path) -- a follower in scan FAILED adopts the"
-           " grid but never LOCKs or hops (leg 6); an originator in scan FAILED"
-           " that adopts a grid never holds authority or self-follows again\n");
+    printf("[PASS] rx_scan_failed_follower: RS-12.21 acceptance -- a follower"
+           " whose scan ran out reports, keeps scanning and LOCKs onto the"
+           " stream, then follows the hop grid (leg 6); a silent follower"
+           " reports every 30 s and walks all 50 channels; a tractor in scan"
+           " FAILED that loses authority scans again, and regains authority"
+           " and self-follow after an adoption\n");
     return 0;
 }
