@@ -5,7 +5,8 @@
 // Covers: RX_FRAME_URC -> decrypt -> arbitration -> Modbus holding block,
 // E-stop latch and clear, link-loss neutral, telemetry out as
 // TX_FRAME_REQ with one frame at the L072 at a time, and every gate release
-// (TX_DONE, ERR_PROTO, BOOT_URC, timeout; FAULT_URC releases nothing).
+// (TX_DONE, ERR_PROTO, BOOT_URC, timeout; FAULT_URC releases nothing), and
+// H7-13: fresh RNG nonce tails, and no TX at all when the RNG is stuck.
 
 #include <stdio.h>
 #include <sys/mman.h>
@@ -19,6 +20,18 @@ uint32_t millis() { return g_now_ms; }
 uint32_t micros() { return g_now_ms * 1000u; }
 void delay(unsigned long ms) { g_now_ms += (uint32_t)ms; }
 long random(long lo, long) { return lo; }
+
+// H7-13: stand-in for the H747 RNG. g_entropy_stuck makes it repeat one
+// word, which lt_entropy.c must catch.
+static uint32_t g_entropy_state = 0x12345678u;
+static bool g_entropy_stuck = false;
+extern "C" bool lifetrac_host_entropy(uint8_t* out, size_t len, void*) {
+    for (size_t i = 0; i < len; i++) {
+        if (!g_entropy_stuck) g_entropy_state = g_entropy_state * 1664525u + 1013904223u;
+        out[i] = g_entropy_stuck ? 0xA5 : (uint8_t)(g_entropy_state >> 24);
+    }
+    return true;
+}
 
 HardwareSerial Serial;
 HardwareSerial Serial1;
@@ -63,6 +76,9 @@ static void l072_rx_packet(const uint8_t* pkt, uint8_t len) {
 struct TxReq { uint8_t tx_id; uint16_t seq; uint8_t len; uint8_t data[255]; };
 static size_t g_tx_scan;
 static uint32_t g_tx_commands;   // FT_COMMAND frames the tractor sent
+static uint8_t g_last_tails[2][5];
+static uint32_t g_tails_seen;
+static uint32_t g_tail_repeats;  // a nonce tail equal to the previous frame's
 
 static void classify_tx(const TxReq& r) {
     KissDecoder dec;
@@ -70,9 +86,12 @@ static void classify_tx(const TxReq& r) {
     for (uint8_t i = 0; i < r.len; i++) {
         uint8_t* frame; size_t flen;
         if (lp_kiss_feed(&dec, r.data[i], &frame, &flen) &&
-            flen >= 12 + sizeof(LoraHeader) &&
-            ((const LoraHeader*)(frame + 12))->frame_type == FT_COMMAND) {
-            g_tx_commands++;
+            flen >= 12 + sizeof(LoraHeader)) {
+            if (((const LoraHeader*)(frame + 12))->frame_type == FT_COMMAND) g_tx_commands++;
+            memcpy(g_last_tails[g_tails_seen & 1u], frame + 7, 5);
+            if (g_tails_seen > 0 &&
+                memcmp(g_last_tails[0], g_last_tails[1], 5) == 0) g_tail_repeats++;
+            g_tails_seen++;
         }
     }
 }
@@ -307,12 +326,32 @@ int main() {
     for (int i = 0; i < 320; i++) ack_all(), run_ms(50);
     expect(g_tx_commands == 0 && g_ladder_rung == 0, "no CMD_LINK_TUNE over Method G");
 
+    expect(g_tails_seen > 10 && g_tail_repeats == 0,
+           "every TX nonce tail comes fresh from the RNG");
+
     // 9. Modbus outage latches the E-stop (IP-205, 10 consecutive failures).
     ModbusRTUClient.fail = true;
     run_ms(600);
     ModbusRTUClient.fail = false;
     run_ms(60);
     expect(reg(REG_ARM_ESTOP) == 1, "10 failed Modbus writes latch the E-stop");
+
+    // 10. A stuck RNG (H7-13): the frame is dropped, never sent with a
+    //     guessable nonce; control keeps running.
+    //     Bytes drawn into the pool before the fault may still go out.
+    g_entropy_stuck = true;
+    for (int i = 0; i < 100; i++) ack_all(), run_ms(50);
+    ack_all();
+    const uint32_t loops0 = SHARED->loop_counter;
+    const uint32_t writes0 = ModbusRTUClient.writes;
+    const uint32_t wd0_rng = reg(REG_WATCHDOG_CTR);
+    run_ms(2500);
+    expect(take_tx_reqs(tx, 16) == 0, "stuck RNG suppresses tractor TX");
+    expect(g_entropy.failed && g_nonce_fail > 0, "stuck RNG is latched and counted");
+    expect(SHARED->loop_counter - loops0 >= 2400 && SHARED->alive_tick_ms == g_now_ms - 1,
+           "M4 mailbox keeps being stamped after the RNG fault");
+    expect(ModbusRTUClient.writes - writes0 >= 45 && (uint16_t)(reg(REG_WATCHDOG_CTR) - wd0_rng) >= 45,
+           "Modbus block and Opta watchdog keep running at 20 Hz after the RNG fault");
 
     if (g_failures) {
         fprintf(stderr, "tractor_methodg_sil: %d failure(s)\n", g_failures);

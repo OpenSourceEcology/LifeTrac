@@ -4713,7 +4713,19 @@ profile stays an option, so work runs in three stages:
 - [ ] **H7-12 Hardware watchdog and fault capture** — independent watchdog
   on each core, a reset-cause and HardFault record kept across reset in
   backup SRAM, reported in the next telemetry frame.
-- [ ] **H7-13 Use the hardware RNG** for nonce seeds and key generation.
+- [x] **H7-13 Use the hardware RNG** for nonce seeds and key generation —
+  nonces done 2026-10-23. The 5-byte AES-GCM nonce tail in `tractor_h7.ino`
+  now comes from the H747 RNG (mbed `trng_api`, `DEVICE_TRNG`) through
+  `lt_entropy.c`, which latches on a repeated 32-bit word (stuck RNG); with
+  no entropy the frame is dropped, never sent. This fixed a real bug: the old
+  tail was a xorshift seeded from the UID and boot-time clock (X8) or
+  unseeded `random()` (H7), so after every reset the tractor reused the same
+  nonces under the same key (seq and seconds restart at boot too). Host
+  tests: `bench/h7_host_proto/lt_entropy_vectors.c` and the stuck-RNG and
+  fresh-tail checks in `bench/methodg_sil/`. Key generation still happens on
+  the PC (`tools/provision.py`); the on-tractor pairing bootstrap
+  (cross-cutting "Device pairing") should draw from `lt_entropy` when it is
+  written.
 - [ ] **H7-14 Dual-bank A/B firmware images** — use the H747's two flash
   banks for a verified update with rollback (USB-only per MASTER_PLAN §8.16).
 - [ ] **H7-15 M7/M4 isolation** — MPU regions so the M7 cannot write the M4's
@@ -4749,6 +4761,12 @@ These items cut across all three nodes and don't fit neatly into a single phase.
 - [ ] Base station pairing: scan same QR from base X8 web UI `/settings/pair` page → key stored in encrypted config file
 - [ ] Re-pair / key-rotation procedure documented in `OPERATIONS_MANUAL.md`
 - [ ] Persistent AES-GCM nonce counter in tractor flash (survives reboot) to prevent replay-attack window after power cycle
+- [ ] **Handheld nonce entropy** — `handheld_mkr.ino` builds its 5-byte nonce
+  tail from `random()` with no `randomSeed()`, and seq and seconds restart at
+  boot, so the handheld repeats nonces under the fleet key after every power
+  cycle (the tractor side was fixed by H7-13). The SAMD21 has no RNG: use a
+  persistent boot counter in flash in the nonce, or a hardware entropy source
+  on the board if one is fitted, and add a test.
 
 ### Firmware update strategy
 

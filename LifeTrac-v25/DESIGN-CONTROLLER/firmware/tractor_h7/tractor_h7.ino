@@ -70,6 +70,7 @@
 // .gitignored.
 #include "src/lifetrac_build_config.h"
 #include "src/lora_proto/lora_proto.h"
+#include "lt_entropy.h"
 #endif
 
 #if LIFETRAC_METHOD_G_HOST_BUILD
@@ -1315,46 +1316,66 @@ static void poll_radio() {
 static inline void rt_rx_rearm() { radio.startReceive(); }
 #endif
 
-#if defined(ARDUINO_PORTENTA_X8) || defined(LIFETRAC_X8_NO_USB_SERIAL)
-static uint32_t g_nonce_prng_state = 0;
+// ---------- nonce entropy (H7-13) ----------
+//
+// The 5-byte nonce tail comes from the H747's hardware RNG through mbed's
+// trng_api, checked by lt_entropy.c. The old tails were a xorshift seeded
+// from the UID and the boot-time clock (X8) or unseeded random() (H7), so
+// they repeated after every reset, and the seq and seconds fields restart at
+// boot too: the same nonce under the same key, which breaks AES-GCM. If the
+// RNG fails, the frame is dropped rather than sent with a guessable nonce.
+#if defined(ARDUINO_ARCH_MBED)
+#if !(defined(DEVICE_TRNG) && DEVICE_TRNG)
+#error "tractor_h7 needs the STM32H747 hardware RNG (mbed DEVICE_TRNG) for AES-GCM nonces"
+#endif
+#include "hal/trng_api.h"
+static trng_t g_trng;
 
-static uint32_t nonce_prng_next() {
-    if (g_nonce_prng_state == 0) {
-        volatile const uint32_t* uid = (volatile const uint32_t*)0x1FF1E800u;
-        uint32_t seed = 0x9E3779B9u ^ millis() ^ micros();
-        seed ^= uid[0] ^ (uid[1] << 11) ^ (uid[1] >> 21) ^ (uid[2] << 22) ^ (uid[2] >> 10);
-        g_nonce_prng_state = seed ? seed : 0xA5A5C3C3u;
+// The STM32 trng_api's trng_init() spins until the RNG yields its first
+// word and calls error() if the clock setup fails, so it runs once, in
+// setup(), where a dead RNG stops the tractor at boot (the M4 never arms)
+// rather than freezing the loop mid-operation. trng_get_bytes() itself
+// times out (HAL) and reports seed/clock errors, which fail the draw.
+static bool trng_source(uint8_t* out, size_t len, void* /*ctx*/) {
+    size_t done = 0;
+    for (int tries = 0; done < len && tries < 4; ++tries) {
+        size_t got = 0;
+        if (trng_get_bytes(&g_trng, out + done, len - done, &got) != 0) return false;
+        done += got;
     }
-    uint32_t x = g_nonce_prng_state;
-    x ^= x << 13;
-    x ^= x >> 17;
-    x ^= x << 5;
-    g_nonce_prng_state = x ? x : 0xA5A5C3C3u;
-    return g_nonce_prng_state;
+    return done == len;
 }
 
-static uint8_t nonce_random_byte() {
-    return (uint8_t)nonce_prng_next();
+static void entropy_begin(lt_entropy_t* e) {
+    trng_init(&g_trng);
+    lt_entropy_init(e, trng_source, nullptr);
 }
 #else
-static uint8_t nonce_random_byte() {
-    return (uint8_t)random(0, 256);
+// Host builds (bench/methodg_sil) supply the source.
+extern "C" bool lifetrac_host_entropy(uint8_t* out, size_t len, void* ctx);
+static void entropy_begin(lt_entropy_t* e) {
+    lt_entropy_init(e, lifetrac_host_entropy, nullptr);
 }
 #endif
 
+static lt_entropy_t g_entropy;
+static uint32_t g_nonce_fail = 0;   // frames dropped for want of entropy
+
 // Build a 12-byte AES-GCM nonce identical in shape to the handheld:
 //   [ source_id | seq(LE) | t_seconds(LE) | rand(5) ]
-// Without the time/random bits, two telemetry frames with the same sequence
-// (e.g. across reboot or after a 16-bit rollover) would reuse a nonce, which
-// is catastrophic for AES-GCM confidentiality.
-static void build_nonce(uint8_t out[12], uint8_t source_id, uint16_t seq) {
+// Returns false (send nothing) when the RNG cannot supply the tail.
+static bool build_nonce(uint8_t out[12], uint8_t source_id, uint16_t seq) {
     out[0] = source_id;
     out[1] = (uint8_t)(seq & 0xFF);
     out[2] = (uint8_t)(seq >> 8);
     uint32_t t = millis() / 1000;
     out[3] = (uint8_t)(t      ); out[4] = (uint8_t)(t >>  8);
     out[5] = (uint8_t)(t >> 16); out[6] = (uint8_t)(t >> 24);
-    for (int i = 0; i < 5; i++) out[7 + i] = nonce_random_byte();
+    if (lt_entropy_get(&g_entropy, out + 7, 5)) return true;
+    if (g_nonce_fail++ == 0) {
+        Serial.println("nonce RNG failed; tractor TX suppressed (H7-13)");
+    }
+    return false;
 }
 
 // Read Opta telemetry and ship a TelemetryFrame over LoRa.
@@ -1612,7 +1633,7 @@ static void emit_topic(uint8_t topic_id, const uint8_t* payload, uint8_t payload
 
     // Encrypt + KISS + send
     uint8_t nonce[12];
-    build_nonce(nonce, SRC_TRACTOR, g_telem_seq);
+    if (!build_nonce(nonce, SRC_TRACTOR, g_telem_seq)) return;
     uint8_t enc[200];
     if (!lp_encrypt(kFleetKey, nonce, (const uint8_t*)&tf,
                     prefix + 2, enc)) return;
@@ -1826,7 +1847,7 @@ static void send_link_tune(uint8_t target_rung, uint8_t reason) {
                           sizeof(CommandFrame) - sizeof(uint16_t));
 
     uint8_t nonce[12];
-    build_nonce(nonce, SRC_TRACTOR, cf.hdr.sequence_num);
+    if (!build_nonce(nonce, SRC_TRACTOR, cf.hdr.sequence_num)) return;
     uint8_t enc[sizeof(CommandFrame) + 16];
     if (!lp_encrypt(kFleetKey, nonce, (const uint8_t*)&cf,
                     sizeof(CommandFrame), enc)) return;
@@ -1969,6 +1990,7 @@ void setup() {
     // BC-25 / K-A2: precompute the per-stick response curve LUT from the
     // build-time exponent. Must run before apply_control() can be called.
     init_stick_curve_lut();
+    entropy_begin(&g_entropy);   // H7-13: before anything can transmit
     boot_trace_mark(3);
 
 #if LIFETRAC_METHOD_G_HOST_BUILD
