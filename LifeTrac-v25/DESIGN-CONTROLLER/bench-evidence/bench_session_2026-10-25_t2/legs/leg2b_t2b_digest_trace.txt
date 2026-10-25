@@ -1,0 +1,15 @@
+== rs13_digest_trace: leg2b_t2b_base.jsonl (leg 2b_t2b, profile image_bw250, 364 rows, 364 vector; horizon 25 rows) ==
+capture seq gaps (leg2b_t2b_base.jsonl): lost 0/364 = 0.0%  (received 364, 0 gaps, longest 0; 1 codec run; period 0.55 s)
+  first frame heard at seq 10: the 9 frame(s) numbered before it are not in the figure above (the camera numbers from seq 1 at start-up — an acquisition delay or a late capture, RS-13.1 A7); counting from seq 1: 9/373 = 2.4%
+  tractor TX log: 373 frame(s) on air (txdone_arrival); the capture's first frame is its #10, its last #373 (placed by the params.txt clock offsets, within 0.05 s): 9/373 = 2.4% of them never reached the capture (9 before its first, 0 after its last)
+seq gaps (row, frames lost): []
+store: ttl_dropped 0, orphans 61, digest 324 checked / 10 mismatched; final digest_ok True; last DIGEST checked (row, result): (363, 'ok')
+resync: 1 episode(s), 12 frame(s): #0-#12 (12, 5.9 s, digest)
+DIGEST mismatch runs: 1 (each starts within the horizon after a seq gap, or at the join)
+
+| leg | loss at row | episode (start-end, frames, s) | ended by | back in step (digest_trace, frames after the loss) | isolated? | pass? |
+|---|---|---|---|---|---|---|
+| 2b_t2b | - | #0-#12 (12, 5.9 s) | digest | - | - | join (not scored): starts before the first epoch start in the capture (row 112: the base joining mid-epoch) |
+
+
+A16 confirmation over 1 capture(s) (2b_t2b): 1 episode(s); loss-opened 0 -- THIN: fewer than 3; pool the Round B VECTOR legs with seq-gap loss <= 10 %; isolated and scored 0: 0 PASS, 0 FAIL -> NO SCORED EPISODE

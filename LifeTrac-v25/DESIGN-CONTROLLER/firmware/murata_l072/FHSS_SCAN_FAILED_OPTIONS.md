@@ -11,7 +11,10 @@ production `2c5e055a`, section 9). **Flashed on both bench boards
 `flash_rc=0`), with every post-flash check and the first legs R1 and R2
 passed (section 6.1;
 [`RESULTS.md`](../../bench-evidence/bench_session_2026-10-25/RESULTS.md) of
-that day). T1, T2 and T4 with camera stalls are still to fly.
+that day). T2 (ten cold starts) flew later that day and passed: 10 of 10
+acquired, none stranded
+([`RESULTS.md`](../../bench-evidence/bench_session_2026-10-25_t2/RESULTS.md)).
+T1 and T4 with camera stalls are still to fly.
 **Date:** 2026-10-24 (main `5d00dac2`).
 **Decision owner:** the design owner (Dorkmo).
 **Rows:** RS-12.21 and RS-12.15 in [`../../TODO.md`](../../TODO.md).
@@ -521,8 +524,9 @@ base flashed (`Verify OK`, `flash_rc=0`), `radio_park.py` `PARK_OK` with
 check-only about 3 min later. R1 and R2 passed every Confirm item below
 that applied (R1's base-0x0D item was not exercised: the base locked in its
 first attempt). Both boards now run bench `0daae279`; step 11 was not
-needed. Not flown
-yet: T1, T2, T4 with stalls (the last item of this section).
+needed. T2 flew
+later that day (the "Later" item at the end of this section). Not flown
+yet: T1, T4 with stalls.
 
 Written 2026-10-25 with both radios off, for the round after it. Both
 boards run `e083ae46` until step 6. Each step that flashes or opens
@@ -681,7 +685,21 @@ profile 1, which ends the park; `leg_post.sh` parks again at the end.
 - **Later, not on the first day:** T1 (the base silent for ≥ 125 s, then
   the stream) needs a harness option that delays the tractor's stream,
   which is not built (build and test it offline first); T2 (a set of about
-  10 cold starts); T4 with camera stalls.
+  10 cold starts); T4 with camera stalls. **T2 flown 2026-10-25 on the
+  operator's GO, PASS**
+  ([`RESULTS.md`](../../bench-evidence/bench_session_2026-10-25_t2/RESULTS.md)):
+  ten 180 s FHSS legs, `mono_g4` and VECTOR alternating, `-ReactiveFire 1`;
+  every start `confirmed acquisition: ACQUIRED`, first frame 11.0-62.4 s
+  after activation (median 11.1 s; 0 of 10 past 120 s, so no final 0x0D
+  and no (b) restart on the base); one start locked in attempt 2 after
+  base 0x0D attempts 0 and 1, 30.0 s apart; every leg-end park `PARK_OK`
+  on the firmware path, `0x80` on both at the check-only 2 min 26-31 s
+  later. The times fall on three values (11.0-11.1, 26.4-26.9 and 62.4 s;
+  all five VECTOR starts 11.1 s): the harness starts both boards the same
+  way each leg, so T2 sampled a few start phases, not the random-phase
+  rate SIL-E2 predicts (1.3 % past 120 s at 2 fps). Measuring that rate
+  on the bench needs a random delay between the tractor reset and the
+  base's activation, which no harness option does yet.
 
 After the round: record it in the session's RESULTS.md, then update the
 "on the boards" records (`murata_l072/README.md` "Expected md5s",

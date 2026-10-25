@@ -1,0 +1,115 @@
+17:55:18Z == leg 2b_t2b post (archive C:/Users/dorkm/Documents/GitHub/LifeTrac-bench-main/LifeTrac-v25/DESIGN-CONTROLLER/bench-evidence/radio_monitor_20261025_125511_5f84b748)
+17:55:18Z -- waiting for the base capture (rs13_cap_base) to finish its 360 s
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+== vector dry run summary ==
+profile image_bw250: one-fragment limit 203 B (epoch starts 202 B)
+frames: 364 total, 364 vector, 0 other, 0 unparseable; by codec {'vector': 364}
+wire bytes (vector): min 60 / p50 200 / p95 203 / max 203; over limit: 0
+epoch starts: 7 received, 7 applied
+arrival: 2.00 fps mean over 181.6 s; gap p50 0.55 s, p95 0.62 s, max 0.66 s; first applied at +0.00 s (0 frame(s) before it)
+store: applied 364, bad 0 , epoch_behind 0, orphans 61, digest 324 checked / 10 mismatched, epochs 8, handovers 7, ttl_dropped 0, resync 1 (1 ended by DIGEST), records 12799
+resync: 1 episode(s), 12 frame(s): #0-#12 (12, 5.9 s, digest)
+scene: epoch 7, level 0, badge 7, digest_ok True, horizon none, L1=29 L2=0 L3=2 L4=0, cal_rev None, anchor age 2151 ms
+checks:
+  [PASS] parse_ok       0 unparseable payload(s)
+  [PASS] all_vector     0 non-vector frame(s): {'vector': 364}
+  [PASS] one_fragment   0 over 203 B (epoch starts 202 B); max 203 B
+  [PASS] store_clean    frames_bad=0 
+  [FAIL] no_orphans     orphans=61
+  [FAIL] digest         324 checked, 10 mismatched, scene digest_ok=True
+  [PASS] epoch_seen     7 epoch start(s) applied of 7 received
+  [PASS] first_apply    0 frame(s) before the first apply
+  [PASS] applied_ratio  364/364 applied = 100.0% (need >= 90%)
+  [PASS] min_frames     364 vector frame(s), need >= 300
+RESULT: FAIL
+json report -> /work/legs/leg2b_t2b_base.json
+17:57:31Z -- radio quiet check before the brackets and the park
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+base: leg daemons [] ttymxc3 holders []
+tractor: leg daemons [] ttymxc3 holders []
+17:57:34Z -- post-brackets (rs115) both boards
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+radio_rx_ok=3146 radio_crc_err=1 radio_tx_ok=546  (base)
+radio_rx_ok=123 radio_crc_err=0 radio_tx_ok=374  (tractor)
+17:57:38Z -- rs12_leg_report (--capture) + frag_gap_report
+train_gap_ms=40  tx_pipeline_depth=2  synth_budget_b=250  force_frf_hz=0  git_sha=5f84b748  log_window=after_stop  
+  (tx frags_ok counter 367 is stale; using 373 fragments from per-frame TX events)
+loss 9/373 = 2.4%   crc_dumps=0  timeouts=0  published=364   [whole logs]
+shared-window loss 9/373 = 2.4%   [txdone_arrival vs frag_arrival, train by train over the window both logs cover; 9 of 373 trains not heard]
+capture seq gaps (leg2b_t2b_base.jsonl): lost 0/364 = 0.0%  (received 364, 0 gaps, longest 0; 1 codec run; period 0.55 s)
+  first frame heard at seq 10: the 9 frame(s) numbered before it are not in the figure above (the camera numbers from seq 1 at start-up — an acquisition delay or a late capture, RS-13.1 A7); counting from seq 1: 9/373 = 2.4%
+  tractor TX log: 373 frame(s) on air (txdone_arrival); the capture's first frame is its #10, its last #373 (placed by the params.txt clock offsets, within 0.05 s): 9/373 = 2.4% of them never reached the capture (9 before its first, 0 after its last)
+acquisition: first image reception: the base's first decoded frame came 11.1 s after its profile-1 activation (rx_daemon.log line 31 at 17:51:48.453 board time, the frame at line 43), within the FHSS cold-start scan budget of 120 s (4 attempts x 30 s: SX1276_RX_SCAN_MAX_RETRIES 3 + 1, SX1276_RX_SCAN_REDESIGN_MS 30000)
+n_frag=364 span=182s max_gap=0.7s gaps>3s=0 total_silent=0.0s
+episodes (start s from first frag, +length): NONE
+head: the first fragment came 11.1 s after the base's profile activation (17:51:48.453 base clock, the first line after REG_PROFILE OK); 4.6 s after the tractor's first txdone (params.txt clock offsets)
+tail: the last fragment came 0.0 s before the tractor's last txdone (params.txt clock offsets); 6.7 s before the base daemon's stop (its 'signal received' line)
+base sends on air=123 | tractor decoded cmds=123
+tractor cmd offsets (s from its first): 0.0, 1.5, 3.0, 4.5, 6.0, 7.5, 9.0, 10.5, 12.0, 13.5, 15.0, 16.5, 17.5, 19.0, 20.5, 21.9, 23.5, 25.0, 26.4, 28.0, 29.5, 31.0, 32.5, 33.9, 35.5, 37.0, 38.5, 40.0, 41.5, 43.0, 44.5, 46.0, 47.5, 49.0, 50.5, 51.9, 53.5, 55.0, 56.5, 57.9
+17:57:39Z -- P2 / P4 from the archive
+# leg 2b_t2b P2/P4 greps on C:/Users/dorkm/Documents/GitHub/LifeTrac-bench-main/LifeTrac-v25/DESIGN-CONTROLLER/bench-evidence/radio_monitor_20261025_125511_5f84b748
+harness: reg_profile=1 force_frf_hz=0 tx_batch=0 synth_fps=2 cam_extra_env=-e LIFETRAC_ENCODE_MODE=9 -e LIFETRAC_VECTOR_DETAIL=80
+published frame_id lines (rx_daemon.log): 364
+tx done K=1 lines: 373
+tx done K>=2 lines: 0
+tx ABORTED lines: 0
+max K: 1 fragments
+camera_service vector_stats lines: 84
+tx drops before air (last tx stats line): drop_full=0 drop_stale=0 
+tractor FHSS authority (post bracket): tx_first_anchor=1 tx_stream_streak_max=373 
+seq-gap loss (per codec run): leg 2b_t2b: 364 frames received; seq gaps within same-codec runs (row, lost): [] -> 0 lost of 364 = 0.0 % after the first received frame (0 codec switch(es) not counted)
+vector_stats lines: 84
+encoder ms_total: p50 196.9 / p95 250.7 / max 293.7
+stage p50 ms: resize=0.5 l0=15.5 l1=75.4 l3=34.2 temporal_pack=69.8
+frame bytes: p50 199 / max 203
+levels seen: {'0': 84}; lines with a pending epoch start: 0
+last: epoch 7 n_live 29 residual 5202.252 detail 80 epochs 8 trigger relabel ttl_dropped 0 waiting 5
+counters to the last line (1 run): frames 371; epoch starts 8 = first 1 forced 0 horizon 0 safety 1 relabel 6; repair share 92 frames, 329 re-sends (85 repeat-once); carousel re-sends 244; DEL repeats 903; ttl_dropped 0
+17:57:41Z -- archive files into legs/
+copied: leg2b_t2b_tractor_ocd_reset.log; not in this archive: inject.log inject_trigger.txt
+17:57:41Z -- RS-13 scorers (PC only; a failure is reported, it never stops the post step or the park)
+radio_monitor_20261025_125511_5f84b748: codec vector, reg_profile=1, reactive_fire=1, probe_echo=0, duration_s=180
+  base PROBE TX: 123 (seq 1..123; on air 123, failed 0)
+  tractor LoRa cmd: PROBE: 123 line(s), 123 distinct seq(s), duplicates 0
+  delivered 123/123 = 100.0 %  (tractor seqs that the base sent, over base PROBE TX)
+  tail: none (the tractor logged the base's last PROBE, seq 123)
+  base acquisition: ACQUIRED; first image reception 11.1 s after the base's profile-1 activation, within the 120 s FHSS scan budget; evidence: the base decoded 364 of the tractor's 373 fragments on air (97.6 %): on its 50-channel hop set a receiver that does not follow the hop grid is on the tractor's channel about one slot in 50, and only a locked scan follows the grid
+  (rs13_probe_score: exit 0 -> leg2b_t2b_probe_score.txt)
+radio_monitor_20261025_125511_5f84b748: reg_profile=1 force_frf_hz=0 encode_mode=9 duration_s=180
+  rx_rf windows: 19, +21..+201 s from the log start
+  RSSI: median of window medians -64.0 dBm; min of window medians -67 dBm; min of window mins -75 dBm; max -62 dBm; n = 19 windows, 364 frames
+  SNR:  median of window medians 10.0 dB; min of window medians 10.0 dB; min of window mins 5.0 dB; max 12.0 dB; n = 19 windows, 364 frames
+  crc_dump: 0
+  published frame_id: 364; frag_arrival: 364; rx_frames (last counter max): 364
+  row: RSSI med / min -64.0 / -75 dBm | SNR med / min 10.0 / 5.0 dB | CRC err 0 | n 19
+  FRF readback: base none; tractor none
+  (rs13_rf_extract: exit 0 -> leg2b_t2b_rf.txt)
+== rs13_digest_trace: leg2b_t2b_base.jsonl (leg 2b_t2b, profile image_bw250, 364 rows, 364 vector; horizon 25 rows) ==
+capture seq gaps (leg2b_t2b_base.jsonl): lost 0/364 = 0.0%  (received 364, 0 gaps, longest 0; 1 codec run; period 0.55 s)
+store: ttl_dropped 0, orphans 61, digest 324 checked / 10 mismatched; final digest_ok True; last DIGEST checked (row, result): (363, 'ok')
+resync: 1 episode(s), 12 frame(s): #0-#12 (12, 5.9 s, digest)
+A16 confirmation over 1 capture(s) (2b_t2b): 1 episode(s); loss-opened 0 -- THIN: fewer than 3; pool the Round B VECTOR legs with seq-gap loss <= 10 %; isolated and scored 0: 0 PASS, 0 FAIL -> NO SCORED EPISODE
+  (rs13_digest_trace: exit 0 -> leg2b_t2b_digest_trace.txt)
+leg 2b_t2b: reg_profile=1 (FHSS, from leg2b_t2b_params.txt) -> the RS-12.15 bracket criteria apply
+base: L072 counters not reset -> delta = post - pre
+tractor: L072 counters RESET during the leg (evidence: radio_dio0, radio_rx_ok, radio_tx_ok, host_parse_ok, tx_fifo_rb_ok, fhss_dec_aligned, tx_stream_streak_max, d(host_parse_ok) < d(radio_tx_ok)) -> delta = post
+cross-check: brackets 123/123 vs logs: base sends on air=123, tractor decoded cmds=123 -> AGREE
+STOP RULE: not tripped
+  (bracket_deltas: exit 0 -> leg2b_t2b_deltas.txt)
+17:57:43Z scorer exit codes (0 = ran clean; the files hold the reasons): rs12_leg_report=0 frag_gap_report=0 leg_replay=0 tractor_log=0 rs13_probe_score=0 rs13_rf_extract=0 rs13_digest_trace=0 bracket_deltas=0
+17:57:43Z -- park both radios (last)
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+base:    attempt 1: PARK_OK {"cap_bitmap": "0x000000FF", "park_tries": 1, "path": "firmware", "persistent": true, "holds": "until a host RXCONT write, a profile activation or a reset", "park_status": "PARKED", "opmode_readback": "0x80", "opmode_after_settle": "0x80", "settle_s": 2.5}
+tractor: attempt 1: PARK_OK {"cap_bitmap": "0x000000FF", "park_tries": 1, "path": "firmware", "persistent": true, "holds": "until a host RXCONT write, a profile activation or a reset", "park_status": "PARKED", "opmode_readback": "0x80", "opmode_after_settle": "0x80", "settle_s": 2.5}
+17:57:52Z == leg 2b_t2b post done (evidence: C:/Users/dorkm/Documents/GitHub/LifeTrac-bench-main/LifeTrac-v25/DESIGN-CONTROLLER/bench-evidence/bench_session_2026-10-25_t2/legs)

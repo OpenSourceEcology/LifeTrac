@@ -1,0 +1,17 @@
+train_gap_ms=40  tx_pipeline_depth=2  synth_budget_b=250  force_frf_hz=0  git_sha=5f84b748  log_window=after_stop  
+  (tx frags_ok counter 367 is stale; using 375 fragments from per-frame TX events)
+  (rx rx_frames counter 359 is stale; using 366 fragments from frag_arrival events)
+loss 9/375 = 2.4%   crc_dumps=0  timeouts=0  published=366   [whole logs]
+shared-window loss 9/375 = 2.4%   [txdone_arrival vs frag_arrival, train by train over the window both logs cover; 9 of 375 trains not heard]
+capture seq gaps (leg2b_t2f_base.jsonl): lost 0/366 = 0.0%  (received 366, 0 gaps, longest 0; 1 codec run; period 0.56 s)
+  first frame heard at seq 10: the 9 frame(s) numbered before it are not in the figure above (the camera numbers from seq 1 at start-up — an acquisition delay or a late capture, RS-13.1 A7); counting from seq 1: 9/375 = 2.4%
+  tractor TX log: 375 frame(s) on air (txdone_arrival); the capture's first frame is its #10, its last #375 (placed by the params.txt clock offsets, within 0.04 s): 9/375 = 2.4% of them never reached the capture (9 before its first, 0 after its last)
+acquisition: first image reception: the base's first decoded frame came 11.1 s after its profile-1 activation (rx_daemon.log line 31 at 18:21:00.086 board time, the frame at line 43), within the FHSS cold-start scan budget of 120 s (4 attempts x 30 s: SX1276_RX_SCAN_MAX_RETRIES 3 + 1, SX1276_RX_SCAN_REDESIGN_MS 30000)
+  confirmed acquisition: ACQUIRED: the base's bracket counts 1 LOCKED -> SCANNING demotion(s) (d(clk_demotion_reset) 1, d(clk_demotion_kept) 0), which only a locked scan makes; the base decoded 366 of the tractor's 375 fragments on air (97.6 %): on its 50-channel hop set a receiver that does not follow the hop grid is on the tractor's channel about one slot in 50, and only a locked scan follows the grid
+radio deltas: {'radio_dio0': 492, 'radio_rx_ok': 366, 'radio_crc_err': 1, 'radio_tx_ok': 125}
+FIRMWARE DROP (drx_ok - host URCs): 366 - 366 = 0
+identity residue: 0
+crc closure: dcrc_err=1 vs crc_dumps=0
+URC-path: rx_urc_lost=7 rx_pretx_drained=0
+RS-12.10: rx_fifo_skip=0 tx_deaf_sum=3754256 us over 125 TX (mean 30.0 ms) tx_deaf_max=30.7 ms tx_done_to_rearm_max=1854 us (max fields: post-bracket values)
+RS-12.15: consider_remote deltas aligned=365 snapped=1 locked_out=0 epoch_drift=0 bad_hop=0 not_init=0 | demotion reset=1 kept=0 | tx_first_anchor delta=0 (post 0) | streak_max post=1

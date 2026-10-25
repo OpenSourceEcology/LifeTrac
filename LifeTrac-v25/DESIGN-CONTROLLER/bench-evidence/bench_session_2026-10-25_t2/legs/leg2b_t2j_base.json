@@ -1,0 +1,131 @@
+{
+  "profile": "image_bw250",
+  "one_fragment_limit": 203,
+  "frames": {
+    "total": 364,
+    "vector": 364,
+    "other": 0,
+    "parse_errors": 0,
+    "by_codec": {
+      "vector": 364
+    }
+  },
+  "wire": {
+    "min": 98,
+    "p50": 201.0,
+    "p95": 203.0,
+    "max": 203,
+    "over_limit": 0
+  },
+  "epoch_starts": 4,
+  "epoch_starts_applied": 4,
+  "arrival": {
+    "span_s": 183.08369040489197,
+    "fps_mean": 1.9826998199414747,
+    "gap_p50_s": 0.5848219394683838,
+    "gap_p95_s": 0.6142759323120117,
+    "gap_max_s": 0.9955940246582031,
+    "first_applied_t_rel_s": 0.0,
+    "frames_before_first_apply": 0
+  },
+  "store": {
+    "frames_rx": 364,
+    "frames_bad": 0,
+    "frames_applied": 364,
+    "epoch_behind": 0,
+    "orphans": 34,
+    "digest_checks": 255,
+    "digest_mismatch": 4,
+    "bad_version": 0,
+    "epochs": 5,
+    "handovers": 4,
+    "ttl_dropped": 0,
+    "resync_events": 1,
+    "resync_digest_ends": 0,
+    "records_applied": 13137,
+    "resync": false,
+    "bad_reasons": {},
+    "epoch": 8,
+    "shapes": 29,
+    "cached_shapes": 0
+  },
+  "resync_episodes": [
+    {
+      "start": 0,
+      "end": 5,
+      "frames": 5,
+      "t_start_s": 0.0,
+      "t_end_s": 2.5997214317321777,
+      "ended_by": "epoch start"
+    }
+  ],
+  "scene": {
+    "epoch": 8,
+    "level": 0,
+    "badge": 7,
+    "digest_ok": true,
+    "horizon_mode": "none",
+    "layers": {
+      "L1": 24,
+      "L2": 0,
+      "L3": 5,
+      "L4": 0
+    },
+    "cal_rev": null,
+    "anchor_age_ms": 25325,
+    "handover": false
+  },
+  "checks": [
+    [
+      "parse_ok",
+      true,
+      "0 unparseable payload(s)"
+    ],
+    [
+      "all_vector",
+      true,
+      "0 non-vector frame(s): {'vector': 364}"
+    ],
+    [
+      "one_fragment",
+      true,
+      "0 over 203 B (epoch starts 202 B); max 203 B"
+    ],
+    [
+      "store_clean",
+      true,
+      "frames_bad=0 "
+    ],
+    [
+      "no_orphans",
+      false,
+      "orphans=34"
+    ],
+    [
+      "digest",
+      false,
+      "255 checked, 4 mismatched, scene digest_ok=True"
+    ],
+    [
+      "epoch_seen",
+      true,
+      "4 epoch start(s) applied of 4 received"
+    ],
+    [
+      "first_apply",
+      true,
+      "0 frame(s) before the first apply"
+    ],
+    [
+      "applied_ratio",
+      true,
+      "364/364 applied = 100.0% (need >= 90%)"
+    ],
+    [
+      "min_frames",
+      true,
+      "364 vector frame(s), need >= 300"
+    ]
+  ],
+  "pass": false
+}
