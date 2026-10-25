@@ -842,7 +842,7 @@ for r in "${RESULTS[@]}"; do say "  $r"; done
 say ""
 say "Still to do by hand (BENCH_SETUP.md):"
 say "  [ ] verify: HC-01 / HC-02 health checks, then '$(basename "$0") $ROLE --check' shows no TODO"
-say "  [ ] L072 bench firmware (build md5 e083ae46a64686031b39866eca42e094): ../FLASH_RUNBOOK.md"
+say "  [ ] L072 bench firmware (mingw32-make bench; the RS-12.21 source builds md5 0daae27978089eb97ab35c18718b62b0, not flashed yet; the bench boards run e083ae46a64686031b39866eca42e094 until then): ../FLASH_RUNBOOK.md"
 if [ "$ROLE" = base ]; then
   say "  [ ] deploy the base tree, image lifetrac-v25 and the broker: DEPLOY.md (deploy_base.sh)"
   say "  [ ] power: the base boots again after 'systemctl poweroff'; remove power to keep it down"

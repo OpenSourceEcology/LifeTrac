@@ -28,7 +28,11 @@ RX_SCAN_FAILED line, a base bracket whose radio_rx_ok outruns the host);
 LOCKED -> SCANNING demotion with --pre/--post, or a share of the tractor's
 fragments only a grid follower decodes); ``NOT DETERMINED`` otherwise, since
 a frame received is not a lock. The base's RX_SCAN_FAILED FAULT lines follow
-when its log holds them. The capture's head (the frames before the first one
+when its log holds them. On the RS-12.21 image (scan option (b), VER
+capability bit 7: --scan-image, default auto) a final RX_SCAN_FAILED is a
+30 s report and the scan goes on, so a lock shown after it is a late
+acquisition, and silence counts over the whole window, not the budget
+(2026-10-24 review). The capture's head (the frames before the first one
 heard, RS-13.1 A7) is placed on the tractor's TX log (``txdone_arrival``) by
 the frame's transport seq, read off rx_daemon.log's published line at its
 capture time (the TileDeltaFrame seq is the camera's own counter), instead of
@@ -109,16 +113,31 @@ PUB_MATCH_S = 0.05
 START_SKEW_S = (-5.0, 40.0)
 
 # 2026-10-24 (leg 6): the FHSS cold-start scan budget. A scan attempt dwells
-# SX1276_RX_SCAN_DWELL_MS (500 ms) per channel and fails after
+# SX1276_RX_SCAN_DWELL_MS per channel (500 ms; 2 s on the RS-12.21 image,
+# option d2, a 50-channel sweep then taking 100 s) and fails after
 # SX1276_RX_SCAN_REDESIGN_MS (30000 ms, sx1276_rx_scan_policy.h); the first
 # attempt and SX1276_RX_SCAN_MAX_RETRIES (3, sx1276_rx_scan_fail.h) retries
-# make 4, and the fourth FAIL enters scan FAILED, which is absorbing
-# (sx1276_rx_scan_policy.c): only a reset or a profile re-activation leaves
-# it, and a follower there never hops. A base that decodes no frame within
-# 4 x 30 s of its profile-1 activation ran out of scan.
+# make 4, and the fourth FAIL is final. Up to the RS-12.21 image it entered
+# scan FAILED, which is absorbing (sx1276_rx_scan_policy.c): only a reset or
+# a profile re-activation leaves it, and a follower there never hops, so a
+# base that decodes no frame within 4 x 30 s of its profile-1 activation ran
+# out of scan. The RS-12.21 image (scan option (b), FHSS_SCAN_FAILED_OPTIONS.md;
+# VER capability bit 7, HOST_CAP_RADIO_PARK) restarts the scan of a node
+# without originator authority at once -- the base always -- and sends a
+# final RX_SCAN_FAILED every 30 s until a LOCK: there a final is a report,
+# not a stop (scan_image() tells the images apart).
 SCAN_ATTEMPT_S = 30.0
 SCAN_MAX_RETRIES = 3
 SCAN_BUDGET_S = SCAN_ATTEMPT_S * (SCAN_MAX_RETRIES + 1)
+# RS-12.21 (b): the restarted attempts' finals come SCAN_ATTEMPT_S apart (each
+# attempt gets a fresh 30 s budget); a log that runs this much longer past
+# the last one without another shows a LOCK within that attempt.
+FINAL_REPEAT_SLACK_S = 5.0
+# The capability bitmap image_rx_daemon.py logs with its VER warm-up line
+# (2026-10-24 review), and its bit for the RS-12.21 image (host_types.h).
+VER_CAP_RE = re.compile(r"L072 VER warm-up ok \(attempt \d+\) cap=0x([0-9A-Fa-f]{8})")
+HOST_CAP_RADIO_PARK = 0x80
+SCAN_IMAGES = ("auto", "restarts", "absorbing")
 # "CFG_SET_REQ(REG_PROFILE=1) OK: 14000100", printed (no timestamp) when the
 # daemon's profile activation is acknowledged; the next timestamped line (the
 # LBT_ENABLE line on every committed archive since 07-25) dates it.
@@ -131,7 +150,8 @@ DECODED_RE = re.compile(r"frag_arrival: seq=|published frame_id=")
 # per URC from both daemons (format_fault_urc_line, method_g_stage1_probe.py).
 # The same URC can leave a legacy line beside its FAULT_URC line, so when a
 # log holds FAULT_URC lines (with name=) only they are counted. Code 0x0D is
-# HOST_FAULT_CODE_RX_SCAN_FAILED and also TX_FIFO_RB_MISMATCH (host_types.h):
+# HOST_FAULT_CODE_RX_SCAN_FAILED; it was also TX_FIFO_RB_MISMATCH on images
+# before the 0x0D split (e083ae46 and older; 0x0F since 2026-10-24):
 # the daemon's name= decides it when it names one of them, else (AMBIGUOUS,
 # or a legacy line) scan_fault_sub() reads the sub-byte by the scan layout.
 FAULT_RE = re.compile(r"\bFAULT\w*\b.*?\bcode=0x([0-9A-Fa-f]{2}) sub=0x([0-9A-Fa-f]{2})")
@@ -152,12 +172,13 @@ PROFILE_NAMES = {"0": "bench-only fixed 915 MHz", "1": "FHSS", "2": "DTS"}
 ACQUIRED, FAILED, UNDETERMINED = "ACQUIRED", "FAILED", "NOT DETERMINED"
 # SX1276_RX_SCAN_LOCK_LOSS_MS (sx1276_rx_scan_policy.h): a LOCKED scan drops
 # back to SCANNING only once SX1276_RX_SCAN_LOCK_LOSS_MS has passed since its
-# channel anchor, and a LOCK resets the attempt count but keeps that anchor
-# (sx1276_rx.c scan_drive: LOCK leaves the anchors unchanged), which the
-# activation's BEGIN_SCAN set (sx1276_rx_scan_reset -> BOOT -> BEGIN_SCAN) or
-# a later ADVANCE moved on. So a lock and its loss take at least this long
-# from the activation, and a final RX_SCAN_FAILED less than SCAN_BUDGET_S +
-# this after it ends 4 attempts with no lock. For this rule the activation
+# channel anchor, and a LOCK resets the attempt count. Up to the RS-12.21
+# image a LOCK kept that anchor (sx1276_rx.c scan_drive: LOCK left the anchors
+# unchanged), which the activation's BEGIN_SCAN set (sx1276_rx_scan_reset ->
+# BOOT -> BEGIN_SCAN) or a later ADVANCE moved on; from it (RS-12.21 L) a LOCK
+# anchors it at the locking frame. Either way a lock and its loss take at
+# least this long from the activation, and a final RX_SCAN_FAILED less than
+# SCAN_BUDGET_S + this after it ends 4 attempts with no lock. For this rule the activation
 # is dated by the last timestamped line before it, never later than it, so
 # the fault's time from it is never read short (the timestamped lines either
 # side of it are 0.34-0.42 s apart on the 45 committed profile-1 archives).
@@ -830,8 +851,8 @@ def scan_fault_sub(sub: int, strict: bool = True) -> dict | None:
     ``crc_seen`` (bit 4, never with hw_suspect), ``marker``: 0x80, the
     final attempt 0 sx1276_rx_scan_fail_eval sends for a NULL input (its
     defensive path). None when the byte does not fit that layout: code 0x0D
-    is also TX_FIFO_RB_MISMATCH (host_types.h), whose sub is the fragment's
-    tx_id. The same 25 values as rx_scan_fail_sub_valid
+    was also TX_FIFO_RB_MISMATCH on images before the 0x0D split (e083ae46
+    and older), whose sub is the fragment's tx_id. The same 25 values as rx_scan_fail_sub_valid
     (method_g_stage1_probe.py, the daemons' decoder). ``strict`` False reads
     the bits whatever they hold (the daemon named the URC RX_SCAN_FAILED)."""
     attempt, final = sub & SCAN_SUB_ATTEMPT, bool(sub & SCAN_SUB_FINAL)
@@ -869,8 +890,45 @@ def bracket_demotions(pre: dict | None, post: dict | None) -> tuple[int, int] | 
     return None if d is None else (d["clk_demotion_reset"], d["clk_demotion_kept"])
 
 
+def scan_image(lines: list[str], act: int, faults: list[dict],
+               override: str = "auto") -> tuple[bool | None, str]:
+    """``(restarts, source)``: whether the base's image restarts its scan
+    after a final RX_SCAN_FAILED (the RS-12.21 image, scan option (b): True)
+    or keeps an absorbing FAILED (every image before it: False), or None when
+    nothing here says (then read as absorbing, the rule those images need),
+    and what says so. In order: ``override`` (--scan-image restarts /
+    absorbing; "auto" reads on); the capability bitmap on the last
+    image_rx_daemon.py VER warm-up line before the activation (logged from the
+    2026-10-24 review on; bit 7, HOST_CAP_RADIO_PARK, is the RS-12.21 image's);
+    an RX_SCAN_FAILED after a final one in the window (``faults``, the scan
+    faults), which an absorbing FAILED never sends."""
+    if override not in SCAN_IMAGES:
+        raise ValueError(f"scan image {override!r}: one of {', '.join(SCAN_IMAGES)}")
+    if override != "auto":
+        return override == "restarts", f"--scan-image {override} given"
+    for n in range(act - 1, -1, -1):
+        m = VER_CAP_RE.search(lines[n])
+        if m:
+            cap = int(m.group(1), 16)
+            bit = "set" if cap & HOST_CAP_RADIO_PARK else "clear"
+            return bool(cap & HOST_CAP_RADIO_PARK), (
+                f"rx_daemon.log line {n + 1} logs the L072's VER capability bitmap "
+                f"0x{cap:08X}, bit 7 (HOST_CAP_RADIO_PARK, the RS-12.21 image) {bit}")
+    finals = [f for f in faults if f["scan"]["final"]]
+    # (later by more than a second line of the same URC could be: the next
+    # report comes a 30 s attempt later at the soonest)
+    later = [f for f in faults if finals and f["line"] > finals[0]["line"]
+             and f["t"] > finals[0]["t"] + FINAL_REPEAT_SLACK_S]
+    if later:
+        return True, (f"the base sent an RX_SCAN_FAILED at rx_daemon.log line "
+                      f"{later[0]['line']} after its final one at line {finals[0]['line']}, "
+                      f"which only an image that restarts its scan does")
+    return None, ("rx_daemon.log logs no VER capability bitmap (image_rx_daemon.py "
+                  "before the 2026-10-24 review) and no RX_SCAN_FAILED after a final one")
+
+
 def acquisition(rx: str, tx: str | None = None, pre: dict | None = None,
-                post: dict | None = None) -> dict:
+                post: dict | None = None, image: str = "auto") -> dict:
     """The base's FHSS cold-start acquisition (2026-10-24, leg 6), one rule
     for rs12_leg_report.py and rs13_probe_score.py.
 
@@ -888,24 +946,42 @@ def acquisition(rx: str, tx: str | None = None, pre: dict | None = None,
     always on while the RX worker lives: ``crash``, when it died, ends both).
 
     ``status``, on positive evidence only (``basis`` says which; ``failed``
-    True / False / None for FAILED / ACQUIRED / NOT DETERMINED):
+    True / False / None for FAILED / ACQUIRED / NOT DETERMINED). The rules
+    depend on the base's image (``restarts`` and ``image``, scan_image():
+    ``image`` "auto", or "restarts" / "absorbing" from --scan-image); an
+    image not identified is read as absorbing, every image before RS-12.21:
 
-    * FAILED on firmware evidence: a final RX_SCAN_FAILED that is cold
-      (warm=0: never locked since the L072 booted), or that came less than
-      SCAN_BUDGET_S + SCAN_LOCK_LOSS_S after the activation (4 attempts in a
-      row with no lock; the activation dated by the last timestamped line
-      before it). This wins over a lock shown;
-    * FAILED on silence: no reception shown within SCAN_BUDGET_S, and an
-      instrument known to be on that shows none (a stats line after the
-      budget still at the activation's rx_frames, the RX worker alive; or
-      per-fragment logging on, a frag_arrival line anywhere, with none in
-      the budget), and nothing that contradicts it: no lock shown (below), no
-      FAULT_URC-logging daemon (``logged``) without an RX_SCAN_FAILED line,
-      no base bracket whose d(radio_rx_ok) exceeds the host's count by more
-      than d(rx_urc_lost) + HOST_DROP_SLACK (in a window no switch cut, the
-      bracket spanning the leg). With a contradiction it is NOT
-      DETERMINED, naming it: the scan's FAILED is absorbing, so the silence
-      is the host's, not the scan's;
+    * FAILED on firmware evidence, absorbing image: a final RX_SCAN_FAILED
+      that is cold (warm=0: never locked since the L072 booted), or that
+      came less than SCAN_BUDGET_S + SCAN_LOCK_LOSS_S after the activation
+      (4 attempts in a row with no lock; the activation dated by the last
+      timestamped line before it). This wins over a lock shown: FAILED is
+      absorbing, so nothing locks after it;
+    * the same finals on the RS-12.21 image (scan option (b)) are 30 s
+      reports: its scan restarts at once and sends a final every 30 s
+      until a LOCK. From the first such final the chain of finals runs to a
+      sign of a LOCK (a later RX_SCAN_FAILED that is not final, or warm
+      after a cold one), else to the last final. A lock shown is placed
+      after the chain by that sign, by a cold last final (no lock before
+      it), or by a FAULT_URC-logging log that runs more than SCAN_ATTEMPT_S
+      + FINAL_REPEAT_SLACK_S past it with no further final: then the lock
+      counts, as a late acquisition (``basis`` says after which final).
+      Without a placement, and with the log ending (or FAULT_URC logging
+      off) within that span of the last final, it is FAILED with no lock
+      shown, NOT DETERMINED with one (the bracket and the fragment share
+      span the leg). A sign of a LOCK is itself a lock shown;
+    * FAILED on silence: no reception shown within SCAN_BUDGET_S (on the
+      RS-12.21 image: in the whole window -- its scan does not strand), and
+      an instrument known to be on that shows none (a stats line after the
+      budget, or the window's last, still at the activation's rx_frames, the
+      RX worker alive; or per-fragment logging on, a frag_arrival line
+      anywhere, with none in the budget or the window), and nothing that
+      contradicts it: no lock shown (below), no FAULT_URC-logging daemon
+      (``logged``) without an RX_SCAN_FAILED line, no base bracket whose
+      d(radio_rx_ok) exceeds the host's count by more than d(rx_urc_lost) +
+      HOST_DROP_SLACK (in a window no switch cut, the bracket spanning the
+      leg). With a contradiction it is NOT DETERMINED, naming it: the
+      silence is the host's, not the scan's;
     * ACQUIRED: no FAILED, and a lock shown in a window no switch cut: the
       base bracket (``pre`` / ``post``, parse_stats) counts a LOCKED ->
       SCANNING demotion, or the base decoded at least GRID_SHARE of the
@@ -1023,7 +1099,11 @@ def acquisition(rx: str, tx: str | None = None, pre: dict | None = None,
     for ln in lines[:acts[0]]:       # the start-up configuration's mask
         mask = MASK_RE.search(ln) or mask
     channels = (int(mask.group(1)) if mask.group(1) else 1) if mask else None
-    out.update(applies=True, t_act=t_act, act_line=at + 1,
+    restarts, image_why = scan_image(
+        lines, acts[0], [f for f in faults if f["scan"] and not f["scan"]["marker"]
+                         and f["name"] != "AMBIGUOUS"], image)
+    out.update(applies=True, t_act=t_act, act_line=at + 1, restarts=restarts,
+               image=image_why,
                lag=None if lo is None else t_act - _log_time(lines[lo]),
                lo_line=None if lo is None else lo + 1, cut=cut, crash=crash,
                first=first, first_line=first_line, first_frag=first_frag, heard=heard,
@@ -1038,30 +1118,11 @@ def acquisition(rx: str, tx: str | None = None, pre: dict | None = None,
     return out
 
 
-def _acquisition_verdict(acq: dict) -> tuple[str, str]:
-    """``(status, basis)`` for :func:`acquisition` (its docstring has the rule)."""
-    budget = SCAN_BUDGET_S
-    final = [f for f in acq["faults"] if f["scan"] and f["scan"]["final"]
-             and not f["scan"]["marker"] and f["name"] != "AMBIGUOUS"]
-    failed = []
-    for f in final:
-        where = (f"the base's final RX_SCAN_FAILED at +{f['t']:.1f} s (rx_daemon.log line "
-                 f"{f['line']}, sub 0x{f['sub']:02X})")
-        if not f["scan"]["warm"]:
-            failed.append(f"{where} is cold (warm=0): the base's L072 had not locked since it "
-                          f"booted")
-        elif acq["lag"] is not None and f["t"] + acq["lag"] < budget + SCAN_LOCK_LOSS_S:
-            failed.append(f"{where} came less than {budget + SCAN_LOCK_LOSS_S:g} s after the "
-                          f"activation (at most +{f['t'] + acq['lag']:.1f} s from rx_daemon.log "
-                          f"line {acq['lo_line']}, the last timestamped line before it): 4 scan "
-                          f"attempts failed in a row from it (a lock resets the attempt count "
-                          f"but keeps the channel anchor the activation's BEGIN_SCAN set, so a "
-                          f"locked scan drops back to scanning no sooner than "
-                          f"SX1276_RX_SCAN_LOCK_LOSS_MS {SCAN_LOCK_LOSS_S * 1000:.0f} after the "
-                          f"activation)")
-    if failed:
-        return FAILED, "; ".join(failed)
-    cut, crash = acq["cut"], acq["crash"]
+def _lock_evidence(acq: dict) -> tuple[list[str], list[str]]:
+    """``(locked, short)`` for :func:`_acquisition_verdict`: what shows a lock
+    in the window (a bracket demotion, the grid share), and what falls short
+    of showing one."""
+    cut = acq["cut"]
     locked, short = [], []
     if cut:
         # the bracket and the tractor's fragments span the leg, not the scan
@@ -1069,43 +1130,151 @@ def _acquisition_verdict(acq: dict) -> tuple[str, str]:
                      f"{cut['line']} (+{cut['t']:.1f} s), which stops the FHSS scan: what it "
                      f"decoded after that is not the scan's, so neither its share of the "
                      f"tractor's fragments nor a bracket demotion is weighed")
-    else:
-        dem = acq["demotions"]
-        if dem and sum(dem):
-            locked.append(f"the base's bracket counts {sum(dem)} LOCKED -> SCANNING "
-                          f"demotion(s) (d(clk_demotion_reset) {dem[0]}, d(clk_demotion_kept) "
-                          f"{dem[1]}), which only a locked scan makes")
-        elif dem:
-            short.append("the base's bracket counts no LOCKED -> SCANNING demotion")
-        rx_n, tx_n, ch = acq["rx_frags"], acq["tx_frags"], acq["channels"]
-        if tx_n and ch and ch >= GRID_MIN_CHANNELS:
-            least = "" if acq["rx_exact"] else "at least "
-            share = (f"the base decoded {least}{rx_n} of the tractor's {tx_n} fragments on air "
-                     f"({least}{100 * rx_n / tx_n:.1f} %)")
-            if rx_n >= GRID_SHARE * tx_n:
-                locked.append(f"{share}: on its {ch}-channel hop set a receiver that does not "
-                              f"follow the hop grid is on the tractor's channel about one slot "
-                              f"in {ch}, and only a locked scan follows the grid")
-            elif not acq["rx_exact"]:
-                short.append(f"the base's fragment count is unknown: its stats thread died "
-                             f"(rx_daemon.log holds '{STATS_CRASH}') and per-fragment logging "
-                             f"was off, so its published frames give only a floor ({share})")
-            else:
-                short.append(f"{share}, under the {100 * GRID_SHARE:g} % that shows a receiver "
-                             f"following its {ch}-channel hop grid")
-        elif not tx_n:
-            short.append("no tractor fragment count (tx_daemon.log) to weigh the base's against")
+        return locked, short
+    dem = acq["demotions"]
+    if dem and sum(dem):
+        locked.append(f"the base's bracket counts {sum(dem)} LOCKED -> SCANNING "
+                      f"demotion(s) (d(clk_demotion_reset) {dem[0]}, d(clk_demotion_kept) "
+                      f"{dem[1]}), which only a locked scan makes")
+    elif dem:
+        short.append("the base's bracket counts no LOCKED -> SCANNING demotion")
+    rx_n, tx_n, ch = acq["rx_frags"], acq["tx_frags"], acq["channels"]
+    if tx_n and ch and ch >= GRID_MIN_CHANNELS:
+        least = "" if acq["rx_exact"] else "at least "
+        share = (f"the base decoded {least}{rx_n} of the tractor's {tx_n} fragments on air "
+                 f"({least}{100 * rx_n / tx_n:.1f} %)")
+        if rx_n >= GRID_SHARE * tx_n:
+            locked.append(f"{share}: on its {ch}-channel hop set a receiver that does not "
+                          f"follow the hop grid is on the tractor's channel about one slot "
+                          f"in {ch}, and only a locked scan follows the grid")
+        elif not acq["rx_exact"]:
+            short.append(f"the base's fragment count is unknown: its stats thread died "
+                         f"(rx_daemon.log holds '{STATS_CRASH}') and per-fragment logging "
+                         f"was off, so its published frames give only a floor ({share})")
         else:
-            short.append(f"rx_daemon.log names no FHSS hop set of {GRID_MIN_CHANNELS} or more "
-                         f"channels to weigh the base's fragment count against")
+            short.append(f"{share}, under the {100 * GRID_SHARE:g} % that shows a receiver "
+                         f"following its {ch}-channel hop grid")
+    elif not tx_n:
+        short.append("no tractor fragment count (tx_daemon.log) to weigh the base's against")
+    else:
+        short.append(f"rx_daemon.log names no FHSS hop set of {GRID_MIN_CHANNELS} or more "
+                     f"channels to weigh the base's fragment count against")
+    return locked, short
+
+
+def _acquisition_verdict(acq: dict) -> tuple[str, str]:
+    """``(status, basis)`` for :func:`acquisition` (its docstring has the rule)."""
+    budget = SCAN_BUDGET_S
+    restarts = bool(acq["restarts"])
+    scan = [f for f in acq["faults"] if f["scan"] and not f["scan"]["marker"]
+            and f["name"] != "AMBIGUOUS"]
+    final = [f for f in scan if f["scan"]["final"]]
+    # 2026-10-24 review: RS-12.21 L anchors the loss timer at the LOCK itself
+    anchor = ("on this image anchors the loss timer at the locking frame (RS-12.21 L)"
+              if restarts else "keeps the channel anchor the activation's BEGIN_SCAN set")
+    failed = []                  # (fault, why): the finals the absorbing rule reads as FAILED
+    for f in final:
+        where = (f"the base's final RX_SCAN_FAILED at +{f['t']:.1f} s (rx_daemon.log line "
+                 f"{f['line']}, sub 0x{f['sub']:02X})")
+        if not f["scan"]["warm"]:
+            failed.append((f, f"{where} is cold (warm=0): the base's L072 had not locked "
+                              f"since it booted"))
+        elif acq["lag"] is not None and f["t"] + acq["lag"] < budget + SCAN_LOCK_LOSS_S:
+            failed.append((f, f"{where} came less than {budget + SCAN_LOCK_LOSS_S:g} s after "
+                              f"the activation (at most +{f['t'] + acq['lag']:.1f} s from "
+                              f"rx_daemon.log line {acq['lo_line']}, the last timestamped line "
+                              f"before it): 4 scan attempts failed in a row from it (a lock "
+                              f"resets the attempt count but {anchor}, so a locked scan drops "
+                              f"back to scanning no sooner than SX1276_RX_SCAN_LOCK_LOSS_MS "
+                              f"{SCAN_LOCK_LOSS_S * 1000:.0f} after the activation)"))
+    if failed and not restarts:
+        return FAILED, "; ".join(why for _f, why in failed)
+    cut, crash = acq["cut"], acq["crash"]
+    locked, short = _lock_evidence(acq)
+    late = None
+    if failed:
+        # RS-12.21 (b), 2026-10-24 review: on this image a final is a 30 s
+        # report. The chain of finals from the first one the absorbing rule
+        # would read as FAILED runs to a sign of a LOCK, else to the last.
+        first = failed[0][0]
+        last, sign, n = first, None, 1
+        for f in scan:
+            if f["line"] <= first["line"]:
+                continue
+            if f["sub"] == last["sub"] and f["t"] <= last["t"] + FINAL_REPEAT_SLACK_S:
+                continue                    # a second line of the same URC
+            if not f["scan"]["final"] or (f["scan"]["warm"] and not last["scan"]["warm"]):
+                sign = f
+                break
+            last, n = f, n + 1
+        reports = (f"{failed[0][1]}, but on this image a final is a {SCAN_ATTEMPT_S:g} s "
+                   f"report, not a stop (RS-12.21 scan option (b): the scan restarts at once "
+                   f"and reports again every {SCAN_ATTEMPT_S:g} s until a LOCK; "
+                   f"{acq['image']})"
+                   + (f"; {n} final reports in a row, the last at +{last['t']:.1f} s "
+                      f"(rx_daemon.log line {last['line']})" if n > 1 else ""))
+        gap = acq["span"] - last["t"]
+        quiet = (sign is None and acq["logged"]
+                 and gap > SCAN_ATTEMPT_S + FINAL_REPEAT_SLACK_S)
+        if sign is not None:
+            s = sign["scan"]
+            locked.append(f"the base's RX_SCAN_FAILED at +{sign['t']:.1f} s (rx_daemon.log "
+                          f"line {sign['line']}, sub 0x{sign['sub']:02X}) is "
+                          + (f"attempt {s['attempt']}, not final: the attempt count restarts "
+                             f"only at a LOCK" if not s["final"] else
+                             "warm after a cold one: the L072 sets warm at a LOCK"))
+            placed = (f"the scan locked between +{last['t']:.1f} s and +{sign['t']:.1f} s")
+        elif locked and not last["scan"]["warm"]:
+            placed = (f"the last final is cold (warm=0: no lock since the L072 booted), so the "
+                      f"lock shown came after +{last['t']:.1f} s")
+        elif locked and quiet:
+            placed = (f"no RX_SCAN_FAILED followed the last final in the {gap:.1f} s the log "
+                      f"runs past it, so the lock shown came within {SCAN_ATTEMPT_S:g} s of "
+                      f"+{last['t']:.1f} s")
+        else:
+            placed = None
+        if placed is not None:
+            late = f"a late acquisition: {reports}; {placed}"
+        elif not quiet:
+            tail = (f"the log ends {gap:.1f} s after the last final, within the "
+                    f"{SCAN_ATTEMPT_S + FINAL_REPEAT_SLACK_S:g} s a next report may take"
+                    if acq["logged"] else
+                    "this daemon does not log every FAULT_URC (no FAULT_URC line), so no "
+                    "missing report shows a lock")
+            if locked:
+                return UNDETERMINED, (f"{reports}; nothing places the lock shown after the "
+                                      f"last final ({tail}), and its evidence spans the leg: "
+                                      + "; ".join(locked))
+            return FAILED, f"{reports}; nothing shows a lock after the last final ({tail})"
+        else:
+            short.append(f"{reports}; no RX_SCAN_FAILED followed the last final in the "
+                         f"{gap:.1f} s the log runs past it, which on this image means a LOCK "
+                         f"within {SCAN_ATTEMPT_S:g} s of it unless its FAULT URCs were lost, "
+                         f"but nothing else shows one")
     if crash:
         short.append(f"the base's image-rx-worker thread died at +{crash[0]:.1f} s "
                      f"(rx_daemon.log line {crash[1]}): its stats counter and frag_arrival "
                      f"lines stop counting there")
     first, heard, quiet = acq["first"], acq["heard"], acq["quiet"]
-    within = (first is not None and first <= budget) or bool(heard and heard[0] <= budget)
+    # RS-12.21 (b): a scan that misses its budget does not strand, so silence
+    # counts over the whole window, not the budget
+    if restarts:
+        within = first is not None or bool(heard)
+        scope = f"in the {acq['span']:.1f} s window"
+    else:
+        within = (first is not None and first <= budget) or bool(heard and heard[0] <= budget)
+        scope = f"within the {budget:g} s budget"
     silent = []
-    if not within:
+    if not within and restarts:
+        if quiet and not crash and not acq["stats_dead"]:
+            silent.append(f"the base's stats counter still read rx_frames={acq['base_rx']} at "
+                          f"+{quiet[0]:.1f} s (rx_daemon.log line {quiet[1]}), its last stats "
+                          f"line in the window (always on, it counts every image fragment, "
+                          f"logged or not)")
+        if acq["frag_on"] and acq["first_frag"] is None and not crash:
+            silent.append("per-fragment logging was on (rx_daemon.log holds frag_arrival "
+                          f"lines) and none came in the {acq['span']:.1f} s window")
+    elif not within:
         if quiet and quiet[0] > budget:
             silent.append(f"the base's stats counter still read rx_frames={acq['base_rx']} at "
                           f"+{quiet[0]:.1f} s (rx_daemon.log line {quiet[1]}; always on, it "
@@ -1132,32 +1301,36 @@ def _acquisition_verdict(acq: dict) -> tuple[str, str]:
             doubt.append(f"the base's bracket counts d(radio_rx_ok) {rx_ok} against the host's "
                          f"{rx_n} (FIRMWARE DROP {rx_ok - rx_n}, d(rx_urc_lost) "
                          f"{acq['urc_lost']}): the L072 delivered frames the host never counted")
-        text = "; ".join(silent) + f": no image fragment reached the base within the {budget:g} s budget"
+        text = "; ".join(silent) + f": no image fragment reached the base {scope}"
         if not doubt:
             return FAILED, text + ", and its scan locks only on a frame it decodes"
+        why = ("A scan that runs out reports it and scans on (this image restarts it, "
+               "RS-12.21 (b)), so this silence is the host's, not the scan's" if restarts else
+               "The scan's FAILED is absorbing (only a re-activation leaves it), so this "
+               "silence is the host's, not the scan's")
         return UNDETERMINED, (
-            text + " by the host's count, but " + "; ".join(doubt) + ". The scan's FAILED is "
-            "absorbing (only a re-activation leaves it), so this silence is the host's, not "
-            "the scan's: its RX path missed what the base received (UART contention, a "
-            "stalled RX worker, lost URCs), or the base locked on a command frame, which "
-            "rx_frames does not count")
+            text + " by the host's count, but " + "; ".join(doubt) + f". {why}: its RX path "
+            "missed what the base received (UART contention, a stalled RX worker, lost "
+            "URCs), or the base locked on a command frame, which rx_frames does not count")
     if locked:
-        return ACQUIRED, "; ".join(locked)
+        return ACQUIRED, "; ".join(locked + ([late] if late else []))
     if within:
         lead = ("a frame received is not a lock (sx1276_rx.c still delivers a frame whose FHSS "
                 "header it rejected), and nothing here shows one")
-    elif first is None and not heard and acq["span"] <= budget:
+    elif first is None and not heard and acq["span"] <= budget and not restarts:
         lead = (f"the scan ran {acq['span']:.1f} s before the base's profile switch, no more "
                 f"than the budget" if cut else
                 f"the base's log covers {acq['span']:.1f} s, no more than the budget")
     else:
         lead = (("the base's first frame line came past the budget" if first is not None or heard
                  else "the base's log holds no frame line")
-                + ", but no instrument known to be on shows that no frame reached it within "
-                  "the budget"
-                + ("" if crash else f" (no stats line after it still at "
-                                    f"rx_frames={acq['base_rx']}, no frag_arrival line to show "
-                                    f"per-fragment logging on)"))
+                + ", but no instrument known to be on shows that no frame reached it "
+                + ("in the window" if restarts else "within the budget")
+                + ("" if crash else
+                   " (no live stats line in it, no frag_arrival line to show per-fragment "
+                   "logging on)" if restarts else
+                   f" (no stats line after it still at rx_frames={acq['base_rx']}, no "
+                   f"frag_arrival line to show per-fragment logging on)"))
     return UNDETERMINED, "; ".join([lead] + short)
 
 
@@ -1237,12 +1410,28 @@ def format_acquisition(acq: dict) -> list[str]:
                 f" The tractor logged {acq['tractor']} frame(s) on air."
                 + (" It sent nothing, so the scan had nothing to find."
                    if not acq["tractor"] else ""))
-        out.append(f"  !! ACQUISITION FAILED: {acq['basis']}. Its scan ran out into FAILED, "
-                   "which is absorbing (sx1276_rx_scan_policy.c): a follower there never "
-                   "hops and hears only what crosses the channel it is parked "
-                   "on, until a reset or a profile re-activation. This leg's "
-                   "loss and command figures measure that, not the link "
-                   "(2026-10-24 leg 6)." + sent)
+        if acq["restarts"]:
+            # 2026-10-24 review: the RS-12.21 image does not strand the scan
+            out.append(f"  !! ACQUISITION FAILED: {acq['basis']}. This image restarts the "
+                       "scan after each final RX_SCAN_FAILED (RS-12.21 scan option (b)), so "
+                       "the base was not stranded on one channel, but it never locked onto "
+                       "the tractor's hop grid in the window: this leg's loss and command "
+                       "figures measure an unacquired base, not the link." + sent)
+        else:
+            # 2026-10-24 review: an image not identified is read by the old
+            # rule; say so, and how to read it as the RS-12.21 image
+            unknown = ("" if acq["restarts"] is not None else
+                       f" The base's image was not identified ({acq['image']}), so the "
+                       "rule of every image before RS-12.21 read it; the RS-12.21 image "
+                       "(VER capability bit 7) restarts its scan after a final "
+                       "RX_SCAN_FAILED and counts silence over the whole window -- if it "
+                       "flew, run again with --scan-image restarts.")
+            out.append(f"  !! ACQUISITION FAILED: {acq['basis']}. Its scan ran out into "
+                       "FAILED, which is absorbing on every image before RS-12.21 "
+                       "(sx1276_rx_scan_policy.c): a follower there never hops and hears "
+                       "only what crosses the channel it is parked on, until a reset or a "
+                       "profile re-activation. This leg's loss and command figures measure "
+                       "that, not the link (2026-10-24 leg 6)." + unknown + sent)
     else:
         out.append(f"  confirmed acquisition: {acq['status']}: {acq['basis']}")
     scan = [f for f in acq["faults"] if f["scan"]]
@@ -1269,7 +1458,10 @@ def format_acquisition(acq: dict) -> list[str]:
             out.append(f"  !! the base's final RX_SCAN_FAILED at +{f['t']:.1f} s "
                        f"(rx_daemon.log line {f['line']}, sub 0x{f['sub']:02X}"
                        + (", AMBIGUOUS with TX_FIFO_RB_MISMATCH" if amb else "")
-                       + "): its scan entered FAILED there"
+                       + ("): its scan reported FAILED there and scanned on (this image "
+                          "restarts it at once and reports every 30 s until a LOCK, "
+                          "RS-12.21 (b))" if acq["restarts"] else
+                          "): its scan entered FAILED there")
                        + (" if this URC was the scan's (the daemon could not rule "
                           "out a TX FIFO readback mismatch on a TX with that tx_id)"
                           if amb else ""))
@@ -1320,6 +1512,12 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--capture", type=pathlib.Path,
                     help="base-side vector_dry_run capture JSONL: adds the "
                          "frame loss from TileDeltaFrame sequence gaps")
+    ap.add_argument("--scan-image", choices=SCAN_IMAGES, default="auto",
+                    help="how the base's L072 image treats a final RX_SCAN_FAILED: "
+                         "'restarts' (the RS-12.21 image, scan option (b): a 30 s "
+                         "report, the scan goes on) or 'absorbing' (every image "
+                         "before it); 'auto' (default) reads the VER capability "
+                         "bitmap image_rx_daemon.py logs, else the faults")
     args = ap.parse_args(argv)
 
     rx = (args.archive / "rx_daemon.log").read_text(encoding="utf-8",
@@ -1346,7 +1544,7 @@ def main(argv: list[str] | None = None) -> int:
                     if args.pre and args.post else (None, None))
     except OSError:
         brackets = (None, None)
-    acq = acquisition(rx, tx, *brackets)
+    acq = acquisition(rx, tx, *brackets, image=args.scan_image)
     print("!! ACQUISITION FAILED (see the acquisition line below)"
           if acq.get("failed") else "")
     # 2026-10-19: every harness up to the 10-19 legs read the daemon logs

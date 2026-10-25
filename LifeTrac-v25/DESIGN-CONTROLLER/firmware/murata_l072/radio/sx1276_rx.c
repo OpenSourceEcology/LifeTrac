@@ -79,7 +79,18 @@ static void     rx_pll_settle_busy_wait(uint32_t delay_us);
  * teaches the pointer. */
 static sx1276_rx_fifo_track_t s_rx_fifo_track;
 
+/* RS-12.21 (2026-10-24): the firmware radio park (sx1276_rx.h; the API is at
+ * the end of this file). Zero-initialised, so every reset clears it. */
+static uint8_t  s_host_parked;
+static uint32_t s_host_parked_ms;     /* platform_now_ms() at the park */
+
 bool sx1276_rx_arm(void) {
+    /* RS-12.21: the park's backstop. Every arm path also returns before its
+     * standby/retune while parked (so the modem stays in SLEEP); this
+     * catches any that does not, sx1276_tx.c's post-TX re-arm included. */
+    if (s_host_parked != 0U) {
+        return false;
+    }
     if (!sx1276_modes_to_rx_cont()) {
         return false;
     }
@@ -100,12 +111,22 @@ void sx1276_rx_disarm(void) {
 
 void sx1276_rx_note_external_arm(void) {
     sx1276_rx_fifo_track_reset(&s_rx_fifo_track);
+    /* RS-12.21: the host armed the receiver itself -- the park is over. */
+    sx1276_rx_unpark();
 }
 
 bool sx1276_rx_service(uint32_t events, sx1276_rx_frame_t *out_frame) {
     uint8_t irq_flags;
 
     if ((events & SX1276_EVT_DIO0) == 0U || out_frame == NULL) {
+        return false;
+    }
+
+    /* RS-12.21 (2026-10-24): an edge latched before the park (host frames
+     * are dispatched before the radio events in main.c's pass). The modem
+     * is asleep and its IRQ flags were cleared at the park: read nothing,
+     * and let no packet adopt a grid or move the frozen scan machine. */
+    if (s_host_parked != 0U) {
         return false;
     }
 
@@ -383,6 +404,9 @@ static uint32_t               s_scan_cold_start_entry_ms;
  *                                   Incremented by A6c-3-c FAIL handler;
  *                                   reset on LOCK. Saturates so the
  *                                   `sub` 4-bit attempt field is safe.
+ *                                   RS-12.21 (b): stays at MAX across
+ *                                   the restarts out of FAILED, so every
+ *                                   later FAIL is final until a LOCK.
  *   s_scan_got_any_irq            — any DIO0 event observed by
  *                                   sx1276_rx_service() since the last
  *                                   BEGIN_SCAN/ADVANCE_CHANNEL. Used
@@ -420,8 +444,12 @@ void sx1276_rx_tick(uint32_t now_ms) {
      * γ-1 must NOT also retune or the two loops will fight. The
      * counter is intentionally NOT recorded for the gated-out case
      * — γ-1 simply did not run, and the scan counters already
-     * capture what happened in that interval. */
-    if (s_scan_state != SX1276_RX_SCAN_STATE_LOCKED) {
+     * capture what happened in that interval.
+     * RS-12.21 (2026-10-24): gated out the same way while the host has
+     * the radio parked (a parked node may sit LOCKED: the scan machine
+     * is frozen), before any standby/retune/re-arm. */
+    if (s_host_parked != 0U ||
+        s_scan_state != SX1276_RX_SCAN_STATE_LOCKED) {
         /* Drop the anchor so the first tick post-LOCK re-anchors
          * cleanly rather than firing a spurious DO_WRAP off stale
          * pre-LOCK timing. */
@@ -516,7 +544,11 @@ void sx1276_rx_tick(uint32_t now_ms) {
  *   BEGIN_SCAN      → channel + cold = now_ms (BOOT → SCANNING entry)
  *   ADVANCE_CHANNEL → channel        = now_ms (cold budget preserved)
  *   REANCHOR        → channel + cold = now_ms (clock-glitch recovery)
- *   LOCK / FAIL / HOLD → anchors unchanged (terminal states or no-op)
+ *   LOCK            → channel        = now_ms (RS-12.21 L, 2026-10-24:
+ *                                     the LOCKED loss timer starts at
+ *                                     the locking frame)
+ *   FAIL / HOLD     → anchors unchanged (FAIL: the dispatcher re-anchors
+ *                     both when it leaves FAILED, scan_leave_failed)
  */
 #ifdef LIFETRAC_FHSS_TX_ROUTED
 
@@ -558,6 +590,8 @@ static uint8_t rx_follow_now(void) {
  * intended action; A6c-2-c-ii could add a saturating "dispatch
  * refused" sub-counter if observability demands it.
  */
+static void scan_leave_failed(uint32_t now_ms);
+
 static void scan_dispatch_action(sx1276_rx_scan_action_t action,
                                  uint32_t                now_ms) {
     switch (action) {
@@ -567,7 +601,15 @@ static void scan_dispatch_action(sx1276_rx_scan_action_t action,
              * non-final retry resumes from a deterministic point
              * rather than wherever ADVANCE_CHANNEL last left the
              * walker mid-pass. ADVANCE_CHANNEL deliberately does
-             * NOT reset — it must keep marching through the table. */
+             * NOT reset — it must keep marching through the table.
+             *
+             * RS-12.21 d2 (2026-10-24): a retry no longer comes through
+             * here. At the 2 s dwell an attempt covers only 15 channels,
+             * so the retries and (b)'s restarts out of FAILED continue
+             * the walk (scan_leave_failed dispatches ADVANCE_CHANNEL)
+             * and a silent node's attempts cover all 50 channels. Only
+             * a fresh acquisition -- BOOT (activation) or a LOCKED loss
+             * demotion -- restarts at channel 0. */
             sx1276_rx_scan_walker_reset();
             /* fallthrough */
         case SX1276_RX_SCAN_ACTION_ADVANCE_CHANNEL: {
@@ -651,7 +693,9 @@ static void scan_dispatch_action(sx1276_rx_scan_action_t action,
              * the HOST_FAULT_CODE_RX_SCAN_FAILED URC with the
              * §13.1 #2 sub-byte, and either re-enter SCANNING with
              * fresh anchors (non-final) or stay in the absorbing
-             * FAILED state the policy already committed. */
+             * FAILED state the policy already committed.
+             * RS-12.21 (b) (2026-10-24): FAILED is now held only by a
+             * node with originator authority (below). */
             const sx1276_rx_scan_fail_input_t fi = {
                 .retries     = s_scan_fail_retries,
                 .max_retries = SX1276_RX_SCAN_MAX_RETRIES,
@@ -665,7 +709,8 @@ static void scan_dispatch_action(sx1276_rx_scan_action_t action,
             host_cmd_emit_fault(HOST_FAULT_CODE_RX_SCAN_FAILED, fd.sub);
 
             if (fd.is_final) {
-                /* FCC-A6c-2-c-ii: park the modem in standby — no
+                /* FCC-A6c-2-c-ii (superseded by RS-12.21 (b), last
+                 * paragraph): park the modem in standby — no
                  * point burning power scanning a hopset the remote
                  * provably is not on. Leave s_scan_state at FAILED
                  * (the policy already committed it); external
@@ -679,27 +724,60 @@ static void scan_dispatch_action(sx1276_rx_scan_action_t action,
                  * follower re-arms only at the next slot boundary, so
                  * a park here would abort a peer frame already on air
                  * and miss the rest of the slot. The FAILED commit and
-                 * the fault URC above are unchanged. */
-                if (rx_follow_own_now() == 0U) {
-                    (void)sx1276_modes_to_standby();
+                 * the fault URC above are unchanged.
+                 *
+                 * RS-12.21 (b) (2026-10-24, FHSS_SCAN_FAILED_OPTIONS.md
+                 * section 4 (b), adopted by the design owner): the park
+                 * is gone, and FAILED is held ONLY under that authority
+                 * -- a streaming originator keeps following its own
+                 * clock in FAILED, as on 2026-10-18 legs W/X, until the
+                 * authority decays (scan_drive then restarts it). A
+                 * node without it (a follower such as the base, or an
+                 * originator whose authority has decayed) re-enters
+                 * SCANNING at once with fresh anchors, as a non-final
+                 * retry does, and the walk continues (scan_leave_failed).
+                 * The fault above still goes out, final bit set and
+                 * the attempt nibble at MAX (the retry count is not
+                 * incremented), so the host hears "not acquired" every
+                 * 30 s until a LOCK.
+                 *   Why: the park stranded a follower. Leg 6 (2026-10-
+                 * 24): the base's receiver stayed on the walker's last
+                 * channel (and later on each PROBE's), it LOCKed on
+                 * nothing and heard 5 of 606 frames, while it kept
+                 * transmitting on hop channels -- a receiver that no
+                 * longer follows the hop sequence, against the "synced
+                 * receivers" of FCC §15.247(a)(1) (FCC notes, 2026-05-
+                 * 19). Only a reset or a profile re-activation got it
+                 * out (host_cfg_profile.c records a 2026-07-24 case).
+                 *   Costs: continuous RX instead of STANDBY (fine for
+                 * the base and the tractor; a battery node would want
+                 * the back-off the 2026-05-19 RX-scan-FAILED analysis
+                 * §13.2 deferred -- this replaces that analysis's
+                 * absorbing-FAILED contract). And once the daemons stop
+                 * both boards scan indefinitely, re-arming RX every
+                 * dwell (a stopped tractor's authority decays after
+                 * 1 s), so a host SLEEP write does not hold: the bench
+                 * park is the RS-12.21 firmware park command in the
+                 * same image. */
+                if (rx_follow_own_now() != 0U) {
+                    return;
                 }
+                scan_leave_failed(now_ms);
                 return;
             }
 
             /* Non-final: account the retry, override the policy's
              * FAILED commit back to SCANNING, reset BOTH anchors so
              * the next 30 s redesign budget restarts cleanly, and
-             * dispatch a BEGIN_SCAN-style HW re-entry (next channel
-             * + standby + set_freq + settle + arm). Per-window
-             * flags are cleared by the recursive BEGIN_SCAN case
-             * via this same dispatcher, preserving the invariant
-             * that got_any_irq + crc_seen reflect only the current
-             * window. */
-            s_scan_fail_retries        = (uint8_t)(s_scan_fail_retries + 1U);
-            s_scan_state               = SX1276_RX_SCAN_STATE_SCANNING;
-            s_scan_channel_entry_ms    = now_ms;
-            s_scan_cold_start_entry_ms = now_ms;
-            scan_dispatch_action(SX1276_RX_SCAN_ACTION_BEGIN_SCAN, now_ms);
+             * re-enter on the next channel (scan_leave_failed: since
+             * RS-12.21 d2 the walk continues across attempts; before
+             * it this dispatched BEGIN_SCAN, restarting at channel 0).
+             * Per-window flags are cleared by the walker step it
+             * dispatches through this same dispatcher, preserving the
+             * invariant that got_any_irq + crc_seen reflect only the
+             * current window. */
+            s_scan_fail_retries = (uint8_t)(s_scan_fail_retries + 1U);
+            scan_leave_failed(now_ms);
             return;
         }
         case SX1276_RX_SCAN_ACTION_HOLD:
@@ -710,6 +788,34 @@ static void scan_dispatch_action(sx1276_rx_scan_action_t action,
              * scan_drive, no HW action wanted. */
             return;
     }
+}
+
+/*
+ * RS-12.21 (2026-10-24): leave a committed FAILED for a fresh 30 s scan
+ * attempt -- the one way out of FAILED short of a scan reset, taken by
+ *   - a non-final FAIL (the A6c-3 retry; its caller counts the retry),
+ *   - option (b): a final FAIL on a node without originator authority
+ *     (scan_dispatch_action), and
+ *   - option (b): a node in FAILED whose authority has decayed, on its
+ *     next scan tick (scan_drive).
+ * Both anchors restart, so the attempt gets the full budget. The walk
+ * CONTINUES where it stopped (d2: ADVANCE_CHANNEL, not BEGIN_SCAN, which
+ * would reset the walker to channel 0), so a silent node's attempts cover
+ * the whole table; the step is suppressed like any other while the node
+ * holds originator authority (a non-final retry can arrive here with it).
+ * The edge is recorded as (FAILED, BEGIN_SCAN) -- it enters SCANNING with
+ * both anchors fresh, as BEGIN_SCAN does, and no policy eval produces
+ * that pair -- so the scan counters, and check-rx-reverse-delivery's
+ * mirror of them, see every FAILED -> SCANNING edge. (Until 2026-10-24
+ * a non-final retry left FAILED without a record.)
+ */
+static void scan_leave_failed(uint32_t now_ms) {
+    sx1276_rx_scan_counter_record(SX1276_RX_SCAN_STATE_FAILED,
+                                  SX1276_RX_SCAN_ACTION_BEGIN_SCAN);
+    s_scan_state               = SX1276_RX_SCAN_STATE_SCANNING;
+    s_scan_channel_entry_ms    = now_ms;
+    s_scan_cold_start_entry_ms = now_ms;
+    scan_dispatch_action(SX1276_RX_SCAN_ACTION_ADVANCE_CHANNEL, now_ms);
 }
 
 /*
@@ -757,6 +863,37 @@ static void scan_drive(sx1276_rx_scan_event_t event,
      * (single-FIFO radio), so nothing is lost.
      */
     if (sx1276_tx_busy()) {
+        return;
+    }
+    /*
+     * RS-12.21 (2026-10-24): the firmware park freezes the machine as a keyed
+     * TX does, for ticks and frame events alike: no walker step, no FAIL
+     * fault, no (b) restart below -- nothing re-arms the parked receiver,
+     * and a parked board sends no RX_SCAN_FAILED every 30 s.
+     * sx1276_rx_unpark() moves a SCANNING node's anchors on by the time
+     * parked, so its dwell and attempt resume where they stood (a LOCKED
+     * node's loss timer counts the park: see there).
+     */
+    if (s_host_parked != 0U) {
+        return;
+    }
+    /*
+     * RS-12.21 (b) (2026-10-24): FAILED is held only while the node follows
+     * its own clock (originator authority, see the FAIL dispatch). Once that
+     * decays -- a stalled or stopped tractor loses it 1 s after its last own
+     * TX (sx1276_fhss_authority.h) -- the next tick scans again: a fresh 30 s
+     * attempt, the walk continuing (scan_leave_failed). TICK only, and only
+     * past the gates above (a parked node in FAILED restarts on its first
+     * tick after the park). Before this an originator in FAILED that
+     * adopted a grid heard in a stall's decay window never held authority,
+     * self-followed or LOCKed again: in FAILED nothing LOCKs, so nothing
+     * demotes, so nothing clears the adoption (sx1276_rx_grid_on_demotion)
+     * -- the tractor twin of leg 6 (check-rx-scan-failed-follower).
+     */
+    if (event == SX1276_RX_SCAN_EVENT_TICK &&
+        s_scan_state == SX1276_RX_SCAN_STATE_FAILED &&
+        rx_follow_own_now() == 0U) {
+        scan_leave_failed(now_ms);
         return;
     }
     const sx1276_rx_scan_input_t in = {
@@ -820,8 +957,19 @@ static void scan_drive(sx1276_rx_scan_event_t event,
         case SX1276_RX_SCAN_ACTION_ADVANCE_CHANNEL:
             s_scan_channel_entry_ms = now_ms;
             break;
-        case SX1276_RX_SCAN_ACTION_HOLD:
         case SX1276_RX_SCAN_ACTION_LOCK:
+            /* RS-12.21 L (2026-10-24): the LOCKED 2 s loss timer runs from
+             * channel_entry_ms, so start it at the locking frame. A LOCK
+             * used to leave the anchors alone, and the timer then ran from
+             * the last walker step -- up to one dwell (now 2 s) before the
+             * LOCK -- so a LOCK late in its dwell demoted early, at a 2 s
+             * dwell often on the next tick (the SIL, memo section 5 item
+             * 3: the 2 s dwell without this makes 1.7x the LOCKs, many
+             * of them demoting at once). REANCHOR keeps doing this for
+             * every later frame. */
+            s_scan_channel_entry_ms = now_ms;
+            break;
+        case SX1276_RX_SCAN_ACTION_HOLD:
         case SX1276_RX_SCAN_ACTION_FAIL:
         default:
             /* anchors unchanged */
@@ -863,9 +1011,13 @@ void sx1276_rx_scan_tick(uint32_t now_ms) {
  *   - The TX-side fit guard (SX1276_FHSS_SLOT_TX_GUARD_US) guarantees
  *     packets END before the boundary, so a boundary retune here
  *     cannot clip a frame that is mid-air for us.
+ *   - RS-12.21 (2026-10-24): the host park -- a parked node may sit LOCKED
+ *     on an adopted grid, or hold authority for up to 1 s after its last
+ *     TX; neither may retune or re-arm the sleeping modem.
  */
 void sx1276_rx_slot_follow(uint32_t now_ms) {
-    if (sx1276_fhss_clock_valid() == 0U ||
+    if (s_host_parked != 0U ||
+        sx1276_fhss_clock_valid() == 0U ||
         sx1276_tx_busy() ||
         rx_follow_now() == 0U) {
         return;
@@ -951,3 +1103,58 @@ void sx1276_rx_scan_reset(void) {
 }
 
 #endif /* LIFETRAC_FHSS_TX_ROUTED */
+
+/*
+ * RS-12.21 (2026-10-24): the firmware radio park (HOST_TYPE_RADIO_PARK_REQ;
+ * contract in sx1276_rx.h, TODO.md RS-12.21). Why it is firmware: with scan
+ * option (b) a node without originator authority no longer parks its own
+ * receiver in scan FAILED, so once the daemons stop both boards scan on,
+ * re-arming RXCONT every dwell (a stopped tractor's authority decays after
+ * 1 s), and a host SLEEP write (radio_park.py) holds only until the next
+ * walker step. Every arm path in this file and sx1276_tx.c checks the flag
+ * before it touches the modem; sx1276_rx_arm() is the backstop.
+ */
+bool sx1276_rx_park(void) {
+    const bool newly = (s_host_parked == 0U);
+    if (newly) {
+        s_host_parked    = 1U;
+        s_host_parked_ms = platform_now_ms();
+    }
+    (void)sx1276_modes_to_sleep();
+    /* No stale RxDone / CRC-error flag may pair with the first packet after
+     * the park ends. */
+    sx1276_write_reg(SX1276_REG_IRQ_FLAGS, 0xFFU);
+    return newly;
+}
+
+void sx1276_rx_unpark(void) {
+    if (s_host_parked == 0U) {
+        return;
+    }
+    s_host_parked = 0U;
+#ifdef LIFETRAC_FHSS_TX_ROUTED
+    /* The scan machine was frozen, so a SCANNING node's timers must not
+     * count the time parked: it resumes its dwell and its 30 s attempt where
+     * they stood (no walker step and no RX_SCAN_FAILED at the first tick for
+     * a dwell or an attempt that never ran). Wrap-safe: both anchors were at
+     * or before the park, so they stay at or before now.
+     *   LOCKED is NOT shifted (2026-10-24 review): its loss timer, like the
+     * FHSS clock's F6 freshness it must agree with (FRESH_MS ==
+     * LOCK_LOSS_MS), counts from the last frame, parked time included. The
+     * adopted grid has drifted meanwhile (HSI16: ~1.5-2 s per 10 min, memo
+     * section 8.3), so a park longer than LOCK_LOSS_MS demotes on the
+     * first tick after it -- a fresh acquisition -- instead of following a
+     * stale grid for up to 2 s. FAILED and BOOT run no timer: FAILED is
+     * held under authority or left at the next tick, and both ways out
+     * re-anchor both (scan_leave_failed, BEGIN_SCAN). */
+    if (s_scan_state == SX1276_RX_SCAN_STATE_SCANNING) {
+        const uint32_t parked_ms = platform_now_ms() - s_host_parked_ms;
+        s_scan_channel_entry_ms    += parked_ms;
+        s_scan_cold_start_entry_ms += parked_ms;
+    }
+#endif
+}
+
+bool sx1276_rx_parked(void) {
+    return s_host_parked != 0U;
+}

@@ -9,7 +9,9 @@ the base's `PROBE TX seq=N ... (tx#K)` lines (rx_daemon.log), over the base's
 PROBE TX count. The base's own `probe:` line counts echoes, so with
 -ProbeEcho 0 it reads 0 % and is ignored here.
 
-    py -3 rs13_probe_score.py [--margin PP] [--void-unlocked] <archive_dir> [<archive_dir> ...]
+    py -3 rs13_probe_score.py [--margin PP] [--void-unlocked]
+                              [--scan-image auto|restarts|absorbing]
+                              <archive_dir> [<archive_dir> ...]
 
 Prints one block per archive (keep it as legs/leg<X>_probe_score.txt). Its
 `tail:` line lists the base PROBE seqs sent after the last one the tractor
@@ -94,11 +96,20 @@ with no RX_SCAN_FAILED one make that silence the host's, and the leg NOT
 DETERMINED. ACQUIRED when a lock shows (the base decoded at least 25 % of
 the tractor's fragments on air on a hop set of 10 or more channels, the
 bench's 50 here, which only a grid follower does); NOT DETERMINED
-otherwise. The block's line
+otherwise. That is the rule of every L072 image before RS-12.21, whose scan
+FAILED is absorbing. The RS-12.21 image (scan option (b); rs12_leg_report.py
+tells it by the VER capability bitmap the base daemon logs, or by an
+RX_SCAN_FAILED after a final one, and --scan-image overrides) restarts its
+scan after a final and reports one every 30 s until a LOCK: there a final
+is no FAILED on its own, a lock shown after it is a late ACQUIRED, and
+silence counts over the whole window, not the budget; FAILED means the base
+never locked onto the hop grid in the window (2026-10-24 review). The
+block's line
 reads `base acquisition: <verdict>; <first image reception>; evidence:
 <what shows it>`. A failed base never follows the hop grid:
 with -ReactiveFire 1 it fires a probe only after a frame it happened to
-catch, from the channel it is parked on, so the leg measures the
+catch, from the channel it is parked on (on the RS-12.21 image, wherever
+its scan stands), so the leg measures the
 acquisition failure, not command delivery (leg 6: 4/5 pooled; a leg that
 catches nothing fires no probe and withholds the pooled verdict). By
 default nothing else changes: such a leg pools like any other, and one that
@@ -370,11 +381,13 @@ def _pct(x: int, y: int) -> str:
     return f"{100.0 * x / y:.1f} %" if y else "n/a"
 
 
-def leg_acquisition(params: dict[str, str], rx_text: str, tx_text: str) -> dict | None:
-    """rs12_leg_report.acquisition on an FHSS leg (params reg_profile=1), else None."""
+def leg_acquisition(params: dict[str, str], rx_text: str, tx_text: str,
+                    image: str = "auto") -> dict | None:
+    """rs12_leg_report.acquisition on an FHSS leg (params reg_profile=1), else None;
+    ``image``: --scan-image (rs12_leg_report.scan_image)."""
     if params.get("reg_profile") != "1":
         return None
-    return rep.acquisition(rx_text, tx_text)
+    return rep.acquisition(rx_text, tx_text, image=image)
 
 
 def acquisition_lines(acq: dict | None) -> list[str]:
@@ -388,6 +401,14 @@ def acquisition_lines(acq: dict | None) -> list[str]:
     seen = rep.reception_phrase(acq)
     if acq["status"] != rep.FAILED:
         return [f"  base acquisition: {acq['status']}; {seen}; evidence: {acq['basis']}"]
+    if acq.get("restarts"):
+        # 2026-10-24 review: the RS-12.21 image scans on after a final
+        return [f"  !! base ACQUISITION FAILED; {seen}; evidence: {acq['basis']}. Its scan "
+                f"scanned on (the RS-12.21 image restarts it after each final RX_SCAN_FAILED) "
+                f"but never locked onto the hop grid, so any probe it fired went out off the "
+                f"grid, after a frame it happened to catch; this leg measures that, not "
+                f"command delivery (--void-unlocked leaves it out of the pool, only under a "
+                f"pass rule written before leg 1)"]
     return [f"  !! base ACQUISITION FAILED; {seen}; evidence: {acq['basis']}. Its scan ran out "
             f"into FAILED and never followed the hop grid, so any probe it fired went out from "
             f"the channel it was parked on, after a frame it happened to catch; this leg "
@@ -539,6 +560,11 @@ def main(argv: list[str] | None = None) -> int:
                          "evidence (rs12_leg_report.py's rule; not one NOT DETERMINED) out of "
                          "the pool and list them; only under a pass rule written before leg 1 "
                          "that says so")
+    ap.add_argument("--scan-image", choices=rep.SCAN_IMAGES, default="auto",
+                    help="how the base's L072 image treats a final RX_SCAN_FAILED, for the "
+                         "acquisition rule (rs12_leg_report.py --scan-image): 'restarts' "
+                         "(the RS-12.21 image), 'absorbing' (every image before it), 'auto' "
+                         "(default: the logged VER capability bitmap, else the faults)")
     a = ap.parse_args(argv)
     if a.margin is not None and not 0 < a.margin < 100:
         ap.error(f"--margin {a.margin:g}: give a margin between 0 and 100 percentage points")
@@ -562,7 +588,7 @@ def main(argv: list[str] | None = None) -> int:
             continue
         # 2026-10-24: the base's FHSS acquisition (rs12_leg_report's rule); only a
         # leg FAILED on positive evidence voids, never one NOT DETERMINED
-        acq = leg_acquisition(params, rx_text, tx_text)
+        acq = leg_acquisition(params, rx_text, tx_text, a.scan_image)
         void = a.void_unlocked and bool(acq and acq.get("status") == rep.FAILED)
         if res["sent"] == 0:
             print(f"{name}: no PROBE TX line in rx_daemon.log (reactive_fire="

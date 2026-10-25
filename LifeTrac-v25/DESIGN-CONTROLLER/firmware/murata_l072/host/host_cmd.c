@@ -478,6 +478,20 @@ static void handle_tx_frame(const host_frame_t *frame) {
         memcpy(req.payload, &frame->payload[2], req.length);
     }
 
+    /* RS-12.21 (2026-10-24): the host has the radio parked
+     * (HOST_TYPE_RADIO_PARK_REQ). Refuse now, with the refusal any failed
+     * TX gets, rather than queue a frame that would be refused at release
+     * (sx1276_tx_begin() refuses while parked too) or, worse, go out after
+     * a later un-park the sender never saw. */
+    if (sx1276_rx_parked()) {
+        host_uart_send_err_proto(frame->seq,
+                                 frame->type,
+                                 frame->ver,
+                                 HOST_ERR_PROTO_FORBIDDEN,
+                                 0U);
+        return;
+    }
+
     /*
      * v25.0.7 slot-clock: park when the modem is busy OR when the
      * frame does not fit the remaining hop-slot time. The ring
@@ -588,6 +602,36 @@ static void handle_reg_write(const host_frame_t *frame) {
                        0U,
                        frame->payload,
                        2U);
+}
+
+/*
+ * RS-12.21 (2026-10-24): the firmware radio park, HOST_TYPE_RADIO_PARK_REQ
+ * (contract in host_types.h; the flag and the gates in radio/sx1276_rx.c).
+ * Refused while a TX is keyed or queued in the TX ring: SLEEP would cut a
+ * transmission short, and every queued frame would then be refused at its
+ * release. The host retries after the TX_DONE. A repeat request re-applies
+ * SLEEP (a raw STANDBY write does not end the park, so the modem may have
+ * left SLEEP). The opmode byte is read back from the chip AFTER the request
+ * (0x80 = LoRa SLEEP; 0x83 on a refusal mid-TX), not taken from the tracked
+ * state. STATS radio_state reads 1 (SX1276_STATE_SLEEP) after a park.
+ */
+static void handle_radio_park(const host_frame_t *frame) {
+    uint8_t payload[HOST_RADIO_PARK_URC_PAYLOAD_LEN];
+
+    if (sx1276_tx_busy() || s_txq_count > 0U) {
+        payload[0] = HOST_RADIO_PARK_STATUS_REFUSED;
+    } else if (sx1276_rx_park()) {
+        payload[0] = HOST_RADIO_PARK_STATUS_PARKED;
+    } else {
+        payload[0] = HOST_RADIO_PARK_STATUS_ALREADY;
+    }
+    payload[1] = sx1276_read_reg(0x01U);   /* RegOpMode */
+
+    host_uart_send_urc(HOST_TYPE_RADIO_PARK_URC,
+                       frame->seq,
+                       0U,
+                       payload,
+                       (uint16_t)sizeof(payload));
 }
 
 static void handle_cfg_set(const host_frame_t *frame) {
@@ -720,6 +764,7 @@ void host_cmd_init(bool radio_ok, uint8_t radio_version) {
     platform_fault_record_t replay;
 
     host_type_compile_time_uniqueness_check();
+    host_fault_code_compile_time_uniqueness_check();   /* RS-12.21 */
 
     s_radio_ok = radio_ok;
     s_radio_version = radio_version;
@@ -784,6 +829,10 @@ void host_cmd_dispatch(const host_frame_t *frame) {
 
         case HOST_TYPE_RESET_REQ:
             platform_system_reset();
+            break;
+
+        case HOST_TYPE_RADIO_PARK_REQ:
+            handle_radio_park(frame);
             break;
 
         case HOST_TYPE_TX_FRAME_REQ:

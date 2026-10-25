@@ -43,17 +43,56 @@ HOST_TYPE_FAULT_URC = 0xF1
 HOST_TYPE_READY_URC = 0xF2
 HOST_TYPE_ERR_PROTO_URC = 0xFE
 
+# 2026-10-24 (RS-12.21, the firmware park command; include/host_types.h).
+# RADIO_PARK_REQ (empty payload) sets the L072's host_parked flag, which
+# gates EVERY RX arm path (scan walker, gamma-1 retune, slot follower, the
+# post-TX re-arm in sx1276_tx.c, the scan restarts), and puts the modem to
+# SLEEP. The flag holds until a host raw RXCONT write (REG_WRITE RegOpMode),
+# a profile activation or a reset; a TX_FRAME_REQ while parked is refused
+# (ERR_PROTO). The reply, RADIO_PARK_URC (same seq): {u8 status
+# (RADIO_PARK_STATUS_*), u8 RegOpMode readback}. Firmware from before the
+# command answers ERR_PROTO UNKNOWN_TYPE (host_cmd.c dispatch default) and
+# leaves the radio alone. HostLink.radio_park() sends it and sorts the answer.
+HOST_TYPE_RADIO_PARK_REQ = 0x04
+HOST_TYPE_RADIO_PARK_URC = 0x84
+RADIO_PARK_STATUS_PARKED = 0
+RADIO_PARK_STATUS_ALREADY_PARKED = 1
+RADIO_PARK_STATUS_REFUSED = 2
+RADIO_PARK_STATUS_NAMES = {
+    RADIO_PARK_STATUS_PARKED: "PARKED",
+    RADIO_PARK_STATUS_ALREADY_PARKED: "ALREADY_PARKED",
+    RADIO_PARK_STATUS_REFUSED: "REFUSED",
+}
+# The firmware answers a host request within one main-loop pass; old
+# firmware's UNKNOWN_TYPE refusal is as quick. 1 s is the "no reply" bound.
+RADIO_PARK_TIMEOUT_S = 1.0
+# VER_URC / READY_URC cap_bitmap bit 7 (host_types.h HOST_CAP_RADIO_PARK): the
+# image answers RADIO_PARK_REQ. The same image moved TX_FIFO_RB_MISMATCH to
+# 0x0F (the 0x0D split, below) and restarts its scan after a final
+# RX_SCAN_FAILED (scan option (b)), so a host SLEEP write cannot hold on it:
+# bench_tools/radio_park.py parks it by the command only (2026-10-24 review).
+HOST_CAP_RADIO_PARK = 0x80
+
 HOST_FAULT_CODE_HOST_RX_SEEN = 0x09
 HOST_FAULT_CODE_HOST_RX_INACTIVE = 0x0A
 HOST_FAULT_CODE_HOST_PARSE_ERROR = 0x0B
 HOST_FAULT_CODE_HOST_DIAG_MARK = 0x0C
 
 # 2026-10-24 (FAULT URC logging): the rest of host_types.h's fault codes, for
-# the `FAULT_URC:` line (format_fault_urc_line). 0x0D is DOUBLE-BOOKED in the
-# firmware: TX_FIFO_RB_MISMATCH (radio/sx1276_tx.c, sub = that TX's tx_id,
-# emitted just BEFORE its TX_DONE_URC) and RX_SCAN_FAILED (radio/sx1276_rx.c,
-# sub = the sx1276_rx_scan_fail.h bit field) share the value, so 0x0D has no
-# entry in HOST_FAULT_CODE_NAMES -- decode_fault_0x0d() resolves it per URC.
+# the `FAULT_URC:` line (format_fault_urc_line).
+# 2026-10-24 (the 0x0D split, FHSS_SCAN_FAILED_OPTIONS.md section 7): 0x0D
+# was DOUBLE-BOOKED -- RX_SCAN_FAILED (radio/sx1276_rx.c, sub = the
+# sx1276_rx_scan_fail.h bit field; since 2026-05-20) and TX_FIFO_RB_MISMATCH
+# (radio/sx1276_tx.c, sub = that TX's tx_id, emitted just BEFORE its
+# TX_DONE_URC; RS-11.5, 2026-08-02). From the split RX_SCAN_FAILED keeps 0x0D
+# and TX_FIFO_RB_MISMATCH moves to 0x0F. An image from before the split still
+# sends its FIFO fault as 0x0D (..._PRE_SPLIT below). VER_URC's version and
+# name do not tell the images apart (0.0.0 / "dev"), but its capability
+# bitmap does: the image with the split also added the park command and sets
+# HOST_CAP_RADIO_PARK (above). decode_fault_0x0d() is called where that bitmap
+# is not at hand (the daemons' FAULT_URC hook), so it reads every 0x0D by its
+# sub-byte, which is exact on a split image too: every 0x0D it sends is a scan
+# fault with a valid sub, so "fw=old" can only mark a pre-split image.
 HOST_FAULT_CODE_HARDFAULT = 0x01
 HOST_FAULT_CODE_NMI = 0x02
 HOST_FAULT_CODE_RADIO_INIT_FAIL = 0x03
@@ -62,9 +101,10 @@ HOST_FAULT_CODE_RX_CRC_DISABLED = 0x05
 HOST_FAULT_CODE_HOST_DMA_OVERRUN = 0x06
 HOST_FAULT_CODE_STACK_GUARD = 0x07
 HOST_FAULT_CODE_CLOCK_HSE_FAILED = 0x08
-HOST_FAULT_CODE_TX_FIFO_RB_MISMATCH = 0x0D
 HOST_FAULT_CODE_RX_SCAN_FAILED = 0x0D
 HOST_FAULT_CODE_TX_DONE_EARLY = 0x0E
+HOST_FAULT_CODE_TX_FIFO_RB_MISMATCH = 0x0F
+HOST_FAULT_CODE_TX_FIFO_RB_MISMATCH_PRE_SPLIT = 0x0D
 
 HOST_FAULT_CODE_NAMES = {
     HOST_FAULT_CODE_HARDFAULT: "HARDFAULT",
@@ -79,7 +119,10 @@ HOST_FAULT_CODE_NAMES = {
     HOST_FAULT_CODE_HOST_RX_INACTIVE: "HOST_RX_INACTIVE",
     HOST_FAULT_CODE_HOST_PARSE_ERROR: "HOST_PARSE_ERROR",
     HOST_FAULT_CODE_HOST_DIAG_MARK: "HOST_DIAG_MARK",
+    # format_fault_urc_line names a 0x0D by decode_fault_0x0d(), not here
+    HOST_FAULT_CODE_RX_SCAN_FAILED: "RX_SCAN_FAILED",
     HOST_FAULT_CODE_TX_DONE_EARLY: "TX_DONE_EARLY",
+    HOST_FAULT_CODE_TX_FIFO_RB_MISMATCH: "TX_FIFO_RB_MISMATCH",
 }
 
 # RX_SCAN_FAILED `sub` layout + retry budget, mirrored from
@@ -92,17 +135,18 @@ RX_SCAN_FAIL_SUB_CRC_SEEN = 0x10     # window saw >= 1 payload-CRC error
 RX_SCAN_FAIL_SUB_ATTEMPT_MASK = 0x0F
 RX_SCAN_MAX_RETRIES = 3              # SX1276_RX_SCAN_MAX_RETRIES (4 attempts)
 
-# TX bookkeeping for the 0x0D decode (HostLink.on_fault_urc): the request
-# that radiates, and the URC that retires it (payload[0] = tx_id in both).
-# An ERR_PROTO_URC whose payload[0] is TX_FRAME_REQ retires the request with
-# its seq too: the L072 refused it (host_cmd.c), so no TX_DONE_URC follows.
+# TX bookkeeping for the 0x0D decode's basis (HostLink.on_fault_urc): the
+# request that radiates, and the URC that retires it (payload[0] = tx_id in
+# both). An ERR_PROTO_URC whose payload[0] is TX_FRAME_REQ retires the
+# request with its seq too: the L072 refused it (host_cmd.c; also every TX
+# while the radio is parked, RS-12.21), so no TX_DONE_URC follows.
 HOST_TYPE_TX_FRAME_REQ = 0x10
 HOST_TYPE_TX_DONE_URC = 0x90
 # A tx_id with an unretired TX_FRAME_REQ counts as in flight until this long
 # after its NEWEST send (time.monotonic()) -- above every host TX timeout
 # (the daemons give up after 2-3 s), so a lost TX_DONE ages out instead of
-# pinning its tx_id "in flight" (which would make every later 0x0D on it
-# AMBIGUOUS).
+# pinning its tx_id "in flight" (which would give every later 0x0D on it
+# basis=tx_id_in_flight).
 TX_INFLIGHT_STALE_S = 5.0
 
 HOST_ERR_PROTO_BAD_VERSION = 0x01
@@ -286,7 +330,8 @@ class HostLink:
         if frame["type"] == HOST_TYPE_TX_DONE_URC:
             # the OLDEST unretired send of that tx_id: the L072 serves its
             # TX ring head-first, and which copy a TX_DONE answers cannot be
-            # told -- a resent tx_id stays in flight (0x0D -> AMBIGUOUS)
+            # told -- a resent tx_id stays in flight (0x0D basis=
+            # tx_id_in_flight)
             if payload:
                 self._tx_retire(payload[0], 0)
             return
@@ -474,6 +519,77 @@ class HostLink:
             if keep:
                 unmatched_local.extend(keep)
             pending = []
+
+    def radio_park(self, timeout: float = RADIO_PARK_TIMEOUT_S,
+                   earlier_seqs=()) -> dict:
+        """Send RADIO_PARK_REQ (RS-12.21, 2026-10-24) and wait up to
+        `timeout` s for the L072's answer to THAT request (its seq) -- or to
+        one of `earlier_seqs`, the seqs of this caller's earlier tries that
+        drew no reply (2026-10-24 review: a late answer to an earlier try is
+        the answer, not a stale frame).
+
+        Not request(): an old image's ERR_PROTO is an answer here (it says
+        which firmware this is), not an error to raise. Returns
+        {"answer", "status", "status_name", "opmode", "detail", "seq",
+        "answer_seq"}: "seq" the seq this call sent, "answer_seq" the seq the
+        answer carried (None for "no_reply");
+          "urc"           RADIO_PARK_URC: status (RADIO_PARK_STATUS_*; None
+                          on an empty payload), status_name, opmode (the
+                          RegOpMode readback byte; None when absent);
+          "unknown_type"  ERR_PROTO UNKNOWN_TYPE: an image from before the
+                          command -- the radio was not touched;
+          "err_proto"     any other ERR_PROTO for it: the image knows the
+                          command but refused the frame (detail = the
+                          decoded payload, format_err_proto_payload);
+          "no_reply"      nothing within `timeout`.
+        Frames that answer something else go back on urc_queue in arrival
+        order, as request() leaves them (a FAULT_URC among them has already
+        been seen by on_fault_urc, once); a RADIO_PARK_URC with any other seq
+        (the late answer to a call that gave up and was not named in
+        `earlier_seqs`) is dropped. Raises only what send() raises (a serial
+        write timeout)."""
+        seq = self.send(HOST_TYPE_RADIO_PARK_REQ)
+        mine = {seq, *earlier_seqs}
+        deadline = time.time() + timeout
+        out = {"answer": "no_reply", "status": None, "status_name": None,
+               "opmode": None, "detail": "", "seq": seq, "answer_seq": None}
+        pending = list(self.urc_queue)
+        self.urc_queue.clear()
+        kept = []
+        while True:
+            for idx, frame in enumerate(pending):
+                ftype = frame["type"]
+                if ftype == HOST_TYPE_RADIO_PARK_URC and frame["seq"] not in mine:
+                    continue
+                if (ftype not in (HOST_TYPE_RADIO_PARK_URC,
+                                  HOST_TYPE_ERR_PROTO_URC)
+                        or frame["seq"] not in mine):
+                    kept.append(frame)
+                    continue
+                self.urc_queue.extend(kept + pending[idx + 1:])
+                out["answer_seq"] = frame["seq"]
+                payload = bytes(frame["payload"])
+                if ftype == HOST_TYPE_RADIO_PARK_URC:
+                    status = payload[0] if payload else None
+                    out.update(
+                        answer="urc", status=status,
+                        status_name=(None if status is None else
+                                     RADIO_PARK_STATUS_NAMES.get(
+                                         status, f"UNKNOWN_0x{status:02X}")),
+                        opmode=payload[1] if len(payload) >= 2 else None)
+                else:
+                    # ERR_PROTO payload: offending_type, offending_ver,
+                    # err_code, detail (format_err_proto_payload)
+                    unknown = (len(payload) >= 3
+                               and payload[2] == HOST_ERR_PROTO_UNKNOWN_TYPE)
+                    out.update(answer="unknown_type" if unknown else "err_proto",
+                               detail=format_err_proto_payload(payload))
+                return out
+            pending = []
+            if time.time() >= deadline:
+                self.urc_queue.extend(kept)
+                return out
+            pending = self.read_frames(0.1)
 
 
 def parse_boot(payload: bytes) -> dict:
@@ -668,9 +784,12 @@ def rx_scan_fail_sub_valid(sub: int) -> bool:
 
     With SX1276_RX_SCAN_MAX_RETRIES = 3 the firmware sets `final` exactly
     when the attempt nibble reaches 3 (retries reset only on LOCK or
-    sx1276_rx_scan_reset), and `hw_suspect` only when `crc_seen` is clear --
-    25 of the 256 values (incl. the NULL-input marker 0x80). Every other
-    0x0D sub can only be a TX_FIFO_RB_MISMATCH tx_id.
+    sx1276_rx_scan_reset; option (b)'s restarts of a node without
+    originator authority keep the count at 3, so every later 30 s attempt
+    is final with attempt 3 again), and `hw_suspect` only when `crc_seen`
+    is clear -- 25 of the 256 values (incl. the NULL-input marker 0x80).
+    Every other 0x0D sub can only be the TX_FIFO_RB_MISMATCH tx_id of an
+    image from before the 0x0D split.
     """
     if sub == RX_SCAN_FAIL_SUB_FINAL:          # defensive NULL-input marker
         return True
@@ -683,23 +802,36 @@ def rx_scan_fail_sub_valid(sub: int) -> bool:
 
 
 def decode_fault_0x0d(sub: int, tx_ids_in_flight=None) -> dict:
-    """Resolve a code-0x0D FAULT_URC (2026-10-24, leg-6 lesson).
+    """Resolve a code-0x0D FAULT_URC (2026-10-24, leg-6 lesson; the 0x0D
+    split, FHSS_SCAN_FAILED_OPTIONS.md section 7).
 
-    The two firmware emitters share the code, so the only evidence is the
-    sub-byte and the host's own TX state:
-      * a sub RX_SCAN_FAILED cannot produce -> TX_FIFO_RB_MISMATCH
-        (basis=not_scan_encoding; certain whatever the TX state);
-      * a valid scan encoding while no TX with tx_id == sub is in flight
-        -> RX_SCAN_FAILED (basis=tx_id_not_in_flight): the FIFO fault fires
-        on that TX's TX_DONE, before its TX_DONE_URC, i.e. while in flight;
-      * a valid scan encoding that IS an in-flight tx_id -> AMBIGUOUS
-        (basis=tx_id_in_flight), e.g. sub 0x00 against fragment 0;
-      * no TX context from the caller (None) -> AMBIGUOUS (basis=no_tx_context).
-    Returns {"name", "basis", "scan" (dict or None), "tx_id" (int or None)}:
-    "scan" is set when the RX_SCAN_FAILED reading is possible, "tx_id" when
-    the TX_FIFO_RB_MISMATCH reading is.
+    0x0D is RX_SCAN_FAILED; TX_FIFO_RB_MISMATCH moved to 0x0F. An image
+    from before the split sends both as 0x0D. Its VER capability bitmap says
+    which image it is (HOST_CAP_RADIO_PARK set: the split), but the FAULT_URC
+    hooks that call this do not have it, so the sub-byte decides (on a split
+    image every 0x0D sub is a valid scan encoding, so the first case below is
+    then the only one):
+      * a sub sx1276_rx_scan_fail_eval() can emit (rx_scan_fail_sub_valid)
+        -> RX_SCAN_FAILED, whatever the TX state. `basis` keeps the in-flight
+        check of PR #166, which still says something about a pre-split image
+        only (its FIFO fault fires on a TX's TX_DONE, before that TX's
+        TX_DONE_URC, i.e. while it is in flight):
+          tx_id_not_in_flight  no TX with tx_id == sub awaited its TX_DONE:
+                               a scan fault on any image;
+          tx_id_in_flight      one did: on a pre-split image this URC could
+                               also be that TX's FIFO readback mismatch (e.g.
+                               sub 0x00 against fragment 0; PR #166's daemons
+                               named it AMBIGUOUS). Read the board's
+                               tx_fifo_rb_bad counter (0 in every archived
+                               reading) if it matters;
+          no_tx_context        the caller passed None;
+      * any other sub -> TX_FIFO_RB_MISMATCH of a pre-split image (tx_id =
+        sub, basis=not_scan_encoding, old_fw True): no image after the split
+        sends 0x0D with it.
+    Returns {"name", "basis", "scan" (dict or None), "tx_id" (int or None),
+    "old_fw" (bool)}: "scan" is set for RX_SCAN_FAILED, "tx_id" and
+    "old_fw" for the pre-split FIFO fault.
     """
-    scan = None
     if rx_scan_fail_sub_valid(sub):
         scan = {
             "attempt": sub & RX_SCAN_FAIL_SUB_ATTEMPT_MASK,
@@ -708,16 +840,16 @@ def decode_fault_0x0d(sub: int, tx_ids_in_flight=None) -> dict:
             "hw_suspect": int(bool(sub & RX_SCAN_FAIL_SUB_HW_SUSPECT)),
             "crc_seen": int(bool(sub & RX_SCAN_FAIL_SUB_CRC_SEEN)),
         }
-    if scan is None:
-        name, basis = "TX_FIFO_RB_MISMATCH", "not_scan_encoding"
-    elif tx_ids_in_flight is None:
-        name, basis = "AMBIGUOUS", "no_tx_context"
-    elif sub in tx_ids_in_flight:
-        name, basis = "AMBIGUOUS", "tx_id_in_flight"
-    else:
-        name, basis = "RX_SCAN_FAILED", "tx_id_not_in_flight"
-    return {"name": name, "basis": basis, "scan": scan,
-            "tx_id": None if name == "RX_SCAN_FAILED" else sub}
+        if tx_ids_in_flight is None:
+            basis = "no_tx_context"
+        elif sub in tx_ids_in_flight:
+            basis = "tx_id_in_flight"
+        else:
+            basis = "tx_id_not_in_flight"
+        return {"name": "RX_SCAN_FAILED", "basis": basis, "scan": scan,
+                "tx_id": None, "old_fw": False}
+    return {"name": "TX_FIFO_RB_MISMATCH", "basis": "not_scan_encoding",
+            "scan": None, "tx_id": sub, "old_fw": True}
 
 
 # Upper case on purpose: the case-sensitive FAULT greps (rs12_leg_report.py
@@ -737,14 +869,17 @@ def format_fault_urc_line(payload: bytes, tx_ids_in_flight=None) -> str:
     during pipelined TX:`, or the untimestamped stdout `FAULT_URC during TX
     wait:` / `FAULT_URC during settle` (wait_for_tx_done, drain_boot; both
     daemons) -- and no legacy line carries `name=`.
-    NAME is HOST_FAULT_CODE_NAMES[code], UNKNOWN, or for 0x0D one of
-    RX_SCAN_FAILED / TX_FIFO_RB_MISMATCH / AMBIGUOUS (decode_fault_0x0d).
-    Detail tokens: 0x0D -> attempt= final= warm= hw_suspect= crc_seen= (when
-    the scan reading is possible), tx_id=0xSS (when the FIFO reading is),
-    basis=, tx_inflight= (comma list, '-' none, '?' unknown); 0x0E ->
-    tx_id=; 0x04 -> opmode=; 0x08 -> clock_source_id=; 0x09-0x0C -> the
-    format_fault_payload token; pc= lr= psr= bfar= when any is non-zero or
-    the code is a CPU fault (a replayed record from the previous boot).
+    NAME is HOST_FAULT_CODE_NAMES[code], UNKNOWN, or for 0x0D
+    RX_SCAN_FAILED or (a pre-split image's FIFO fault) TX_FIFO_RB_MISMATCH
+    (decode_fault_0x0d). Logs written by PR #166's daemons (2026-10-24,
+    before the 0x0D split) can also hold name=AMBIGUOUS; this function no
+    longer writes it.
+    Detail tokens: 0x0D -> attempt= final= warm= hw_suspect= crc_seen= (an
+    RX_SCAN_FAILED), or tx_id=0xSS fw=old (the pre-split FIFO fault), then
+    basis= and tx_inflight= (comma list, '-' none, '?' unknown); 0x0E and
+    0x0F -> tx_id=; 0x04 -> opmode=; 0x08 -> clock_source_id=; 0x09-0x0C ->
+    the format_fault_payload token; pc= lr= psr= bfar= when any is non-zero
+    or the code is a CPU fault (a replayed record from the previous boot).
     uptime_ms is payload[20:24] -- the L072's platform_now_ms() when the URC
     was SENT (host_cmd.c), '?' on a short payload.
     """
@@ -763,6 +898,8 @@ def format_fault_urc_line(payload: bytes, tx_ids_in_flight=None) -> str:
                          .format(**d["scan"]))
         if d["tx_id"] is not None:
             parts.append(f"tx_id=0x{d['tx_id']:02X}")
+        if d["old_fw"]:
+            parts.append("fw=old")
         parts.append(f"basis={d['basis']}")
         if tx_ids_in_flight is None:
             parts.append("tx_inflight=?")
@@ -774,7 +911,8 @@ def format_fault_urc_line(payload: bytes, tx_ids_in_flight=None) -> str:
         detail = _fault_sub_detail(code, sub)
         if detail:
             parts.append(detail)
-        elif code == HOST_FAULT_CODE_TX_DONE_EARLY:
+        elif code in (HOST_FAULT_CODE_TX_DONE_EARLY,
+                      HOST_FAULT_CODE_TX_FIFO_RB_MISMATCH):
             parts.append(f"tx_id=0x{sub:02X}")
         elif code == HOST_FAULT_CODE_RADIO_OPMODE_DRIFT:
             parts.append(f"opmode=0x{sub:02X}")

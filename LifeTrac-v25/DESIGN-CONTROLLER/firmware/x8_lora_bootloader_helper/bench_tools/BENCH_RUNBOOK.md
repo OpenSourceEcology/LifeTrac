@@ -21,7 +21,7 @@ per-session reference and the trap list. The rest of the bench kit:
 | file | runs on | purpose |
 |---|---|---|
 | `run_flash_bench.sh` + `stamp.py` + `kmsg_log.py` | board, `/home/fio` (persistent) | instrumented wrapper around `full_flash_pipeline.sh`: monotonic-stamped pipeline log + kernel log, fsync'd so a PMIC power-cycle cannot lose them. `REVIVE_MODE=reboot bash /home/fio/run_flash_bench.sh <bin>`; success = `Verify OK` + `flash_rc=0` in `/home/fio/pipeline_stamped.log` (~2.5 min incl. reboot). |
-| `radio_park.py` | board, daemon container | STANDBY → SLEEP, reads RegOpMode back, waits 1.5 s, reads again; prints `PARK_OK` only if still `0x80` (`PARK_TRANSIENT`, exit 5, if the firmware re-armed it). **The readback is NOT a persistent-off guarantee** (PR #125 review): the firmware's scan walker, γ-1 retune and slot follower all call `sx1276_rx_arm()` and will bring the modem back to RXCONT (receive-only) while any of them still has work. The park holds once the scan SM has exhausted into FAILED — up to ~2 min after the daemons stop (500 ms/channel, hard FAIL at 30 s per attempt, 3 retries). Park after that, and confirm later with `radio_state.py`. Firmware park command = TODO RS-12.21. |
+| `radio_park.py` | board, daemon container | Puts the radio in LoRa SLEEP (`0x80`) by one of two paths, picked by the VER reply's capability bitmap, then reads RegOpMode twice, 2.5 s apart (1.5 s until 2026-10-24); prints `PARK_OK` only if asleep at both reads. **Firmware path** (2026-10-24, RS-12.21; the image with capability bit 7, bitmap `0x000000FF`: built 2026-10-25, not flashed yet): the park command (`RADIO_PARK_REQ` 0x04, up to 3 tries) sets the L072's `host_parked` flag, which gates every RX arm path (scan walker, γ-1 retune, slot follower, the post-TX re-arm, the scan restarts), and puts the modem to SLEEP. **Persistent:** it holds until a host raw RXCONT write, a profile activation (any daemon start) or a reset. No answer from that image, or a refusal (a TX on air or queued), is `PARK_FAIL` (exit 4) with no register write; a `PARK_TRANSIENT` there is a firmware defect (an arm path the gate missed). **Register path** (`e083ae46` and older, which answer the command `UNKNOWN_TYPE` or not at all): STANDBY → SLEEP register writes. **Transient** (PR #125 review): the firmware's scan walker, γ-1 retune and slot follower all call `sx1276_rx_arm()` and bring the modem back to RXCONT (receive-only) while any of them still has work, so the park holds only once the scan SM has exhausted into FAILED — up to ~2 min after the daemons stop (500 ms/channel, hard FAIL at 30 s per attempt, 3 retries); `PARK_TRANSIENT` (exit 5) means it was still walking. Park after that, and confirm later with `radio_state.py`. The last line is `PARK_OK` / `PARK_TRANSIENT` / `PARK_FAIL` plus JSON: `path`, `persistent`, `holds`, `cap_bitmap`, `park_tries`, and `park_status` (PARKED / ALREADY_PARKED / REFUSED) or `park_cmd` (unknown_type / no_reply / err_proto). |
 | `radio_state.py` | board, daemon container | read-only RegOpMode decode — answers "is it off?" without touching it. |
 | `clear_retained.py` / `clear_retained_host.py <host>` | base (container) / PC | clear the retained control topics (`encode_mode_override`, `req_keyframe`, `radio_profile`) on the base broker / on another broker. A stale retained pin has flipped the camera and re-commanded a profile mid-leg; clear before EVERY leg. |
 | `kf_inject.py <period_s> <count>` | base (container) | REQ_KEYFRAME storm; the unacked retries at 0.4/0.8 s make the 2–3-command bursts that LOCK the tractor's scan machine (the RS-12.15 trigger). |
@@ -112,6 +112,12 @@ leg's `synth_fps` ("A leg", Base acquisition).
     `3c8ced60` with the L072 source unchanged; production twin `148de24e`).
     Flash record and a copy of the image:
     `bench-evidence/RS_12_15_reverse_delivery_2026-10-18/firmware_flash/`.
+  - **Built, not flashed (2026-10-25):** the RS-12.21 image (scan option
+    (b) + L + d2, the firmware park command, the 0x0D split; DECISIONS.md
+    D-FHSS1), bench `0daae279`, production `2c5e055a`, 25 324 B each. Its
+    flash and first legs are planned in
+    [`FHSS_SCAN_FAILED_OPTIONS.md`](../../murata_l072/FHSS_SCAN_FAILED_OPTIONS.md)
+    §6.1; "A leg", "First flash and legs on the RS-12.21 image" below.
   - The previous bench build, `0c1bb0a9` (RS-12.15 v2, on both boards
     2026-09-15 → 2026-10-18), comes from `main` before #152 (re-checked at
     `f6e4b463` on 2026-10-14). It is the rollback image.
@@ -202,7 +208,18 @@ line on the base from rx_smoke's own log (`inject_watch.sh`), not from the
 console tail that started leg W (2026-10-18) 2 min 41 s late.
 `-InjectOn fault:0x0D:final` starts it at the tractor's final
 RX_SCAN_FAILED (leg X); `fault:<code>` and `fault:<code>:<sub>` also work
-(the PC polls the tractor's tx_smoke log about every 2 s). At leg end the
+(the PC polls the tractor's tx_smoke log about every 2 s). Since
+2026-10-24 (the 0x0D split; offline-tested, not yet flown) `final` means
+code 0x0D with a valid scan sub at attempt 3 (0x83, 0x93, 0xA3, 0xC3,
+0xD3 or 0xE3), not bit 7 alone: the tractor's command tx_id 0xFE (the
+base's 0xFD) has bit 7 too, so an old image's FIFO fault on a command
+frame fired the old test. The 0x80 NULL-input marker no longer fires it,
+and the harness refuses `fault:<code>:final` for any code but 0x0D. The
+FIFO fault of an image with the split is `fault:0x0F` (or
+`fault:0x0F:<tx_id>`). On the RS-12.21 image a tractor without authority
+(its stream stalled for 1 s or more) restarts its scan after the final
+fault and sends another final every 30 s; the trigger fires on the first
+only. At leg end the
 harness stops the injector if it is still running, prints
 `INJECT <status> ... trigger: ...`, and archives `inject.log` (trigger,
 injector output, exit) and `inject_trigger.txt` (PC-side timeline). Not yet
@@ -335,29 +352,42 @@ list). `uptime_ms` is the L072's uptime when it sent the URC (payload bytes
 bfar=` print for a CPU fault (a record replayed from the previous boot) or
 when any of them is non-zero.
 
-Code 0x0D is two faults in the firmware (`host_types.h`):
+Code 0x0D was two faults in the firmware up to `e083ae46`:
 TX_FIFO_RB_MISMATCH (`sx1276_tx.c`: sub = that TX's tx_id, sent just before
 its TX_DONE) and RX_SCAN_FAILED (`sx1276_rx.c`: sub bit 7 `final`, the last
-attempt, after which the scan is FAILED; bit 6 `warm`, this boot has LOCKED
-before; bit 5 `hw_suspect`, the attempt saw no DIO0 IRQ and no CRC error;
-bit 4 `crc_seen`; bits 3–0 the attempt, 0 to 3). Only 25 sub values are scan
-encodings: attempts 0–2 not final, attempt 3 final, `hw_suspect` never with
-`crc_seen`, plus 0x80, the firmware's defensive NULL-input marker. The
-daemon decides with its own TX state and writes the decision as `name=`:
+attempt, the retries spent; bit 6 `warm`, this boot has LOCKED before; bit
+5 `hw_suspect`, the attempt saw no DIO0 IRQ and no CRC error; bit 4
+`crc_seen`; bits 3–0 the attempt, 0 to 3). **The 0x0D split** (2026-10-24,
+the RS-12.21 image; built 2026-10-25, not flashed yet): RX_SCAN_FAILED
+keeps 0x0D and TX_FIFO_RB_MISMATCH moves to **0x0F** (`host_types.h`).
+Only 25 sub values are scan encodings: attempts 0–2 not final, attempt 3
+final, `hw_suspect` never with `crc_seen`, plus 0x80, the firmware's
+defensive NULL-input marker. The daemons read 0x0D by its sub alone (their
+FAULT hook has no VER reply to tell the images apart; on an image with the
+split every 0x0D is a scan fault, so the rule is exact there):
 
-| `name=` | `basis=` | when |
+| code, sub | `name=` and detail | meaning |
 |---|---|---|
-| `TX_FIFO_RB_MISMATCH` | `not_scan_encoding` | the sub is not a scan encoding (certain) |
-| `RX_SCAN_FAILED` | `tx_id_not_in_flight` | a scan encoding, and no TX with that tx_id awaits its TX_DONE (the FIFO fault comes while its TX is in flight) |
-| `AMBIGUOUS` | `tx_id_in_flight` | a scan encoding that is also an in-flight tx_id, e.g. sub 0x00 while fragment 0 is in flight |
-| `AMBIGUOUS` | `no_tx_context` | no TX state to judge by |
+| 0x0D, a scan encoding | `RX_SCAN_FAILED attempt= final= warm= hw_suspect= crc_seen=`, then `basis=` | a scan attempt failed, on any image |
+| 0x0D, any other sub | `TX_FIFO_RB_MISMATCH tx_id=0xSS fw=old basis=not_scan_encoding` | an old image's FIFO fault (`fw=old`: no image with the split sends it) |
+| 0x0F | `TX_FIFO_RB_MISMATCH tx_id=0xSS` (no `basis=`, like 0x0E) | the FIFO fault of an image with the split |
 
-The 0x0D detail tokens are `attempt= final= warm= hw_suspect= crc_seen=`
-when the scan reading is possible, `tx_id=0xSS` when the FIFO reading is,
-then `basis=` and `tx_inflight=` (the tx_ids in flight; `-` for none, `?`
-when unknown). A `final=1` RX_SCAN_FAILED (sub 0x83, 0x93, 0xA3, 0xC3, 0xD3
-or 0xE3, or the 0x80 marker) is the scan entering FAILED; the attempts come
-about 30 s apart. Leg 6's first tractor 0x0D (`tx_daemon.log:237`, `FAULT
+On a 0x0D line `basis=` keeps PR #166's in-flight test, which matters only
+on an old image: `tx_id_not_in_flight` (no TX with tx_id = sub awaited its
+TX_DONE: a scan fault on any image), `tx_id_in_flight` (one did: on an old
+image it could also be that TX's FIFO fault, e.g. sub 0x00 while fragment 0
+is in flight; read the board's `tx_fifo_rb_bad`, 0 in every archived
+reading), `no_tx_context` (no TX state to judge by). `tx_inflight=` lists
+the tx_ids in flight (`-` for none, `?` when unknown). PR #166's daemons
+(2026-10-24, before the split) wrote `name=AMBIGUOUS` for the last two
+cases; the daemons no longer write it, and `rs12_leg_report.py` still reads
+it in old logs. A `final=1` RX_SCAN_FAILED (sub 0x83, 0x93, 0xA3, 0xC3,
+0xD3 or 0xE3, or the 0x80 marker) means the scan's retries are spent; the
+attempts come about 30 s apart. On `e083ae46` and older the scan then
+enters FAILED, which is absorbing. On the RS-12.21 image only a node with
+originator authority (a streaming tractor) holds FAILED; any other node
+scans on and sends another final RX_SCAN_FAILED every 30 s until it locks
+(scan option (b)). Leg 6's first tractor 0x0D (`tx_daemon.log:237`, `FAULT
 during pipelined TX: code=0x0D sub=0x20`) reads like this in the new form,
 with fragment 0x00 in flight:
 
@@ -384,8 +414,26 @@ it, and a follower there never hops, so it hears only what crosses the
 channel it is parked on. On 2026-10-24 leg 6 (2b_f3) the base heard 5 of 606
 frames and fired 5 probes, and the rule written before leg 1 pooled its 4/5;
 its FAILED entry was inferred, not seen
-(`bench-evidence/bench_session_2026-10-24/RESULTS.md`, Anomalies). Three
-checks now flag such a leg:
+(`bench-evidence/bench_session_2026-10-24/RESULTS.md`, Anomalies).
+
+That is `e083ae46` and older. **On the RS-12.21 image** (2026-10-25, built,
+not flashed yet; DECISIONS.md D-FHSS1) the dwell is 2 s per channel and the
+walk goes on across attempts, and a node without originator authority (the
+base, always) does not stay in FAILED: after the fourth failure it sends
+the final RX_SCAN_FAILED and scans on, with another final every 30 s until
+it locks. A lock after a final is a late acquisition, not a failure.
+`rs12_leg_report.py` and `rs13_probe_score.py` therefore take `--scan-image
+auto|restarts|absorbing` (default `auto`): `auto` reads the image from the
+base daemon's `L072 VER warm-up ok (attempt N) cap=0x...` line (capability
+bit 7, `HOST_CAP_RADIO_PARK`, marks the RS-12.21 image), else from a
+RX_SCAN_FAILED logged after a final one (an absorbing FAILED sends none).
+With neither, the old absorbing rule below applies and the FAILED line says
+that the image was not identified and how to override it. On the RS-12.21
+image a cold or early final is a 30 s report: the verdict is ACQUIRED (a
+late acquisition) when a lock can be placed after the chain of finals;
+when it cannot and the log ends within 35 s of the last final, it is
+FAILED if no lock shows and NOT DETERMINED if one does. Three checks now
+flag such a leg:
 
 - `rs12_leg_report.py`: an `acquisition:` line, after the loss lines, gives
   the base's first image reception (its first `frag_arrival` or `published
@@ -522,6 +570,38 @@ and Base acquisition, above; not yet flown). Confirm:
   acquisition:` line, and `leg<X>_digest_trace.txt` places its head too (it
   found the archive).
 
+**First flash and legs on the RS-12.21 image** (bench `0daae279`; planned
+2026-10-25, not yet flown; the full step list with its STOP rules is
+[`FHSS_SCAN_FAILED_OPTIONS.md`](../../murata_l072/FHSS_SCAN_FAILED_OPTIONS.md)
+§6.1). The flash needs its own GO and each leg its own. Fly from a
+checkout that holds the image's host side (the harness pushes the daemons
+and probe helpers from it). Confirm:
+
+- the build: `mingw32-make check` all `[PASS]`, bench md5
+  `0daae27978089eb97ab35c18718b62b0`, production
+  `2c5e055abff95126309a62409fafc654`; `flash_l072.sh` names it
+  `RS-12.21 bench build`, then `Verify OK`, `flash_rc=0` on each board
+  (tractor first);
+- after each flash: `rs116_health_probe.py` as before (`STATS-OK`,
+  `radio_state=4`, `tx_fifo_rb_bad` 0), then `radio_park.py` → `PARK_OK`
+  with `"cap_bitmap": "0x000000FF"`, `"path": "firmware"`, `"park_status":
+  "PARKED"`, and `radio_state.py` still `0x80` at least 2 min later
+  (`0x0000007F` or `"path": "register"` means the old image is still
+  there);
+- R1, a profile-1 `2c` leg (`leg_prep.sh 2c_<tag> image_bw250
+  --reactive-fire 1`): the base's `L072 VER warm-up ok ... cap=0x000000FF`
+  line, `confirmed acquisition: ACQUIRED` within 120 s, every 0x0D line
+  `name=RX_SCAN_FAILED` with no `fw=old`, no 0x0F line and
+  Δ`tx_fifo_rb_bad` 0 on both boards, no `!! BASE NEVER LOCKED`, and the
+  leg-end park on the firmware path at the first attempt, still `0x80` at
+  the `--check-only` reading at least 2 min later (profile 1 is still
+  active there, so this is the test of the park gate);
+- R2, the 2026-10-18 leg-X shape (480 s, KF requests off, no reactive
+  fire, `-InjectCmd "dual_inject.py 120" -InjectOn fault:0x0D:final`):
+  the tractor's attempts 0-2 and its final attempt 3 about 30 s apart,
+  the injector started on that attempt-3 line and on no earlier one, the
+  base's commands heard with the tractor in FAILED.
+
 Counter deltas: the harness fires an SWD reset of the tractor's L072 at leg
 start. At leg end it judges that reset from its openocd log:
 `TRACTOR_L072_RESET landed|failed|unknown (...)` in the `=== LEG CHECKS ===`
@@ -596,6 +676,18 @@ post-leg park has held for hours this way (both boards `0x80` an hour after
 leg V), but that is because of the timing above, not because the write is
 authoritative. RXCONT is receive-only — the TX path only fires on a host
 request, and there is none with the daemons down.
+
+**On the RS-12.21 image** (built 2026-10-25, not flashed yet) the timing
+above no longer applies. After an FHSS (profile 1) leg, with the daemons
+down, the scan of both boards never fails out (scan option (b): neither
+has originator authority), so a register park would never hold.
+`radio_park.py` reads the VER capability bitmap (`0x000000FF`) and uses
+the firmware park command instead, which holds right away: `PARK_OK` with `"path": "firmware"` and `"persistent":
+true` at the first attempt, no wait. It holds until a host RXCONT write, a
+profile activation (the next daemon start) or a reset. Still confirm with
+`radio_state.py` (or `--check-only`) at least ~2 min later before calling
+the bench off: on this image anything but `0x80` then is a firmware
+defect, not a scan still walking.
 
 ### L072 resets at leg start
 

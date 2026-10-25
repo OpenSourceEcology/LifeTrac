@@ -12,6 +12,9 @@
 #define HOST_TYPE_VER_REQ                    0x01U
 #define HOST_TYPE_UID_REQ                    0x02U
 #define HOST_TYPE_RESET_REQ                  0x03U
+/* RS-12.21 (2026-10-24) firmware radio park (mirror of host_types.h; payload
+ * none; reply RADIO_PARK_URC {u8 status, u8 RegOpMode readback}). */
+#define HOST_TYPE_RADIO_PARK_REQ             0x04U
 
 #define HOST_TYPE_TX_FRAME_REQ               0x10U
 
@@ -26,6 +29,11 @@
 
 #define HOST_TYPE_VER_URC                    0x81U
 #define HOST_TYPE_UID_URC                    0x82U
+#define HOST_TYPE_RADIO_PARK_URC             0x84U
+#define HOST_RADIO_PARK_URC_PAYLOAD_LEN      2U
+#define HOST_RADIO_PARK_STATUS_PARKED        0U
+#define HOST_RADIO_PARK_STATUS_ALREADY       1U
+#define HOST_RADIO_PARK_STATUS_REFUSED       2U
 #define HOST_TYPE_TX_DONE_URC                0x90U
 #define HOST_TYPE_RX_FRAME_URC               0x91U
 #define HOST_RX_FRAME_URC_TAIL_LEN           8U
@@ -41,6 +49,10 @@
 #define HOST_TYPE_ERR_PROTO_URC              0xFEU
 
 #define HOST_FAULT_CODE_CLOCK_HSE_FAILED     0x08U
+/* The 0x0D split (2026-10-24, mirror of host_types.h): 0x0D is RX_SCAN_FAILED
+ * only; TX_FIFO_RB_MISMATCH moved from 0x0D to 0x0F. */
+#define HOST_FAULT_CODE_RX_SCAN_FAILED       0x0DU
+#define HOST_FAULT_CODE_TX_FIFO_RB_MISMATCH  0x0FU
 
 #define HOST_STATS_OFFSET_HOST_DROPPED       0U
 #define HOST_STATS_OFFSET_HOST_ERRORS        4U

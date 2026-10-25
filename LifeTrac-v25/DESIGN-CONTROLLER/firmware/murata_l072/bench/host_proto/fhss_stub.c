@@ -94,3 +94,9 @@ uint32_t sx1276_stub_last_budget_us(void) {
  * radio/sx1276_rx.c must not see a second definition. */
 void sx1276_rx_scan_reset(void) {
 }
+
+/* RS-12.21 (2026-10-24): host_cfg_profile_activate() also ends a firmware
+ * radio park. Same placement rationale; check-radio-park pins the real one
+ * through the real activation. */
+void sx1276_rx_unpark(void) {
+}

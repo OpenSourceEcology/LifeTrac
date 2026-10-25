@@ -12,10 +12,17 @@ on their HostLink: one `FAULT_URC:` line per FAULT_URC, produced by
 otherwise, wherever the reader takes it off the wire. The legacy lines
 stay, so tools count `FAULT_URC: code=0x.. sub=0x.. name=` lines only.
 
+2026-10-24, later (the 0x0D split, FHSS_SCAN_FAILED_OPTIONS.md section 7):
+RX_SCAN_FAILED keeps 0x0D and TX_FIFO_RB_MISMATCH moves to 0x0F. The decoder
+names a 0x0D RX_SCAN_FAILED whenever its sub is a scan encoding (the
+in-flight check survives as `basis=`, the only trace of the pre-split
+ambiguity) and the pre-split FIFO fault (`fw=old`) otherwise; it no longer
+writes AMBIGUOUS.
+
 Contract pinned here:
   * the formatter on REAL payloads from the committed archives, incl. the
-    honest 0x0D decode (RX_SCAN_FAILED / TX_FIFO_RB_MISMATCH / AMBIGUOUS)
-    and the L072 uptime (payload bytes 20-23);
+    0x0D decode (RX_SCAN_FAILED with its basis / the pre-split
+    TX_FIFO_RB_MISMATCH), 0x0F, and the L072 uptime (payload bytes 20-23);
   * the line is seen by the case-sensitive FAULT greps the tools use, and
     is told apart from its legacy twins by `name=`;
   * the scan sub-byte model matches the firmware (sx1276_rx_scan_fail.h,
@@ -127,30 +134,63 @@ class FormatterOnArchivedPayloads(unittest.TestCase):
         self.assertIn("name=RX_SCAN_FAILED attempt=3 final=1", line)
         self.assertIn("tx_inflight=- uptime_ms=123670 ", line)
 
-    def test_sub_equal_to_an_in_flight_tx_id_is_ambiguous(self):
-        """Leg X's sub 0x00 against fragment 0 in flight: both firmware
-        emitters can produce it, so the line says so and carries both reads."""
+    def test_sub_equal_to_an_in_flight_tx_id_keeps_its_basis(self):
+        """Leg X's sub 0x00 against fragment 0 in flight. A scan encoding is
+        RX_SCAN_FAILED after the 0x0D split (PR #166 named it AMBIGUOUS);
+        basis=tx_id_in_flight keeps what still matters on a pre-split image:
+        this URC could also be fragment 0's FIFO readback mismatch."""
         self.assertEqual(
             mg.format_fault_urc_line(LEGX_ATTEMPT0, frozenset({0x00})),
-            "FAULT_URC: code=0x0D sub=0x00 name=AMBIGUOUS attempt=0 final=0 "
-            "warm=0 hw_suspect=0 crc_seen=0 tx_id=0x00 basis=tx_id_in_flight "
+            "FAULT_URC: code=0x0D sub=0x00 name=RX_SCAN_FAILED attempt=0 final=0 "
+            "warm=0 hw_suspect=0 crc_seen=0 basis=tx_id_in_flight "
             "tx_inflight=0x00 uptime_ms=33668 "
             "raw=0d0000000000000000000000000000000000000084830000")
 
-    def test_no_tx_context_is_ambiguous(self):
+    def test_no_tx_context_is_still_a_scan_failure(self):
         line = mg.format_fault_urc_line(LEG6_ATTEMPT0)
-        self.assertIn("name=AMBIGUOUS", line)
-        self.assertIn("basis=no_tx_context tx_inflight=?", line)
+        self.assertIn("name=RX_SCAN_FAILED attempt=0 final=0 warm=0 "
+                      "hw_suspect=1 crc_seen=0 basis=no_tx_context tx_inflight=? ",
+                      line)
 
-    def test_non_scan_sub_is_a_fifo_mismatch_whatever_the_context(self):
+    def test_the_decoder_never_writes_ambiguous(self):
+        for sub in range(256):
+            for ctx in (None, frozenset(), frozenset({sub})):
+                d = mg.decode_fault_0x0d(sub, ctx)
+                self.assertIn(d["name"], ("RX_SCAN_FAILED", "TX_FIFO_RB_MISMATCH"))
+                self.assertEqual(d["name"] == "RX_SCAN_FAILED",
+                                 mg.rx_scan_fail_sub_valid(sub), hex(sub))
+                self.assertEqual(d["old_fw"], d["name"] == "TX_FIFO_RB_MISMATCH")
+                self.assertNotIn("AMBIGUOUS",
+                                 mg.format_fault_urc_line(fault(0x0D, sub), ctx))
+
+    def test_non_scan_sub_is_a_pre_split_fifo_mismatch_whatever_the_context(self):
         # 0xFE/0xFD: the command-frame tx_ids (hw_suspect+crc_seen both set);
-        # 0x03: attempt 3 without `final`; 0x84: final with attempt 4.
+        # 0x03: attempt 3 without `final`; 0x84: final with attempt 4. No
+        # image after the 0x0D split sends these as 0x0D: fw=old says so.
         for sub in (0xFE, 0xFD, 0x03, 0x84, 0x30, 0x05):
             for ctx in (None, frozenset(), frozenset({sub})):
                 line = mg.format_fault_urc_line(fault(0x0D, sub, 7), ctx)
                 self.assertIn(f"name=TX_FIFO_RB_MISMATCH tx_id=0x{sub:02X} "
-                              "basis=not_scan_encoding", line, (sub, ctx))
+                              "fw=old basis=not_scan_encoding", line, (sub, ctx))
                 self.assertNotIn("attempt=", line)
+
+    def test_0x0f_is_the_fifo_mismatch(self):
+        """After the split TX_FIFO_RB_MISMATCH is 0x0F, sub = the host's
+        tx_id; the code says it all (no basis, no fw= token), whatever the
+        sub would read as under 0x0D."""
+        for sub in (0x00, 0x02, 0x83, 0xFD, 0xFE):
+            for ctx in (None, frozenset(), frozenset({sub})):
+                line = mg.format_fault_urc_line(fault(0x0F, sub, 180000), ctx)
+                self.assertEqual(
+                    line, f"FAULT_URC: code=0x0F sub=0x{sub:02X} "
+                    f"name=TX_FIFO_RB_MISMATCH tx_id=0x{sub:02X} uptime_ms=180000 "
+                    f"raw={fault(0x0F, sub, 180000).hex()}", (sub, ctx))
+        self.assertEqual(mg.HOST_FAULT_CODE_TX_FIFO_RB_MISMATCH, 0x0F)
+        self.assertEqual(mg.HOST_FAULT_CODE_TX_FIFO_RB_MISMATCH_PRE_SPLIT, 0x0D)
+        self.assertEqual(mg.HOST_FAULT_CODE_RX_SCAN_FAILED, 0x0D)
+        # the legacy text needs no decode: byte-identical shape
+        self.assertEqual(mg.format_fault_payload(fault(0x0F, 0x02, 9)),
+                         f"code=0x0F sub=0x02 raw={fault(0x0F, 0x02, 9).hex()}")
 
     def test_other_codes(self):
         self.assertEqual(
@@ -225,7 +265,7 @@ class FormatterOnArchivedPayloads(unittest.TestCase):
     def test_log_levels(self):
         self.assertEqual(mh.fault_urc_log_level(fault(0x09, 1)), logging.INFO)
         self.assertEqual(mh.fault_urc_log_level(fault(0x0C, 1)), logging.INFO)
-        for code in (0x01, 0x0A, 0x0B, 0x0D, 0x0E):
+        for code in (0x01, 0x0A, 0x0B, 0x0D, 0x0E, 0x0F):
             self.assertEqual(mh.fault_urc_log_level(fault(code, 0)),
                              logging.WARNING, code)
         self.assertEqual(mh.fault_urc_log_level(b""), logging.WARNING)
@@ -320,18 +360,35 @@ class ScanEncodingMatchesFirmware(unittest.TestCase):
         d = self._defines("host_types.h")
         codes = {k[len("HOST_FAULT_CODE_"):]: v for k, v in d.items()
                  if k.startswith("HOST_FAULT_CODE_")}
-        # the double booking this whole decode exists for
-        self.assertEqual(codes["TX_FIFO_RB_MISMATCH"], 0x0D)
+        # the 0x0D split (2026-10-24): the double booking is gone, every
+        # code is unique and the host names each one as the firmware does
         self.assertEqual(codes["RX_SCAN_FAILED"], 0x0D)
+        self.assertEqual(codes["TX_FIFO_RB_MISMATCH"], 0x0F)
+        self.assertEqual(len(set(codes.values())), len(codes), codes)
         for name, value in codes.items():
-            if value == 0x0D:
-                continue
             self.assertEqual(mg.HOST_FAULT_CODE_NAMES.get(value), name, name)
-        self.assertNotIn(0x0D, mg.HOST_FAULT_CODE_NAMES)
+        self.assertEqual(set(mg.HOST_FAULT_CODE_NAMES), set(codes.values()))
         self.assertEqual(d["HOST_FAULT_URC_PAYLOAD_LEN"], 24)
         self.assertEqual(d["HOST_TYPE_FAULT_URC"], mg.HOST_TYPE_FAULT_URC)
         self.assertEqual(d["HOST_TYPE_TX_FRAME_REQ"], mg.HOST_TYPE_TX_FRAME_REQ)
         self.assertEqual(d["HOST_TYPE_TX_DONE_URC"], mg.HOST_TYPE_TX_DONE_URC)
+        # RS-12.21 park command (HostLink.radio_park, bench_tools/radio_park.py)
+        self.assertEqual(d["HOST_TYPE_RADIO_PARK_REQ"], mg.HOST_TYPE_RADIO_PARK_REQ)
+        self.assertEqual(d["HOST_TYPE_RADIO_PARK_URC"], mg.HOST_TYPE_RADIO_PARK_URC)
+        self.assertEqual((mg.HOST_TYPE_RADIO_PARK_REQ, mg.HOST_TYPE_RADIO_PARK_URC),
+                         (0x04, 0x84))
+        # 2026-10-24 review: the capability bit radio_park.py and
+        # rs12_leg_report.py read the image by, and that the image sets it
+        with open(os.path.join(_FW_INC, "host_types.h"), encoding="utf-8") as fh:
+            text = fh.read()
+        bit = re.search(r"#define\s+HOST_CAP_RADIO_PARK\s+\(1UL << (\d+)\)", text)
+        self.assertEqual(1 << int(bit.group(1)), mg.HOST_CAP_RADIO_PARK)
+        self.assertRegex(text, r"HOST_CAP_TX_FRAME \| \\\s*\n\s*HOST_CAP_RADIO_PARK\)")
+        tools = os.path.join(_DC_DIR, "tools")
+        if tools not in sys.path:
+            sys.path.insert(0, tools)
+        import rs12_leg_report as rep
+        self.assertEqual(rep.HOST_CAP_RADIO_PARK, mg.HOST_CAP_RADIO_PARK)
 
     def test_every_emittable_sub_is_a_scan_encoding(self):
         emitted = set()
@@ -343,6 +400,12 @@ class ScanEncodingMatchesFirmware(unittest.TestCase):
                         emitted.add(sub)
                         d = mg.decode_fault_0x0d(sub, frozenset())
                         self.assertEqual(d["name"], "RX_SCAN_FAILED", hex(sub))
+                        self.assertEqual(d["basis"], "tx_id_not_in_flight")
+                        # a TX with tx_id == sub in flight moves the basis only
+                        busy = mg.decode_fault_0x0d(sub, frozenset({sub}))
+                        self.assertEqual((busy["name"], busy["basis"], busy["scan"]),
+                                         ("RX_SCAN_FAILED", "tx_id_in_flight",
+                                          d["scan"]))
                         self.assertEqual(d["scan"]["attempt"], retries)
                         self.assertEqual(d["scan"]["warm"], int(warm))
                         self.assertEqual(d["scan"]["crc_seen"], int(crc))
@@ -384,6 +447,7 @@ class FakeL072:
         self.on_tx = {}                # tx_id -> [(type, payload)] before TX_DONE
         self.park_tx = False           # True: TX_FRAME_REQ draws no reply
         self.refuse_tx = 0             # next N TX_FRAME_REQs: ERR_PROTO FORBIDDEN
+        self.ver_payload = bytes(12)   # VER_URC: proto..reserved, cap_bitmap (LE)
 
     # -- os surface used by HostLink --
     def open(self, *_a, **_k):
@@ -425,7 +489,7 @@ class FakeL072:
         for ftype, payload in self.before_reply.pop(t, []):
             self.push(ftype, payload)
         if t == 0x01:                                       # VER_REQ
-            self.push(0x81, bytes(12), seq)
+            self.push(0x81, self.ver_payload, seq)
         elif t == 0x20:                                     # CFG_SET_REQ
             self.push(0xA0, bytes([p[0], 0]), seq)
         elif t == 0x30:                                     # REG_READ_REQ
@@ -536,9 +600,9 @@ class HostLinkObserver(_WireCase):
     def test_resent_tx_id_stays_in_flight_until_both_tx_dones(self):
         """Review 2026-10-24 (dup tx_id): the pipelined watchdog / serial
         retry resend a tx_id while the L072 may still hold the first copy.
-        The first TX_DONE must not retire both: a FIFO fault on the resend
-        (sub = tx_id 0x00, also a scan encoding) is AMBIGUOUS, not a
-        determinate RX_SCAN_FAILED."""
+        The first TX_DONE must not retire both: a pre-split FIFO fault on
+        the resend (code 0x0D, sub = tx_id 0x00, also a scan encoding)
+        keeps basis=tx_id_in_flight, not tx_id_not_in_flight."""
         link = self.link(observe=False)
         lines = []
         link.on_fault_urc = lambda fr, ids: lines.append(
@@ -553,7 +617,7 @@ class HostLinkObserver(_WireCase):
         self.fake.push(0xF1, fault(0x0D, 0x00, 70_000))      # nothing in flight
         while len(lines) < 2:
             self.assertTrue(link.read_frames(0.2))
-        self.assertIn("sub=0x00 name=AMBIGUOUS attempt=0", lines[0])
+        self.assertIn("sub=0x00 name=RX_SCAN_FAILED attempt=0", lines[0])
         self.assertIn("basis=tx_id_in_flight tx_inflight=0x00 "
                       "uptime_ms=40000", lines[0])
         self.assertIn("sub=0x00 name=RX_SCAN_FAILED attempt=0", lines[1])
@@ -691,25 +755,60 @@ class BaseDaemonFaultPaths(_DaemonCase):
                       "tx_inflight=- uptime_ms=64012", msg)
         self.assertEqual(len(fault_urc_lines(records)), 2)
 
+    def test_open_link_logs_the_capability_bitmap(self):
+        """2026-10-24 review: the VER warm-up line names the image by its
+        capability bitmap (bit 7 HOST_CAP_RADIO_PARK: the RS-12.21 image, whose
+        scan restarts after a final RX_SCAN_FAILED), in the shape
+        rs12_leg_report.py's acquisition rule reads; a short VER payload logs
+        cap=?."""
+        tools = os.path.join(_DC_DIR, "tools")
+        if tools not in sys.path:
+            sys.path.insert(0, tools)
+        import rs12_leg_report as rep
+        for payload, cap in ((bytes(8) + (0xFF).to_bytes(4, "little"), "0x000000FF"),
+                             (bytes(8) + (0x7F).to_bytes(4, "little"), "0x0000007F"),
+                             (bytes(11), "?")):
+            with self.subTest(cap=cap):
+                self.fake.ver_payload = payload
+                _link, records = self.open_link(self.daemon())
+                msgs = [r.getMessage() for r in records
+                        if r.getMessage().startswith("L072 VER warm-up ok")]
+                self.assertEqual(msgs, [f"L072 VER warm-up ok (attempt 1) cap={cap}"])
+                m = rep.VER_CAP_RE.search(msgs[0])
+                if cap == "?":
+                    self.assertIsNone(m)
+                else:
+                    self.assertEqual(int(m.group(1), 16) & rep.HOST_CAP_RADIO_PARK,
+                                     int(cap, 16) & 0x80)
+
     def test_command_tx_fifo_mismatch(self):
-        d = self.daemon()
-        link, _ = self.open_link(d)
-        self.fake.on_tx[0xFD] = [(0xF1, fault(0x0D, 0xFD, 5000))]
-        body = pack_command_frame(CMD_OP_REQ_KEYFRAME)
-        with self.assertLogs(self.logger, level="DEBUG") as cap:
-            d._send_command_frame(link, body, copies=1)
-        self.assert_one_fault_line(
-            cap.records, "code=0x0D sub=0xFD name=TX_FIFO_RB_MISMATCH "
-            "tx_id=0xFD basis=not_scan_encoding tx_inflight=0xFD")
-        # the base's command TX wait also print()s a stdout twin (review
-        # 2026-10-24): one docker log, one count on the `name=` key
-        self.assertIn("FAULT_URC during TX wait: " + mg.format_fault_payload(
-            fault(0x0D, 0xFD, 5000)), self.stdout.getvalue())
-        self.assert_one_count(cap.records, 1)
-        # non-FAULT handling around it: TX_DONE still completes the send
-        self.assertTrue(any("command TX opcode=0x60 copy=1/1 OK (on air)"
-                            in r.getMessage() for r in cap.records))
-        self.assertEqual(getattr(d, "_cmd_tx_ok", 0), 1)
+        """A pre-split image's FIFO fault on a base command (code 0x0D, sub
+        = tx_id 0xFD), and the same fault from a split image (code 0x0F)."""
+        for code, expect in (
+                (0x0D, "code=0x0D sub=0xFD name=TX_FIFO_RB_MISMATCH tx_id=0xFD "
+                       "fw=old basis=not_scan_encoding tx_inflight=0xFD "
+                       "uptime_ms=5000"),
+                (0x0F, "code=0x0F sub=0xFD name=TX_FIFO_RB_MISMATCH tx_id=0xFD "
+                       "uptime_ms=5000")):
+            with self.subTest(code=hex(code)):
+                self.stdout.seek(0)
+                self.stdout.truncate()
+                d = self.daemon()
+                link, _ = self.open_link(d)
+                self.fake.on_tx[0xFD] = [(0xF1, fault(code, 0xFD, 5000))]
+                body = pack_command_frame(CMD_OP_REQ_KEYFRAME)
+                with self.assertLogs(self.logger, level="DEBUG") as cap:
+                    d._send_command_frame(link, body, copies=1)
+                self.assert_one_fault_line(cap.records, expect)
+                # the base's command TX wait also print()s a stdout twin
+                # (review 2026-10-24): one docker log, one count on `name=`
+                self.assertIn("FAULT_URC during TX wait: " + mg.format_fault_payload(
+                    fault(code, 0xFD, 5000)), self.stdout.getvalue())
+                self.assert_one_count(cap.records, 1)
+                # non-FAULT handling around it: TX_DONE still completes the send
+                self.assertTrue(any("command TX opcode=0x60 copy=1/1 OK (on air)"
+                                    in r.getMessage() for r in cap.records))
+                self.assertEqual(getattr(d, "_cmd_tx_ok", 0), 1)
 
     def test_rx_loop_logs_fault_and_still_handles_frames(self):
         """The RX loop used to drop FAULTs at DEBUG; now the observer logs
@@ -763,15 +862,19 @@ class TractorDaemonFaultPaths(_DaemonCase):
 
     def test_pipelined_tx_scan_and_fifo_faults(self):
         """Fragments 0 and 1 in flight (depth 2): a scan fault (sub 0x20)
-        reads as RX_SCAN_FAILED; a 0x0D whose sub is fragment 1's tx_id is
-        AMBIGUOUS. The historical pipelined line is still written verbatim
-        and the TX_DONE accounting is unchanged."""
+        reads as RX_SCAN_FAILED; a 0x0D whose sub is fragment 1's tx_id
+        reads as RX_SCAN_FAILED too, with basis=tx_id_in_flight (a pre-split
+        image could have meant fragment 1's FIFO fault; PR #166 named it
+        AMBIGUOUS); a split image's 0x0F on fragment 1 is the FIFO fault.
+        The historical pipelined line is still written verbatim and the
+        TX_DONE accounting is unchanged."""
         d = self.daemon()
         link, _ = self.open_link(d)
         scan = fault(0x0D, 0x20, 34012)
-        fifo = fault(0x0D, 0x01, 34200)
+        busy = fault(0x0D, 0x01, 34200)
+        fifo = fault(0x0F, 0x01, 34201)
         self.fake.on_tx[0x00] = [(0xF1, scan)]
-        self.fake.on_tx[0x01] = [(0xF1, fifo)]
+        self.fake.on_tx[0x01] = [(0xF1, busy), (0xF1, fifo)]
         frame = image_tx_daemon._PendingFrame(seq=7, payload=b"x",
                                               enqueued_ms=0)
         with self.assertLogs(self.logger, level="DEBUG") as cap:
@@ -782,15 +885,19 @@ class TractorDaemonFaultPaths(_DaemonCase):
             "final=0 warm=0 hw_suspect=1 crc_seen=0 basis=tx_id_not_in_flight "
             "tx_inflight=0x00,0x01 uptime_ms=34012")
         self.assert_one_fault_line(
-            cap.records, "code=0x0D sub=0x01 name=AMBIGUOUS attempt=1 final=0 "
-            "warm=0 hw_suspect=0 crc_seen=0 tx_id=0x01 basis=tx_id_in_flight "
+            cap.records, "code=0x0D sub=0x01 name=RX_SCAN_FAILED attempt=1 final=0 "
+            "warm=0 hw_suspect=0 crc_seen=0 basis=tx_id_in_flight "
             "tx_inflight=0x01 uptime_ms=34200")
+        self.assert_one_fault_line(
+            cap.records, "code=0x0F sub=0x01 name=TX_FIFO_RB_MISMATCH tx_id=0x01 "
+            "uptime_ms=34201")
         legacy = [r.getMessage() for r in cap.records
                   if r.getMessage().startswith("FAULT during pipelined TX: ")]
         self.assertEqual(legacy, [
             "FAULT during pipelined TX: " + mg.format_fault_payload(scan),
+            "FAULT during pipelined TX: " + mg.format_fault_payload(busy),
             "FAULT during pipelined TX: " + mg.format_fault_payload(fifo)])
-        self.assert_one_count(cap.records, 2)
+        self.assert_one_count(cap.records, 3)
         self.assertEqual((d.frames_tx_ok, d.fragments_tx_ok,
                           d.fragments_tx_fail), (1, 2, 0))
 

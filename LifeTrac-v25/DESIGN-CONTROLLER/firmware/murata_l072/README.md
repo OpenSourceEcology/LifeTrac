@@ -107,14 +107,28 @@ python3 tools/check_size_budget.py build/firmware.elf
 
 ### Expected md5s
 
-At `13f20aa1` (the RS-12.15 reverse-delivery fix, built on the bench PC
-2026-10-14 and repeated after `mingw32-make clean`), with the toolchain above
-and the default flags:
+The RS-12.21 image (scan option (b) + L + d2, the firmware park command and
+the 0x0D split, [FHSS_SCAN_FAILED_OPTIONS.md](FHSS_SCAN_FAILED_OPTIONS.md)
+section 5 item 2, adopted 2026-10-24 as [DECISIONS.md](../../DECISIONS.md)
+D-FHSS1; branch `fhss-scan-recovery-2026-10-24`), built on the bench PC
+2026-10-25, repeated from a clean copy of the tree and again after
+`mingw32-make clean`, with the toolchain above and the default flags.
+**Built, not flashed** (the flash and its checks: the memo's section 6.1,
+on the operator's GO):
+
+| image | md5 | size |
+|---|---|---|
+| `build/firmware_bench_diag.bin` (bench; not flashed yet) | `0daae27978089eb97ab35c18718b62b0` | 25 324 B |
+| `build/firmware.bin` (production, committed) | `2c5e055abff95126309a62409fafc654` | 25 324 B |
+
+The image flashed on the boards until then, at `13f20aa1` (the RS-12.15
+reverse-delivery fix, built 2026-10-14 and repeated after
+`mingw32-make clean`):
 
 | image | md5 | size |
 |---|---|---|
 | `build/firmware_bench_diag.bin` (bench; on both boards since 2026-10-18) | `e083ae46a64686031b39866eca42e094` | 24 972 B |
-| `build/firmware.bin` (production, committed) | `148de24e1f9acce417c46c2c69a5be6b` | 24 972 B |
+| `build/firmware.bin` (production) | `148de24e1f9acce417c46c2c69a5be6b` | 24 972 B |
 
 Both bench boards run `e083ae46` since 2026-10-18, flashed for the RS-12.15
 reverse-delivery round (Verify OK, `flash_rc=0` on both;

@@ -156,6 +156,10 @@ static bool time_reached(uint32_t now, uint32_t deadline) {
 static void sx1276_tx_cleanup(void) {
     (void)sx1276_modes_to_standby();
     if (s_rearm_rx != 0U) {
+        /* RS-12.21 (2026-10-24): the post-TX re-arm. It cannot meet a host
+         * park: the park is refused while a TX is keyed or queued
+         * (host_cmd.c) and sx1276_tx_begin() refuses while parked -- and
+         * sx1276_rx_arm() refuses while parked regardless. */
         (void)sx1276_rx_arm();
         /* RS-12.10: the receiver is listening again — book the deaf
          * window (disarm -> here) and the TX_DONE -> re-arm turnaround. */
@@ -182,6 +186,13 @@ bool sx1276_tx_begin(const sx1276_tx_request_t *req) {
     sx1276_airtime_result_t airtime_result;
 
     if (req == NULL || s_tx_state != SX1276_TX_STATE_IDLE) {
+        return false;
+    }
+    /* RS-12.21 (2026-10-24): nothing goes on air while the host has the
+     * radio parked (HOST_TYPE_RADIO_PARK_REQ) -- refused before any side
+     * effect (no clock anchor, no scheduler step, no RFCO snapshot); the
+     * host gets the same ERR_PROTO FORBIDDEN as for any refused TX. */
+    if (sx1276_rx_parked()) {
         return false;
     }
 
@@ -571,6 +582,8 @@ static void tx_fifo_readback_check(void) {
         host_stats_tx_fifo_rb_ok();
     } else {
         host_stats_tx_fifo_rb_bad();
+        /* 0x0F since 2026-10-24 (0x0D before: it collided with
+         * RX_SCAN_FAILED, host_types.h). */
         host_cmd_emit_fault(HOST_FAULT_CODE_TX_FIFO_RB_MISMATCH, s_tx_id);
     }
 }

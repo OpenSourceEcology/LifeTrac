@@ -3,6 +3,19 @@
 
 #include <stdint.h>
 
+/* Version contract (RS-12.21 note, 2026-10-24). HOST_PROTOCOL_VER is the
+ * frame header's `ver` byte, refused on mismatch by host_cmd_dispatch
+ * (BAD_VERSION), so it changes only with the framing. HOST_WIRE_SCHEMA_VER
+ * is reported in BOOT/VER/READY and CFG key 0x81 (1 -> 2 on 2026-05-20,
+ * d4dfcb86, with the FHSS batch). Additive changes have kept both since: a
+ * new message type (0xC5 RX_CRC_DUMP_URC, 2026-08-02), a tail appended to a
+ * payload (the F8 RX_FRAME_URC tail, the STATS_URC tails), a new fault code
+ * or a fault code's sub-byte (the 2026-05-19 RX-scan-FAILED analysis §13.1
+ * #7 contract: the FAULT_URC format, host_stats and schema_ver untouched).
+ * The 2026-10-24 RADIO_PARK_REQ/URC and the 0x0D split are such changes:
+ * no bump. A new command is advertised in the capability bitmap instead,
+ * and an older image answers it with ERR_PROTO UNKNOWN_TYPE (detail = the
+ * type). */
 #define HOST_PROTOCOL_VER                    1U
 #define HOST_WIRE_SCHEMA_VER                 2U
 
@@ -13,6 +26,10 @@
 #define HOST_CAP_STATS                       (1UL << 4)
 #define HOST_CAP_RESET                       (1UL << 5)
 #define HOST_CAP_TX_FRAME                    (1UL << 6)
+/* RS-12.21 (2026-10-24): RADIO_PARK_REQ/URC below. The image that added it
+ * also moved TX_FIFO_RB_MISMATCH to 0x0F, so a host may read this bit as
+ * "0x0D is RX_SCAN_FAILED only" (the 0x0D split, fault codes below). */
+#define HOST_CAP_RADIO_PARK                  (1UL << 7)
 
 #define HOST_CAPABILITY_BITMAP               (HOST_CAP_PING | \
                                              HOST_CAP_VERSION | \
@@ -20,13 +37,43 @@
                                              HOST_CAP_REG_IO | \
                                              HOST_CAP_STATS | \
                                              HOST_CAP_RESET | \
-                                             HOST_CAP_TX_FRAME)
+                                             HOST_CAP_TX_FRAME | \
+                                             HOST_CAP_RADIO_PARK)
 
 /* Host-to-L072 commands. */
 #define HOST_TYPE_PING_REQ                   0x00U
 #define HOST_TYPE_VER_REQ                    0x01U
 #define HOST_TYPE_UID_REQ                    0x02U
 #define HOST_TYPE_RESET_REQ                  0x03U
+/*
+ * RADIO_PARK_REQ (RS-12.21, 2026-10-24): the firmware radio park, the bench's
+ * persistent radio-off state (FHSS_SCAN_FAILED_OPTIONS.md section 5 item 2,
+ * adopted with scan option (b): a node without originator authority now
+ * scans on after its scan budget, re-arming RX every dwell, so a host SLEEP
+ * write does not hold once the daemons stop). Payload: none (ignored).
+ *   - Sets the host_parked flag (radio/sx1276_rx.c, sx1276_rx_park()) and
+ *     puts the modem to LoRa SLEEP. While it is set nothing arms the
+ *     receiver: the scan machine is frozen (no walker step, no FAIL fault,
+ *     no (b) restart), the slot follower, the gamma-1 retune and the post-TX
+ *     re-arm do nothing, and sx1276_rx_arm() refuses.
+ *   - A TX_FRAME_REQ while parked is refused (ERR_PROTO FORBIDDEN, detail
+ *     0, as any refused TX): nothing goes on air.
+ *   - Ends at a host raw RegOpMode RX write (REG_WRITE 0x01 = 0x85 RXCONT,
+ *     the daemons' arm; 0x86 RXSINGLE in a diag build), a profile
+ *     activation (CFG_SET REG_PROFILE) or any reset. The scan machine then
+ *     resumes as it stood (an activation restarts it): a SCANNING node's
+ *     dwell and 30 s attempt do not count the parked time; a LOCKED node's
+ *     2 s loss timer does, as the FHSS clock's freshness does, so a park
+ *     longer than that demotes it at the first tick (a fresh acquisition,
+ *     not a drifted grid).
+ * Reply: RADIO_PARK_URC, same seq, HOST_RADIO_PARK_URC_PAYLOAD_LEN bytes:
+ *   u8 status  HOST_RADIO_PARK_STATUS_*: 0 PARKED; 1 ALREADY_PARKED (SLEEP
+ *              re-applied); 2 REFUSED -- a TX is on air or queued, nothing
+ *              changed (retry after its TX_DONE)
+ *   u8 opmode  RegOpMode read back after the request (0x80 = LoRa SLEEP)
+ * Bench check: check-radio-park (bench/host_proto/radio_park.c).
+ */
+#define HOST_TYPE_RADIO_PARK_REQ             0x04U
 
 #define HOST_TYPE_TX_FRAME_REQ               0x10U
 
@@ -42,6 +89,12 @@
 /* L072-to-host URCs/responses. */
 #define HOST_TYPE_VER_URC                    0x81U
 #define HOST_TYPE_UID_URC                    0x82U
+/* RS-12.21 (2026-10-24): reply to RADIO_PARK_REQ, layout above. */
+#define HOST_TYPE_RADIO_PARK_URC             0x84U
+#define HOST_RADIO_PARK_URC_PAYLOAD_LEN      2U
+#define HOST_RADIO_PARK_STATUS_PARKED        0U
+#define HOST_RADIO_PARK_STATUS_ALREADY       1U
+#define HOST_RADIO_PARK_STATUS_REFUSED       2U
 
 #define HOST_TYPE_TX_DONE_URC                0x90U
 /* TX_DONE_URC payload: {u8 tx_id, u8 status, u32 time_on_air_us_le, u8 tx_power_dbm} */
@@ -248,36 +301,48 @@
 #define HOST_FAULT_CODE_HOST_RX_INACTIVE     0x0AU
 #define HOST_FAULT_CODE_HOST_PARSE_ERROR     0x0BU
 #define HOST_FAULT_CODE_HOST_DIAG_MARK       0x0CU
-/* RS-11.5 (2026-08-02) TX-path discriminators for the slot-(total-2)
- * on-air CRC corruption. sub = the fragment's tx_id (== index).
- * 0x0D: post-TX FIFO readback checksum != load-time checksum — the FIFO
- *       was altered between load and TX_DONE (corrupt at the source).
- * 0x0E: TX_DONE arrived >5 ms EARLIER than the expected ToA — the
- *       radiation was truncated. */
-#define HOST_FAULT_CODE_TX_FIFO_RB_MISMATCH  0x0DU
-#define HOST_FAULT_CODE_TX_DONE_EARLY        0x0EU
-
 /*
- * RX_SCAN_FAILED — emitted by the SCANNING-state failure handler in
- * radio/sx1276_rx.c when the FHSS rendezvous scan has failed to lock
- * within REDESIGN_MS (per FCC-A6c-1 policy, sx1276_rx_scan_policy.c).
+ * RX_SCAN_FAILED (0x0D) -- emitted by the scan FAIL dispatch in
+ * radio/sx1276_rx.c (scan_dispatch_action, FCC-A6c-3-c) at the end of every
+ * 30 s scan attempt that did not LOCK (SX1276_RX_SCAN_REDESIGN_MS,
+ * radio/sx1276_rx_scan_policy.c). The `sub` byte, built by
+ * sx1276_rx_scan_fail_eval() (radio/sx1276_rx_scan_fail.c), carries a
+ * four-class disambiguation encoding so the host can tell the root cause at
+ * the fault edge without a wider URC payload (AI NOTES/2026-05-19_RX_Scan_
+ * FAILED_State_Analysis §13.1 #2, A6c-3-a):
  *
- * The `sub` byte carries a four-class disambiguation encoding so the
- * host can distinguish root cause at the fault edge without a wider
- * URC payload (per AI NOTES/2026-05-19_RX_Scan_FAILED_State_Analysis
- * §13.1 #2, A6c-3-a):
- *
- *   bit 7 : final       — 1 == retries exhausted, FAILED entered
+ *   bit 7 : final       — 1 == the retries are spent (attempt nibble at
+ *                         SX1276_RX_SCAN_MAX_RETRIES). Since RS-12.21 (b)
+ *                         (2026-10-24) this does NOT mean "FAILED for
+ *                         good": only a node with originator authority
+ *                         holds FAILED; any other node scans on, and its
+ *                         final fault repeats every 30 s until a LOCK.
  *   bit 6 : warm        — 1 == this boot has previously LOCKED
  *   bit 5 : hw_suspect  — 1 == no DIO0 IRQ observed during scan
  *   bit 4 : crc_seen    — 1 == >=1 CRC-error IRQ observed during scan
  *   bits 3..0 : attempt — 0..15 saturating, this attempt's index
  *
- * Emission semantics (B-prime, per §13.1 #6) and the file-statics that
- * back the `sub` bits land in FCC-A6c-3-b / A6c-3-c. This define is
- * declaration-only (FCC-A6c-3-a); no code emits it yet.
+ * History (FHSS_SCAN_FAILED_OPTIONS.md section 7): this define took 0x0D on
+ * 2026-05-20 as a declaration-only step whose note read "no code emits it
+ * yet"; the emitter landed with A6c-3-c, the note stayed, and RS-11.5 took
+ * 0x0D again for TX_FIFO_RB_MISMATCH on 2026-08-02. The 2026-10-24 split
+ * keeps 0x0D for this fault (every logged 0x0D is one) and moves the FIFO
+ * fault to 0x0F. A host decoding an older image: a 0x0D whose sub is not a
+ * valid scan encoding is that image's FIFO fault (tx_id = sub); an image
+ * advertising HOST_CAP_RADIO_PARK has the split.
  */
 #define HOST_FAULT_CODE_RX_SCAN_FAILED       0x0DU
+/* RS-11.5 (2026-08-02) TX-path discriminators for the slot-(total-2)
+ * on-air CRC corruption (radio/sx1276_tx.c). sub = the TX's tx_id (the
+ * host's: a fragment index, or a command/PROBE id such as 0xFD/0xFE).
+ * 0x0E: TX_DONE arrived >5 ms EARLIER than the expected ToA — the
+ *       radiation was truncated.
+ * 0x0F: post-TX FIFO readback checksum != load-time checksum — the FIFO
+ *       was altered between load and TX_DONE (corrupt at the source). Was
+ *       0x0D until 2026-10-24 (the 0x0D split, above); the counter
+ *       tx_fifo_rb_bad (STATS offset 136) stays its primary signal. */
+#define HOST_FAULT_CODE_TX_DONE_EARLY        0x0EU
+#define HOST_FAULT_CODE_TX_FIFO_RB_MISMATCH  0x0FU
 
 /* CFG status codes used in CFG_OK_URC payload. */
 #define HOST_CFG_STATUS_OK                   0U
@@ -298,13 +363,16 @@
 #define HOST_ERR_PROTO_QUEUE_FULL            7U
 #define HOST_ERR_PROTO_FORBIDDEN             8U
 
-/* Duplicate case labels produce a compile-time error if any ID collides. */
+/* Duplicate case labels produce a compile-time error if any ID collides.
+ * RS-12.21 (2026-10-24): RADIO_PARK_REQ/URC added, and the 0xC3-0xC5 URC
+ * types the list had missed. */
 static inline void host_type_compile_time_uniqueness_check(void) {
     switch (0U) {
         case HOST_TYPE_PING_REQ:
         case HOST_TYPE_VER_REQ:
         case HOST_TYPE_UID_REQ:
         case HOST_TYPE_RESET_REQ:
+        case HOST_TYPE_RADIO_PARK_REQ:
         case HOST_TYPE_TX_FRAME_REQ:
         case HOST_TYPE_CFG_SET_REQ:
         case HOST_TYPE_CFG_GET_REQ:
@@ -314,6 +382,7 @@ static inline void host_type_compile_time_uniqueness_check(void) {
         case HOST_TYPE_STATS_DUMP_REQ:
         case HOST_TYPE_VER_URC:
         case HOST_TYPE_UID_URC:
+        case HOST_TYPE_RADIO_PARK_URC:
         case HOST_TYPE_TX_DONE_URC:
         case HOST_TYPE_RX_FRAME_URC:
         case HOST_TYPE_CFG_OK_URC:
@@ -323,10 +392,41 @@ static inline void host_type_compile_time_uniqueness_check(void) {
         case HOST_TYPE_RADIO_IRQ_URC:
         case HOST_TYPE_STATS_URC:
         case HOST_TYPE_AIRTIME_INVARIANT_REJECT_URC:
+        case HOST_TYPE_RFCO_PERTX_URC:
+        case HOST_TYPE_RFCO_SUMMARY_URC:
+        case HOST_TYPE_RX_CRC_DUMP_URC:
         case HOST_TYPE_BOOT_URC:
         case HOST_TYPE_FAULT_URC:
         case HOST_TYPE_READY_URC:
         case HOST_TYPE_ERR_PROTO_URC:
+            break;
+        default:
+            break;
+    }
+}
+
+/* RS-12.21 (2026-10-24, FHSS_SCAN_FAILED_OPTIONS.md section 7): the same
+ * guard for the FAULT_URC code space. RX_SCAN_FAILED and TX_FIFO_RB_MISMATCH
+ * shared 0x0D from 2026-08-02 to 2026-10-24 because nothing checked fault
+ * codes; every HOST_FAULT_CODE_* belongs in this list. Called from
+ * host_cmd_init() next to the type check. */
+static inline void host_fault_code_compile_time_uniqueness_check(void) {
+    switch (0U) {
+        case HOST_FAULT_CODE_HARDFAULT:
+        case HOST_FAULT_CODE_NMI:
+        case HOST_FAULT_CODE_RADIO_INIT_FAIL:
+        case HOST_FAULT_CODE_RADIO_OPMODE_DRIFT:
+        case HOST_FAULT_CODE_RX_CRC_DISABLED:
+        case HOST_FAULT_CODE_HOST_DMA_OVERRUN:
+        case HOST_FAULT_CODE_STACK_GUARD:
+        case HOST_FAULT_CODE_CLOCK_HSE_FAILED:
+        case HOST_FAULT_CODE_HOST_RX_SEEN:
+        case HOST_FAULT_CODE_HOST_RX_INACTIVE:
+        case HOST_FAULT_CODE_HOST_PARSE_ERROR:
+        case HOST_FAULT_CODE_HOST_DIAG_MARK:
+        case HOST_FAULT_CODE_RX_SCAN_FAILED:
+        case HOST_FAULT_CODE_TX_DONE_EARLY:
+        case HOST_FAULT_CODE_TX_FIFO_RB_MISMATCH:
             break;
         default:
             break;

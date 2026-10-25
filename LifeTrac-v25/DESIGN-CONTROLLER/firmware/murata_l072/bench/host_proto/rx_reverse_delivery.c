@@ -54,9 +54,10 @@
  *       is handed UNANCHORED and adopted; closing the window itself is a
  *       grid-policy matter, sx1276_rx_grid_policy.c, not this harness's);
  *   8   scan FAILED: with no command for 150 s the tractor's scan machine
- *       runs out of retries into the absorbing FAILED state (it can never
- *       LOCK again); its own clock still drives the receiver and every
- *       clean, covered command is received;
+ *       runs out of retries into FAILED, which a streaming node holds
+ *       (RS-12.21 (b): FAILED is held only under originator authority) --
+ *       it never LOCKs there; its own clock still drives the receiver and
+ *       every clean, covered command is received;
  *   9   final FAIL mid-command: the streaming tractor's final scan FAIL
  *       fires while a clean command is on air. The fault is reported and
  *       FAILED committed, but the receiver is not parked: the slot
@@ -67,12 +68,26 @@
  *       crc_seen bit covers its own window (the last dwell) only, as on
  *       a walking node, so neither of the first two FAILs reports one.
  * In EVERY scenario, per main-loop pass: the walker retunes exactly when
- * the scan machine dispatches BEGIN_SCAN / ADVANCE (or a non-final FAIL)
- * unless the node holds originator authority; no scan action takes the
+ * the scan machine dispatches BEGIN_SCAN / ADVANCE (or a FAIL, which
+ * re-enters SCANNING unless it is held) unless the node holds originator
+ * authority; no scan action takes the
  * receiver out of RX while the node holds authority; every slot-follow
  * retune is onto the clock's channel and allowed by the follow rule
  * (LOCKED on an adopted grid, or originator authority); and every own
  * transmission is keyed on the hop channel of the slot its header claims.
+ * RS-12.21 (2026-10-24, firmware/murata_l072/FHSS_SCAN_FAILED_OPTIONS.md
+ * section 5 item 2, adopted) adds four, in every scenario too:
+ *   (b)  the scan machine is FAILED after a scan tick only while the node
+ *        holds originator authority (or a TX is keyed: the tick is frozen
+ *        then); a FAIL is held exactly when it is final and the node holds
+ *        authority, and every exit from FAILED is recorded as
+ *        (FAILED, BEGIN_SCAN) -- the mirror below follows the records;
+ *   d2   the walker steps through the channel table in order: channel 0
+ *        only after a BEGIN_SCAN out of BOOT or LOCKED, the next channel
+ *        after a retry or a restart out of FAILED (the walk continues
+ *        across attempts);
+ *   L    no LOCKED -> SCANNING demotion comes sooner than LOCK_LOSS_MS
+ *        after the LOCK or the last accepted frame.
  * In the tractor scenarios 1-4 and 8 the tractor's grid never moves: one
  * phase anchor, no adoption, no clock reset, no SNAP.
  *
@@ -81,11 +96,22 @@
  * receiver, scan FAILs) and an FNV-1a trace hash over every
  * radio-affecting call with its time and caller. Scenario 5's hash is the
  * same against the pre-fix sx1276_rx.c: the follower path is
- * call-for-call, microsecond-for-microsecond unchanged.
+ * call-for-call, microsecond-for-microsecond unchanged. The hashes are
+ * printed, not pinned. RS-12.21's 2 s scan dwell changed all ten
+ * (2026-10-24; the walker's timing is in every scenario), with every
+ * scenario's assertions unchanged; (b) and L alone change none but
+ * scenario 7's (L: its LOCKs come out of SCANNING).
  *
  * check-rx-scan-failed-follower (rx_scan_failed_follower.c) reuses this
  * simulation: it #includes this file with RX_REVERSE_DELIVERY_SIM_ONLY
  * defined, which leaves out the scenarios below and main().
+ * check-radio-park (radio_park.c, RS-12.21 2026-10-24) does too, with
+ * RX_SIM_REAL_HOST also defined: it links the real host_cmd.c, host_cfg.c
+ * and host_cfg_profile.c, so the stubs for host_cmd_emit_fault(),
+ * host_uart_send_urc() and host_cfg_profile_active() drop out, and the
+ * mailbox step below also services host_cmd.c's own TX ring. While the
+ * host has the radio parked the scan tick is frozen, which the (b) check
+ * allows.
  */
 
 #include <stdbool.h>
@@ -209,6 +235,16 @@ static uint32_t toa_us(uint8_t on_air_len) {
                                          1U, 0U, 8U, 0U);
 }
 
+/* Channel table index of a centre frequency (0xFF: not a table channel). */
+static uint8_t chan_of_hz(uint32_t hz) {
+    for (uint8_t i = 0U; i < SX1276_FHSS_CHANNEL_COUNT; ++i) {
+        if (sx1276_fhss_chantab_center_hz(i) == hz) {
+            return i;
+        }
+    }
+    return 0xFFU;
+}
+
 /* Channel of an absolute slot, from the pure scheduler helpers (both ends
  * run farm_id = node_id = 0, the activation default). */
 static uint32_t hop_hz(uint32_t abs_slot) {
@@ -261,6 +297,14 @@ typedef struct {
     uint32_t locks, demotions;
     uint64_t walker_after_decay_us;   /* first walker retune after a decay */
     uint32_t walker_after_decay_viol;
+    /* RS-12.21 (2026-10-24) */
+    uint32_t viol_fail_rule;          /* (b): FAILED held / left off the rule */
+    uint32_t viol_failed_unauth;      /* (b): FAILED after a tick, no authority */
+    uint32_t viol_walk_order;         /* d2: walker step not the next channel */
+    uint32_t viol_early_demotion;     /* L: demoted < LOCK_LOSS after an anchor */
+    uint32_t final_restarts;          /* (b): final FAIL -> SCANNING at once */
+    uint32_t tick_restarts;           /* (b): FAILED -> SCANNING on a tick */
+    uint64_t walker_seen;             /* channels the walker tuned (bit n) */
     uint32_t trace;                   /* FNV-1a over radio-affecting calls */
     /* first clean covered command missed (0 = none) */
     uint64_t first_miss_us;
@@ -431,26 +475,61 @@ void sx1276_write_burst(uint8_t start_reg, const uint8_t *src, size_t len) {
 static uint32_t g_freq_calls, g_last_freq;
 /* Who last tuned the synth, and who had tuned it for the last frame heard. */
 static ctx_t g_tuner = CTX_NONE, g_heard_tuner = CTX_NONE;
+/* RS-12.21 d2: the channel the scan walker must tune next (reset to 0 by a
+ * BEGIN_SCAN out of BOOT or LOCKED, in the scan-counter hook below). */
+static uint8_t g_walk_next;
+/* RS-12.21 (2026-10-24): every firmware call into the modem, and every scan
+ * record, monotonic and never reset, for check-radio-park's "nothing touched
+ * the parked modem, the scan machine stood still". */
+static struct {
+    uint32_t freq, standby, rx_cont, tx, sleep, scan_rec;
+} g_calls;
 
 void sx1276_set_frequency_hz(uint32_t freq_hz) {
     sim_advance_to(g_now_us + COST_FREQ_US);
+    ++g_calls.freq;
     g_radio.freq_hz = freq_hz;
     g_radio.rx_since_us = g_now_us;   /* a retune restarts any reception */
     ++g_freq_calls;
     g_tuner = g_ctx;
     g_last_freq = freq_hz;
+    /* Every retune in the scan tick is a walker step; so is one in
+     * rx_service (a frame event in BOOT dispatches BEGIN_SCAN). */
+    if (g_ctx == CTX_SCAN || g_ctx == CTX_RX_SERVICE) {
+        const uint8_t ch = chan_of_hz(freq_hz);
+        if (ch != g_walk_next) {
+            ++g_sc.viol_walk_order;
+        }
+        if (ch < SX1276_FHSS_CHANNEL_COUNT) {
+            g_sc.walker_seen |= (1ULL << ch);
+        }
+        g_walk_next = (uint8_t)((ch + 1U) % SX1276_FHSS_CHANNEL_COUNT);
+    }
     trace_mix(1U, freq_hz);
 }
 
 bool sx1276_modes_to_standby(void) {
     sim_advance_to(g_now_us + COST_MODE_US);
+    ++g_calls.standby;
     g_radio.mode = SX1276_STATE_STANDBY;
     trace_mix(2U, 0U);
     return true;
 }
 
+/* RS-12.21 (2026-10-24): the firmware park (sx1276_rx_park) sleeps the
+ * modem. Nothing else in the linked firmware calls it, so the existing
+ * scenarios' traces are unchanged. */
+bool sx1276_modes_to_sleep(void) {
+    sim_advance_to(g_now_us + COST_MODE_US);
+    ++g_calls.sleep;
+    g_radio.mode = SX1276_STATE_SLEEP;
+    trace_mix(6U, 0U);
+    return true;
+}
+
 bool sx1276_modes_to_rx_cont(void) {
     sim_advance_to(g_now_us + COST_MODE_US);
+    ++g_calls.rx_cont;
     g_radio.mode = SX1276_STATE_RX_CONT;
     g_radio.rx_since_us = g_now_us;
     trace_mix(3U, g_radio.freq_hz);
@@ -459,6 +538,7 @@ bool sx1276_modes_to_rx_cont(void) {
 
 bool sx1276_modes_to_tx(void) {
     sim_advance_to(g_now_us + COST_MODE_US);
+    ++g_calls.tx;
     g_radio.mode    = SX1276_STATE_TX;
     g_radio.tx_len  = g_radio.regs[REG_PAYLOAD_LENGTH];
     memcpy(g_radio.tx_bytes, g_radio.fifo, g_radio.tx_len);   /* TX base 0 */
@@ -522,9 +602,10 @@ static uint8_t g_last_dec = 0xFFU;
 static uint8_t g_last_fail_sub;
 static uint8_t g_fail_seen;
 static uint32_t g_pass_now_ms;     /* the current pass's now_ms */
-static uint32_t g_fail_ms[4];      /* pass now_ms of the first four FAILs */
-static uint8_t  g_fail_sub[4];     /* ... and their sub-bytes */
-static uint64_t g_final_fail_us;   /* when the final FAIL fired (0 = not yet) */
+#define FAIL_LOG 16U               /* RS-12.21 (b): a FAIL every 30 s unacquired */
+static uint32_t g_fail_ms[FAIL_LOG];   /* pass now_ms of the first FAILs */
+static uint8_t  g_fail_sub[FAIL_LOG];  /* ... and their sub-bytes */
+static uint64_t g_final_fail_us;   /* when the LAST final FAIL fired (0 = none) */
 static uint64_t g_last_crc_us;     /* last payload-CRC IRQ serviced */
 
 void host_stats_radio_rx_ok(void) {}
@@ -546,9 +627,12 @@ void host_stats_clk_demotion_note(bool reset) {
 void host_stats_tx_first_anchor(void) { ++g_sc.first_anchor; }
 void host_stats_tx_stream_streak_note(uint32_t streak) { (void)streak; }
 
-void host_cmd_emit_fault(uint8_t code, uint8_t sub) {
+/* Every FAULT the firmware emits. check-radio-park links the real
+ * host_cmd.c (RX_SIM_REAL_HOST), whose host_cmd_emit_fault() reaches this
+ * through its FAULT_URC; the other harnesses through the stub below. */
+static void sim_note_fault(uint8_t code, uint8_t sub) {
     if (code == HOST_FAULT_CODE_RX_SCAN_FAILED) {
-        if (g_sc.scan_fail_urc < 4U) {
+        if (g_sc.scan_fail_urc < FAIL_LOG) {
             g_fail_ms[g_sc.scan_fail_urc] = g_pass_now_ms;
             g_fail_sub[g_sc.scan_fail_urc] = sub;
         }
@@ -561,45 +645,92 @@ void host_cmd_emit_fault(uint8_t code, uint8_t sub) {
     }
 }
 
+/* RX_SIM_REAL_HOST (check-radio-park, 2026-10-24): the harness links the
+ * real host_cmd.c and host_cfg_profile.c, and provides host_uart_send_urc()
+ * itself, so these three stubs drop out. g_profile stays: scenario_begin()
+ * writes it, nothing reads it then (the real active profile is set through
+ * the real CFG_SET REG_PROFILE path). */
+static host_cfg_profile_req_t g_profile;
+#ifndef RX_SIM_REAL_HOST
+void host_cmd_emit_fault(uint8_t code, uint8_t sub) {
+    sim_note_fault(code, sub);
+}
+
 void host_uart_send_urc(uint8_t type, uint16_t seq, uint8_t flags,
                         const uint8_t *payload, uint16_t payload_len) {
     (void)type; (void)seq; (void)flags; (void)payload; (void)payload_len;
 }
 
-static host_cfg_profile_req_t g_profile;
 const host_cfg_profile_req_t *host_cfg_profile_active(void) {
     return &g_profile;
 }
+#endif /* !RX_SIM_REAL_HOST */
 
 /* --- scan-machine mirror: intercepts the counters TU's record hook --- */
 
 static sx1276_rx_scan_state_t  g_scan_mirror = SX1276_RX_SCAN_STATE_BOOT;
-static uint8_t                 g_tick_recorded;
+static uint8_t                 g_tick_recorded;   /* records in this scan tick */
+static sx1276_rx_scan_state_t  g_tick_state;      /* ... the first one's      */
 static sx1276_rx_scan_action_t g_tick_action;
+static uint8_t                 g_tick_left_failed; /* then (FAILED, BEGIN_SCAN) */
+static uint8_t                 g_tick_extra_bad;   /* then anything else        */
+static uint32_t                g_lock_anchor_ms;   /* LOCK / last accepted frame */
 
 void sx1276_rx_scan_counter_record(sx1276_rx_scan_state_t state,
                                    sx1276_rx_scan_action_t action) {
+    ++g_calls.scan_rec;
     if (state != g_scan_mirror) {
         ++g_sc.mirror_mismatch;
     }
     if (g_ctx == CTX_SCAN) {
-        g_tick_recorded = 1U;
-        g_tick_action = action;
+        if (g_tick_recorded == 0U) {
+            g_tick_state = state;
+            g_tick_action = action;
+        } else if (state == SX1276_RX_SCAN_STATE_FAILED &&
+                   action == SX1276_RX_SCAN_ACTION_BEGIN_SCAN) {
+            g_tick_left_failed = 1U;
+        } else {
+            g_tick_extra_bad = 1U;
+        }
+        ++g_tick_recorded;
     }
     switch (action) {
         case SX1276_RX_SCAN_ACTION_BEGIN_SCAN:
             if (state == SX1276_RX_SCAN_STATE_LOCKED) {
                 ++g_sc.demotions;
+                /* RS-12.21 L: the loss timer runs from the LOCK or the last
+                 * accepted frame (the demotion is a TICK: the pass's ms). */
+                if ((uint32_t)(g_pass_now_ms - g_lock_anchor_ms) <
+                    SX1276_RX_SCAN_LOCK_LOSS_MS) {
+                    ++g_sc.viol_early_demotion;
+                }
+            }
+            /* RS-12.21 d2: a fresh acquisition (out of BOOT or LOCKED)
+             * restarts the walk at channel 0; leaving FAILED continues it. */
+            if (state != SX1276_RX_SCAN_STATE_FAILED) {
+                g_walk_next = 0U;
             }
             g_scan_mirror = SX1276_RX_SCAN_STATE_SCANNING;
             break;
         case SX1276_RX_SCAN_ACTION_LOCK:
             ++g_sc.locks;
             g_scan_mirror = SX1276_RX_SCAN_STATE_LOCKED;
+            /* A frame event: the firmware's now_ms is this same ms. */
+            g_lock_anchor_ms = platform_now_ms();
+            break;
+        case SX1276_RX_SCAN_ACTION_REANCHOR:
+            /* A frame event (now) or a tick: a frame read late in a pass
+             * carries a fresher ms than the pass's now_ms, so the scan tick
+             * after it sees time run backwards and re-anchors to the pass's
+             * ms (up to 1 ms earlier). */
+            g_lock_anchor_ms = (g_ctx == CTX_SCAN) ? g_pass_now_ms
+                                                   : platform_now_ms();
             break;
         case SX1276_RX_SCAN_ACTION_FAIL:
-            /* Provisional: a non-final FAIL is overridden back to SCANNING
-             * by the dispatcher; resolved from the URC sub-byte below. */
+            /* RS-12.21: the dispatcher records (FAILED, BEGIN_SCAN) when it
+             * leaves FAILED again -- a non-final retry, or (b) on a node
+             * without originator authority -- so the mirror follows the
+             * records alone; fw_pass checks the decision against (b). */
             g_scan_mirror = SX1276_RX_SCAN_STATE_FAILED;
             break;
         default:
@@ -1182,17 +1313,24 @@ static void fw_pass(void) {
 
     g_ctx = CTX_MAILBOX;
     fw_service_mailbox();
+#ifdef RX_SIM_REAL_HOST
+    host_cmd_service_tx_mailbox();   /* the real host_cmd.c TX ring */
+#endif
 
     /* Scan tick: the walker retunes on every BEGIN_SCAN / ADVANCE (and a
-     * non-final FAIL) unless the node follows its own clock, and no scan
-     * action takes the receiver out of RX while it does (the slot
-     * follower re-arms only at the next boundary). */
+     * FAIL that re-enters SCANNING) unless the node follows its own clock,
+     * and no scan action takes the receiver out of RX while it does (the
+     * slot follower re-arms only at the next boundary). */
     {
         /* Authority as the firmware evaluates it: at a fresh time (the
          * pass's now_ms can be a tick older than the last TX_DONE note). */
         const uint8_t auth = auth_now_ms(platform_now_ms());
         const sx1276_state_t mode_before = g_radio.mode;
+        const uint8_t busy_before = (uint8_t)sx1276_tx_busy();
+        const uint8_t parked_before = (uint8_t)sx1276_rx_parked();
         g_tick_recorded = 0U;
+        g_tick_left_failed = 0U;
+        g_tick_extra_bad = 0U;
         g_fail_seen = 0U;
         g_freq_calls = 0U;
         g_ctx = CTX_SCAN;
@@ -1205,21 +1343,45 @@ static void fw_pass(void) {
             uint32_t expect = 0U;
             switch (g_tick_action) {
                 case SX1276_RX_SCAN_ACTION_BEGIN_SCAN:
+                    if (g_tick_state == SX1276_RX_SCAN_STATE_FAILED) {
+                        /* RS-12.21 (b): FAILED -> SCANNING on a tick, only
+                         * once the node has lost originator authority. */
+                        ++g_sc.tick_restarts;
+                        if (auth != 0U) { ++g_sc.viol_fail_rule; }
+                    }
+                    /* fallthrough */
                 case SX1276_RX_SCAN_ACTION_ADVANCE_CHANNEL:
                     expect = (auth != 0U) ? 0U : 1U;
                     break;
                 case SX1276_RX_SCAN_ACTION_FAIL: {
+                    /* RS-12.21 (b): FAILED is held exactly when the FAIL is
+                     * final and the node holds originator authority; any
+                     * other FAIL re-enters SCANNING at once, recorded as
+                     * (FAILED, BEGIN_SCAN), and its walker step retunes
+                     * unless the node holds authority. (Before (b) a final
+                     * FAIL always held, and parked a node without
+                     * authority in STANDBY.) */
                     const uint8_t final_fail = (uint8_t)(g_fail_seen != 0U &&
                         (g_last_fail_sub & (1U << SX1276_RX_SCAN_FAIL_SUB_BIT_FINAL)) != 0U);
-                    g_scan_mirror = (final_fail != 0U) ? SX1276_RX_SCAN_STATE_FAILED
-                                                       : SX1276_RX_SCAN_STATE_SCANNING;
-                    expect = (final_fail != 0U || auth != 0U) ? 0U : 1U;
-                    if (final_fail != 0U) { ++g_sc.fail_final; }
+                    const uint8_t hold = (uint8_t)(final_fail != 0U && auth != 0U);
+                    if (g_tick_left_failed == hold) {
+                        ++g_sc.viol_fail_rule;
+                    }
+                    expect = (auth != 0U) ? 0U : 1U;
+                    if (final_fail != 0U) {
+                        ++g_sc.fail_final;
+                        if (g_tick_left_failed != 0U) { ++g_sc.final_restarts; }
+                    }
                     break;
                 }
                 default:
                     expect = 0U;
                     break;
+            }
+            if (g_tick_extra_bad != 0U ||
+                (g_tick_left_failed != 0U &&
+                 g_tick_action != SX1276_RX_SCAN_ACTION_FAIL)) {
+                ++g_sc.viol_fail_rule;
             }
             if (g_freq_calls != expect) {
                 ++g_sc.viol_walker;
@@ -1245,6 +1407,13 @@ static void fw_pass(void) {
             }
         } else if (g_freq_calls != 0U) {
             ++g_sc.viol_walker;
+        }
+        /* RS-12.21 (b): FAILED survives a scan tick only under originator
+         * authority, or while a TX is keyed or the host has the radio
+         * parked (the tick is frozen then). */
+        if (g_scan_mirror == SX1276_RX_SCAN_STATE_FAILED && auth == 0U &&
+            busy_before == 0U && parked_before == 0U) {
+            ++g_sc.viol_failed_unauth;
         }
     }
 
@@ -1277,9 +1446,11 @@ static void fw_pass(void) {
         if (auth != 0U) {
             ++g_sc.auth_passes;
         } else if (g_prev_auth != 0U) {
-            /* The one-dwell bound is for a SCANNING walker; LOCKED waits
-             * out LOCK_LOSS and FAILED never walks again. */
-            g_decay_at_us = (g_scan_mirror == SX1276_RX_SCAN_STATE_SCANNING)
+            /* The one-dwell bound is for a SCANNING walker -- and, since
+             * RS-12.21 (b), a FAILED one, which scans again on its next
+             * tick; LOCKED waits out LOCK_LOSS. */
+            g_decay_at_us = (g_scan_mirror == SX1276_RX_SCAN_STATE_SCANNING ||
+                             g_scan_mirror == SX1276_RX_SCAN_STATE_FAILED)
                                 ? g_now_us : 0U;
             g_sc.walker_after_decay_us = 0U;
         }
@@ -1364,6 +1535,8 @@ static void scenario_begin(const char *name, role_t role, uint32_t seed) {
     (void)sx1276_fhss_init(0ULL, 0ULL, 0U);
     sx1276_rx_scan_reset();
     g_scan_mirror = SX1276_RX_SCAN_STATE_BOOT;
+    g_walk_next = 0U;
+    g_lock_anchor_ms = 0U;
     g_prev_adopted = 0U;
     g_prev_auth = 0U;
     g_decay_at_us = 0U;
@@ -1418,6 +1591,19 @@ static void print_scenario(void) {
            g_sc.follow_locked, g_sc.follow_own, g_sc.viol_follow_gate,
            g_sc.window_follow, g_sc.viol_follow_chan, g_sc.viol_tx_chan,
            g_sc.mirror_mismatch, g_submit_fail, g_sc.trace);
+    {
+        uint32_t seen = 0U;
+        for (uint8_t i = 0U; i < SX1276_FHSS_CHANNEL_COUNT; ++i) {
+            seen += (uint32_t)((g_sc.walker_seen >> i) & 1ULL);
+        }
+        printf("    RS-12.21: FAILED -> SCANNING at a final FAIL=%u on a tick=%u |"
+               " walker channels %u/%u | viol fail_rule=%u failed_unauth=%u"
+               " walk_order=%u early_demotion=%u\n",
+               g_sc.final_restarts, g_sc.tick_restarts, seen,
+               (unsigned)SX1276_FHSS_CHANNEL_COUNT, g_sc.viol_fail_rule,
+               g_sc.viol_failed_unauth, g_sc.viol_walk_order,
+               g_sc.viol_early_demotion);
+    }
 }
 
 /* Structural checks every scenario must pass. */
@@ -1444,6 +1630,22 @@ static void check_structure(void) {
           "[%s] %u TX submissions refused", g_sc.name, g_submit_fail);
     CHECK(g_sc.recv_dup == 0U,
           "[%s] %u commands delivered twice", g_sc.name, g_sc.recv_dup);
+    /* RS-12.21 (2026-10-24): (b), d2 and L. */
+    CHECK(g_sc.viol_fail_rule == 0U,
+          "[%s] RS-12.21 (b): %u scan FAILs held or left against the rule (held"
+          " exactly when final under originator authority; every exit recorded"
+          " as (FAILED, BEGIN_SCAN))", g_sc.name, g_sc.viol_fail_rule);
+    CHECK(g_sc.viol_failed_unauth == 0U,
+          "[%s] RS-12.21 (b): scan FAILED after %u scan ticks without originator"
+          " authority or a TX keyed", g_sc.name, g_sc.viol_failed_unauth);
+    CHECK(g_sc.viol_walk_order == 0U,
+          "[%s] RS-12.21 d2: %u walker steps not to the next channel (channel 0"
+          " only after a BEGIN_SCAN out of BOOT or LOCKED)", g_sc.name,
+          g_sc.viol_walk_order);
+    CHECK(g_sc.viol_early_demotion == 0U,
+          "[%s] RS-12.21 L: %u LOCKED -> SCANNING demotions sooner than"
+          " LOCK_LOSS_MS after the LOCK or the last accepted frame", g_sc.name,
+          g_sc.viol_early_demotion);
 }
 
 #ifndef RX_REVERSE_DELIVERY_SIM_ONLY
@@ -1558,7 +1760,9 @@ static void test_scan_failed(void) {
      * absorbing FAILED state; then the light command plane of (1) starts.
      * FAILED never LOCKs again, so before the fix only an in-slot hit
      * could land; the originator's own clock must keep driving the
-     * receiver in FAILED too. */
+     * receiver in FAILED too. (RS-12.21 (b), 2026-10-24: FAILED is held
+     * because the tractor holds originator authority -- it streams without
+     * a gap of 1 s -- and nothing parks the modem any more.) */
     tractor_setup("8 scan FAILED, then commands", 0x89ABCDEU, 600U, 40U,
                   k_short_trains, CMD_IN_GAP, 2500U, 3500U, 5U, 60U);
     g_base.next_allowed_us = g_now_us + 150000000ULL;
