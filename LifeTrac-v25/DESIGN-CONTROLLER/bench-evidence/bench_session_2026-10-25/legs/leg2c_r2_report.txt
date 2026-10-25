@@ -1,0 +1,21 @@
+train_gap_ms=40  tx_pipeline_depth=2  synth_budget_b=250  force_frf_hz=0  git_sha=d597b094  log_window=after_stop  
+  (tx frags_ok counter 1764 is stale; using 1769 fragments from per-frame TX events)
+  (rx rx_frames counter 1723 is stale; using 1725 fragments from frag_arrival events)
+loss 44/1769 = 2.5%   crc_dumps=1  timeouts=3  published=954   [whole logs]
+shared-window loss 44/1769 = 2.5%   [txdone_arrival vs frag_arrival, train by train over the window both logs cover; 41 of 998 trains not heard]
+capture seq gaps (leg2c_r2_base.jsonl): lost 15/969 = 1.5%  (received 954, 15 gaps, longest 1; 2 codec runs; period 0.51 s)
+  first frame heard at seq 41: the 40 frame(s) numbered before it are not in the figure above (the camera numbers from seq 1 at start-up — an acquisition delay or a late capture, RS-13.1 A7); counting from seq 1: 55/1009 = 5.5%
+  tractor TX log: 998 frame(s) on air (txdone_arrival); the capture's first frame is its #41, its last #998 (placed by the params.txt clock offsets, within 0.06 s): 44/998 = 4.4% of them never reached the capture (40 before its first, 0 after its last)
+  codec runs: mono_g4 seq 41..234 (194 rx, 0 lost) | webp seq 235..241 (760 rx, 15 lost) — each codec path numbers its own frames, so nothing is counted across a switch
+acquisition: first image reception: the base's first decoded frame came 26.7 s after its profile-1 activation (rx_daemon.log line 31 at 14:49:06.434 board time, the frame at line 45), within the FHSS cold-start scan budget of 120 s (4 attempts x 30 s: SX1276_RX_SCAN_MAX_RETRIES 3 + 1, SX1276_RX_SCAN_REDESIGN_MS 30000)
+  confirmed acquisition: ACQUIRED: the base's bracket counts 1 LOCKED -> SCANNING demotion(s) (d(clk_demotion_reset) 1, d(clk_demotion_kept) 0), which only a locked scan makes; the base decoded 1725 of the tractor's 1769 fragments on air (97.5 %): on its 50-channel hop set a receiver that does not follow the hop grid is on the tractor's channel about one slot in 50, and only a locked scan follows the grid
+train length 3 [tx log, modal of 112 long trains; mixture 1x339 2x547 3x112]
+attributed 3; penultimate idx 1 = 1 (33%, uniform 33%)
+  0:2 1:1 2:0
+radio deltas: {'radio_dio0': 1915, 'radio_rx_ok': 1818, 'radio_crc_err': 1, 'radio_tx_ok': 95}
+FIRMWARE DROP (drx_ok - host URCs): 1818 - 1725 = 93
+identity residue: 1
+crc closure: dcrc_err=1 vs crc_dumps=1
+URC-path: rx_urc_lost=2 rx_pretx_drained=0
+RS-12.10: rx_fifo_skip=0 tx_deaf_sum=2330484 us over 95 TX (mean 24.5 ms) tx_deaf_max=30.7 ms tx_done_to_rearm_max=1847 us (max fields: post-bracket values)
+RS-12.15: consider_remote deltas aligned=1817 snapped=1 locked_out=0 epoch_drift=0 bad_hop=0 not_init=0 | demotion reset=1 kept=0 | tx_first_anchor delta=0 (post 0) | streak_max post=1

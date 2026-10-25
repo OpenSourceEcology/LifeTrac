@@ -43,15 +43,16 @@ instead of relying on the default.
   commands, `ARD-078` and version `1.2.3`. It was extracted from the MKRWAN
   library's `MKRWANFWUpdate_standalone/fw.h`. Use it to put a module back to
   factory state; the LifeTrac bench software does not work with it.
-- **LifeTrac bench firmware (both bench boards since 2026-10-18):** build
+- **LifeTrac bench firmware (both bench boards since 2026-10-25):** build
   it with `mingw32-make bench` in [`../murata_l072/`](../murata_l072/). That
   gives `build/firmware_bench_diag.bin`, md5
-  `e083ae46a64686031b39866eca42e094` (#152; the previous build `0c1bb0a9`
-  is the rollback image; the RS-12.21 source of 2026-10-25 builds
-  `0daae27978089eb97ab35c18718b62b0`, not flashed yet); toolchain and
+  `0daae27978089eb97ab35c18718b62b0` (the RS-12.21 image, #168; the
+  previous build `e083ae46`, #152, is the rollback image); toolchain and
   expected hashes are in
   [`../murata_l072/README.md`](../murata_l072/README.md). Saved copies of
   the earlier flashed bench builds are in
   [`bench-evidence/RS_13_vector_scene_2026-09-26/firmware/`](../../bench-evidence/RS_13_vector_scene_2026-09-26/firmware/README.md);
   the `e083ae46` copy flashed on 2026-10-18 is in
-  [`bench-evidence/RS_12_15_reverse_delivery_2026-10-18/firmware_flash/`](../../bench-evidence/RS_12_15_reverse_delivery_2026-10-18/firmware_flash/firmware_bench_diag_e083ae46.bin).
+  [`bench-evidence/RS_12_15_reverse_delivery_2026-10-18/firmware_flash/`](../../bench-evidence/RS_12_15_reverse_delivery_2026-10-18/firmware_flash/firmware_bench_diag_e083ae46.bin),
+  and the `0daae279` copy flashed on 2026-10-25 in
+  `bench-evidence/bench_session_2026-10-25/firmware_flash/`.

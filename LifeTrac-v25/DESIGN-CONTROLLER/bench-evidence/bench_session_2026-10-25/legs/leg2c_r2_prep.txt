@@ -1,0 +1,60 @@
+14:48:01Z == leg 2c_r2 prep (profile image_bw250 = harness -RegProfile 1, boot mono_g4, 2 fps, 480 s, -ReactiveFire 0, -StopDrainS 4 (FHSS default), capture 660 s min-frames 800 no-strict) from bench-session-2026-10-25 @ d597b094
+14:48:02Z -- production camera unit / radio-UART holders
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+tractor: lifetrac-camera=failed containers=[bench_mqtt x8-devel x8-provisioning x8-webapp] ttymxc3 holders=[]
+base:    containers=[design-controller-mosquitto-1] ttymxc3 holders=[]
+14:48:04Z -- scene: bench video window to the front + camera check (camera only)
+window pid 19120 'Front view of Colorado's STUNNING Royal Gorge Route Railroad - YouTube - Mozilla Firefox' player fullscreen: True
+# leg2c_r2 scene check, 2026-10-25T14:48:07Z PC clock (content: https://www.youtube.com/watch?v=B1yUQwpNhJA, normal Firefox window, player fullscreen; min 8 %)
+camera: first frame 0.5 s after opening /dev/video1; 200 frames, the sixth 0.2 s and the last 10.7 s after the first
+1.9 s apart: mean abs diff 13.58  pct pixels diff>25: 53.16 %
+5.0 s apart: mean abs diff 56.00  pct pixels diff>25: 73.37 %
+10.0 s apart: mean abs diff 53.25  pct pixels diff>25: 74.61 %
+mean luma 97.0
+frame -> C:/Users/dorkm/Documents/GitHub/LifeTrac-bench-main/LifeTrac-v25/DESIGN-CONTROLLER/bench-evidence/bench_session_2026-10-25/legs/leg2c_r2_scene.jpg
+SCENE-CHECK-OK: 10 s change 74.61 % (min 8 %)
+14:48:21Z -- health probes (rs116) both boards
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+STATS-OK (attempt 1)
+  radio_state=1
+RS12-URC-COUNTERS=YES
+STATS-OK (attempt 1)
+  radio_state=1
+RS12-URC-COUNTERS=YES
+14:48:25Z -- clear retained control topics on the base broker
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+RETAINED-CLEARED lifetrac/v25/control/encode_mode_override lifetrac/v25/cmd/req_keyframe lifetrac/v25/control/radio_profile
+14:48:27Z -- pre-brackets (rs115) both boards
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+radio_rx_ok=599 radio_crc_err=0 radio_tx_ok=204  (base)
+radio_rx_ok=204 radio_crc_err=1 radio_tx_ok=610  (tractor)
+14:48:32Z -- base-side capture, detached (docker rs13_cap_base): profile image_bw250, 660 s, min-frames 800 no-strict
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+rs13_cap_base id f98639305845
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+connected to 127.0.0.1:1883 (rc=0); subscribing lifetrac/v25/video/tile_deltacapture -> /work/legs/leg2c_r2_base.jsonl (profile image_bw250, limit 203 B); 660 s
+
+14:48:36Z == leg 2c_r2 prep done -> launch the harness NOW (the capture is already listening), in PowerShell:
+   & "C:/Users/dorkm/AppData/Local/Temp/lifetrac-bench/leg2c_r2_harness.ps1"
+   which runs, from C:/Users/dorkm/Documents/GitHub/LifeTrac-bench-main/LifeTrac-v25/DESIGN-CONTROLLER/firmware/x8_lora_bootloader_helper:
+   .\run_live_radio_monitor.ps1 -TxAdbSerial 2E2C1209DABC240B -RxAdbSerial 2D0A1209DABC240B -HostIp 192.168.1.79 -TxFeed camera -RegProfile 1 -DurationS 480 -StopDrainS 4 -SynthFps 2 -KfRequestDisable 1 -ReactiveFire 0 -ProbeEcho 0 -LogFragArrivals 1 -TxBatch 0 -CamExtraEnv "-e LIFETRAC_ENCODE_MODE=6" -Archive
+   while frames flow:            bash "C:/Users/dorkm/Documents/GitHub/LifeTrac-bench-main/LifeTrac-v25/DESIGN-CONTROLLER/firmware/x8_lora_bootloader_helper/bench_tools/legs/link_sample.sh" 2c_r2
+   after '[EVIDENCE] archived to':  bash "C:/Users/dorkm/Documents/GitHub/LifeTrac-bench-main/LifeTrac-v25/DESIGN-CONTROLLER/firmware/x8_lora_bootloader_helper/bench_tools/legs/leg_post.sh" 2c_r2
+   NOT flying after all (no GO, harness refused, round aborted)? The probes left both L072s
+   listening (RXCONT) and rs13_cap_base is running. Stop the capture and park both radios:
+                                 bash "C:/Users/dorkm/Documents/GitHub/LifeTrac-bench-main/LifeTrac-v25/DESIGN-CONTROLLER/firmware/x8_lora_bootloader_helper/bench_tools/legs/power_up_guard.sh" --stop-leg-daemons

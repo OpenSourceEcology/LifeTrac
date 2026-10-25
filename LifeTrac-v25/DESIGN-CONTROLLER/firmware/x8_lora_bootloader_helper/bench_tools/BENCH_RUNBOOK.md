@@ -21,7 +21,7 @@ per-session reference and the trap list. The rest of the bench kit:
 | file | runs on | purpose |
 |---|---|---|
 | `run_flash_bench.sh` + `stamp.py` + `kmsg_log.py` | board, `/home/fio` (persistent) | instrumented wrapper around `full_flash_pipeline.sh`: monotonic-stamped pipeline log + kernel log, fsync'd so a PMIC power-cycle cannot lose them. `REVIVE_MODE=reboot bash /home/fio/run_flash_bench.sh <bin>`; success = `Verify OK` + `flash_rc=0` in `/home/fio/pipeline_stamped.log` (~2.5 min incl. reboot). |
-| `radio_park.py` | board, daemon container | Puts the radio in LoRa SLEEP (`0x80`) by one of two paths, picked by the VER reply's capability bitmap, then reads RegOpMode twice, 2.5 s apart (1.5 s until 2026-10-24); prints `PARK_OK` only if asleep at both reads. **Firmware path** (2026-10-24, RS-12.21; the image with capability bit 7, bitmap `0x000000FF`: built 2026-10-25, not flashed yet): the park command (`RADIO_PARK_REQ` 0x04, up to 3 tries) sets the L072's `host_parked` flag, which gates every RX arm path (scan walker, γ-1 retune, slot follower, the post-TX re-arm, the scan restarts), and puts the modem to SLEEP. **Persistent:** it holds until a host raw RXCONT write, a profile activation (any daemon start) or a reset. No answer from that image, or a refusal (a TX on air or queued), is `PARK_FAIL` (exit 4) with no register write; a `PARK_TRANSIENT` there is a firmware defect (an arm path the gate missed). **Register path** (`e083ae46` and older, which answer the command `UNKNOWN_TYPE` or not at all): STANDBY → SLEEP register writes. **Transient** (PR #125 review): the firmware's scan walker, γ-1 retune and slot follower all call `sx1276_rx_arm()` and bring the modem back to RXCONT (receive-only) while any of them still has work, so the park holds only once the scan SM has exhausted into FAILED — up to ~2 min after the daemons stop (500 ms/channel, hard FAIL at 30 s per attempt, 3 retries); `PARK_TRANSIENT` (exit 5) means it was still walking. Park after that, and confirm later with `radio_state.py`. The last line is `PARK_OK` / `PARK_TRANSIENT` / `PARK_FAIL` plus JSON: `path`, `persistent`, `holds`, `cap_bitmap`, `park_tries`, and `park_status` (PARKED / ALREADY_PARKED / REFUSED) or `park_cmd` (unknown_type / no_reply / err_proto). |
+| `radio_park.py` | board, daemon container | Puts the radio in LoRa SLEEP (`0x80`) by one of two paths, picked by the VER reply's capability bitmap, then reads RegOpMode twice, 2.5 s apart (1.5 s until 2026-10-24); prints `PARK_OK` only if asleep at both reads. **Firmware path** (2026-10-24, RS-12.21; the image with capability bit 7, bitmap `0x000000FF`: on both boards since 2026-10-25): the park command (`RADIO_PARK_REQ` 0x04, up to 3 tries) sets the L072's `host_parked` flag, which gates every RX arm path (scan walker, γ-1 retune, slot follower, the post-TX re-arm, the scan restarts), and puts the modem to SLEEP. **Persistent:** it holds until a host raw RXCONT write, a profile activation (any daemon start) or a reset. No answer from that image, or a refusal (a TX on air or queued), is `PARK_FAIL` (exit 4) with no register write; a `PARK_TRANSIENT` there is a firmware defect (an arm path the gate missed). **Register path** (`e083ae46` and older, which answer the command `UNKNOWN_TYPE` or not at all): STANDBY → SLEEP register writes. **Transient** (PR #125 review): the firmware's scan walker, γ-1 retune and slot follower all call `sx1276_rx_arm()` and bring the modem back to RXCONT (receive-only) while any of them still has work, so the park holds only once the scan SM has exhausted into FAILED — up to ~2 min after the daemons stop (500 ms/channel, hard FAIL at 30 s per attempt, 3 retries); `PARK_TRANSIENT` (exit 5) means it was still walking. Park after that, and confirm later with `radio_state.py`. The last line is `PARK_OK` / `PARK_TRANSIENT` / `PARK_FAIL` plus JSON: `path`, `persistent`, `holds`, `cap_bitmap`, `park_tries`, and `park_status` (PARKED / ALREADY_PARKED / REFUSED) or `park_cmd` (unknown_type / no_reply / err_proto). |
 | `radio_state.py` | board, daemon container | read-only RegOpMode decode — answers "is it off?" without touching it. |
 | `clear_retained.py` / `clear_retained_host.py <host>` | base (container) / PC | clear the retained control topics (`encode_mode_override`, `req_keyframe`, `radio_profile`) on the base broker / on another broker. A stale retained pin has flipped the camera and re-commanded a profile mid-leg; clear before EVERY leg. |
 | `kf_inject.py <period_s> <count>` | base (container) | REQ_KEYFRAME storm; the unacked retries at 0.4/0.8 s make the 2–3-command bursts that LOCK the tractor's scan machine (the RS-12.15 trigger). |
@@ -107,24 +107,29 @@ leg's `synth_fps` ("A leg", Base acquisition).
   `lifetrac-tractor-x8:latest` for the camera feed (it ships `/usr/bin/ffmpeg`;
   the host has none — a wiped `/tmp/ffmpeg` does not matter).
 * Bench firmware is byte-reproducible.
-  - Both boards run `e083ae46` since 2026-10-18: the RS-12.15
-    reverse-delivery bench build of `13f20aa1` (#152, merged as `main`
-    `3c8ced60` with the L072 source unchanged; production twin `148de24e`).
-    Flash record and a copy of the image:
-    `bench-evidence/RS_12_15_reverse_delivery_2026-10-18/firmware_flash/`.
-  - **Built, not flashed (2026-10-25):** the RS-12.21 image (scan option
-    (b) + L + d2, the firmware park command, the 0x0D split; DECISIONS.md
-    D-FHSS1), bench `0daae279`, production `2c5e055a`, 25 324 B each. Its
-    flash and first legs are planned in
+  - Both boards run `0daae279` since 2026-10-25: the RS-12.21 bench build
+    (scan option (b) + L + d2, the firmware park command, the 0x0D split;
+    DECISIONS.md D-FHSS1; `main` `d597b094`, #168; production twin
+    `2c5e055a`, 25 324 B each; VER capability bitmap `0x000000FF`). Flash
+    record and a copy of the image:
+    `bench-evidence/bench_session_2026-10-25/firmware_flash/`; its first
+    legs, R1 and R2, in that session's `RESULTS.md` ("A leg", "First flash
+    and legs on the RS-12.21 image" below;
     [`FHSS_SCAN_FAILED_OPTIONS.md`](../../murata_l072/FHSS_SCAN_FAILED_OPTIONS.md)
-    §6.1; "A leg", "First flash and legs on the RS-12.21 image" below.
-  - The previous bench build, `0c1bb0a9` (RS-12.15 v2, on both boards
-    2026-09-15 → 2026-10-18), comes from `main` before #152 (re-checked at
-    `f6e4b463` on 2026-10-14). It is the rollback image.
+    §6.1).
+  - The previous bench build, `e083ae46` (on both boards 2026-10-18 →
+    2026-10-25), is the RS-12.15 reverse-delivery build of `13f20aa1`
+    (#152, merged as `main` `3c8ced60` with the L072 source unchanged;
+    production twin `148de24e`). It is the rollback image: its flown copy is
+    `bench-evidence/RS_12_15_reverse_delivery_2026-10-18/firmware_flash/firmware_bench_diag_e083ae46.bin`.
+  - The older bench build `0c1bb0a9` (RS-12.15 v2, on both boards
+    2026-09-15 → 2026-10-18) comes from `main` before #152 (re-checked at
+    `f6e4b463` on 2026-10-14).
   - The old RS-12.10 build `e8ad8424` comes from `main` `3a0cb524` (`e02ab86e`).
-  - Copies of these and of the other surviving bench builds (`5a160e4a`,
-    `8c112e6f`) are in `bench-evidence/RS_13_vector_scene_2026-09-26/firmware/`,
-    along with the inventory of every flashed build.
+  - Copies of `0c1bb0a9`, `e8ad8424` and the other surviving older bench
+    builds (`5a160e4a`, `8c112e6f`) are in
+    `bench-evidence/RS_13_vector_scene_2026-09-26/firmware/`, along with the
+    inventory of the flashed builds up to then.
   - Stage `e8ad8424` for A/Bs against the pre-clock-authority firmware.
 
 ## Prep — every session, and again after every flash
@@ -358,7 +363,7 @@ its TX_DONE) and RX_SCAN_FAILED (`sx1276_rx.c`: sub bit 7 `final`, the last
 attempt, the retries spent; bit 6 `warm`, this boot has LOCKED before; bit
 5 `hw_suspect`, the attempt saw no DIO0 IRQ and no CRC error; bit 4
 `crc_seen`; bits 3–0 the attempt, 0 to 3). **The 0x0D split** (2026-10-24,
-the RS-12.21 image; built 2026-10-25, not flashed yet): RX_SCAN_FAILED
+the RS-12.21 image; on both boards since 2026-10-25): RX_SCAN_FAILED
 keeps 0x0D and TX_FIFO_RB_MISMATCH moves to **0x0F** (`host_types.h`).
 Only 25 sub values are scan encodings: attempts 0–2 not final, attempt 3
 final, `hw_suspect` never with `crc_seen`, plus 0x80, the firmware's
@@ -416,8 +421,8 @@ frames and fired 5 probes, and the rule written before leg 1 pooled its 4/5;
 its FAILED entry was inferred, not seen
 (`bench-evidence/bench_session_2026-10-24/RESULTS.md`, Anomalies).
 
-That is `e083ae46` and older. **On the RS-12.21 image** (2026-10-25, built,
-not flashed yet; DECISIONS.md D-FHSS1) the dwell is 2 s per channel and the
+That is `e083ae46` and older. **On the RS-12.21 image** (on both boards
+since 2026-10-25; DECISIONS.md D-FHSS1) the dwell is 2 s per channel and the
 walk goes on across attempts, and a node without originator authority (the
 base, always) does not stay in FAILED: after the fourth failure it sends
 the final RX_SCAN_FAILED and scans on, with another final every 30 s until
@@ -571,7 +576,9 @@ and Base acquisition, above; not yet flown). Confirm:
   found the archive).
 
 **First flash and legs on the RS-12.21 image** (bench `0daae279`; planned
-2026-10-25, not yet flown; the full step list with its STOP rules is
+2026-10-25 and flown the same day, every item below that applied PASS:
+`bench-evidence/bench_session_2026-10-25/RESULTS.md`; the full step list
+with its STOP rules is
 [`FHSS_SCAN_FAILED_OPTIONS.md`](../../murata_l072/FHSS_SCAN_FAILED_OPTIONS.md)
 §6.1). The flash needs its own GO and each leg its own. Fly from a
 checkout that holds the image's host side (the harness pushes the daemons
@@ -677,7 +684,7 @@ leg V), but that is because of the timing above, not because the write is
 authoritative. RXCONT is receive-only — the TX path only fires on a host
 request, and there is none with the daemons down.
 
-**On the RS-12.21 image** (built 2026-10-25, not flashed yet) the timing
+**On the RS-12.21 image** (on both boards since 2026-10-25) the timing
 above no longer applies. After an FHSS (profile 1) leg, with the daemons
 down, the scan of both boards never fails out (scan option (b): neither
 has originator authority), so a register park would never hold.
@@ -750,7 +757,7 @@ Candidates; only (c) has been seen in an archived reset log (once, A2c2):
   O–X. It shows as `OCD_EXIT=129` with no openocd banner (verdict `killed by
   SIGHUP ... openocd never started`). Seen on 2026-10-19 A2c2, on a board up
   since the day before, so it does not need a fresh boot. Fixed in the bench
-  kit of 2026-10-19, not yet flown: the harness pushes
+  kit of 2026-10-19, flown since 2026-10-24: the harness pushes
   `bench_tools/ocd_reset.sh` and runs it under sudo. The script sets
   `trap '' HUP` before it forks, and an ignored disposition is inherited
   through fork and exec, so the subshell and nohup start with HUP already
@@ -763,8 +770,8 @@ Candidates; only (c) has been seen in an archived reset log (once, A2c2):
   `nohup`. The offline test (`bench_tools/test_run_live_radio_monitor.ps1`,
   Git for Windows dash) reproduces A2c2's signature with the old inline form
   when the spawn's process group gets a SIGHUP, and shows ocd_reset.sh land
-  under the same hangup. The first flown legs should read `landed`, with the
-  banner and `OCD_EXIT=0`.
+  under the same hangup. Every flown leg since has read `landed`, with the
+  banner and `OCD_EXIT=0` (2026-10-24: six legs; 2026-10-25: R1, R2).
 - (d) `08_boot_user_app.cfg` does `init; halt` and never resumes the H7 (it
   ends with `shutdown`). Only the first leg after a boot halts an H7 that is
   serving a live x8h7 bridge; later legs attach to an H7 the previous leg
@@ -772,12 +779,12 @@ Candidates; only (c) has been seen in an archived reset log (once, A2c2):
   this reason (in-flight SPI requests time out and wedge the x8h7 driver). It
   shows as an attach or halt error, or a hang, in that leg's log.
 
-`tractor_ocd_reset.log` from the first leg after the next flash reboot tells
-whether those misses are (c) too, or (a), (b) or (d). A log has now shown
-(c), so its fix did not wait for that leg (`ocd_reset.sh`, above). If a
-first-leg miss still shows with the fix in, its log shows (a), (b) or (d) as
-described, or a 129 without the banner that would point to a cause other
-than the session hangup.
+2026-10-25: R1 (`2c_r1`) was the first leg after a flash reboot with the fix
+in, and its reset landed: own `OCD_LEG` tag, banner, PF_4 0 then 1,
+`OCD_EXIT=0` (`bench-evidence/bench_session_2026-10-25/legs/leg2c_r1_tractor_ocd_reset.log`).
+One case; why the earlier first-leg misses happened is still not shown. If a
+first-leg miss shows again, its log shows (a), (b) or (d) as described, or a
+129 without the banner that would point to a cause other than the hangup.
 
 ## Bench web UI on the base (optional)
 

@@ -131,17 +131,17 @@ TI=$TRACTOR_PROBE_IMAGE                                 # tractor probe image
 
 ## 3. Radio firmware (L072)
 
-Both boards run the bench build **`e083ae46`** (since 2026-10-18). The
-production `build/firmware.bin` refuses the bench carrier pin, so do not put
-it on a bench board. The source now builds the RS-12.21 image (scan option
-(b) + L + d2, the firmware park command, the 0x0D split): bench
-**`0daae279`**, production `2c5e055a` (25 324 B, built 2026-10-25). It is
-**built, not flashed**; flashing it needs its own GO
-([Expected md5s](../../murata_l072/README.md#expected-md5s)). The flash and
-the checks after it are planned step by step in
+Both boards run the bench build **`0daae279`** (since 2026-10-25): the
+RS-12.21 image (scan option (b) + L + d2, the firmware park command, the
+0x0D split), production twin `2c5e055a` (25 324 B each). The production
+`build/firmware.bin` refuses the bench carrier pin, so do not put it on a
+bench board ([Expected md5s](../../murata_l072/README.md#expected-md5s)).
+It was flashed and checked step by step by
 [FHSS_SCAN_FAILED_OPTIONS.md](../../murata_l072/FHSS_SCAN_FAILED_OPTIONS.md)
-§6.1. On that image the VER capability bitmap reads `0x000000FF` (step 8:
-the firmware park).
+§6.1 on 2026-10-25
+([RESULTS](../../../bench-evidence/bench_session_2026-10-25/RESULTS.md)). On
+that image the VER capability bitmap reads `0x000000FF` (step 8: the
+firmware park).
 
 ```powershell
 # PowerShell (mingw32-make does not work from Git Bash)
@@ -153,11 +153,13 @@ mingw32-make bench
 
 A different md5 means a different toolchain; see the toolchain section of
 [murata_l072/README.md](../../murata_l072/README.md). If you have no
-toolchain, the same bytes are committed as
-[`firmware_bench_diag_e083ae46.bin`](../../../bench-evidence/RS_12_15_reverse_delivery_2026-10-18/firmware_flash/firmware_bench_diag_e083ae46.bin).
-The previous build, `0c1bb0a9` (on both boards 2026-09-15 → 2026-10-18), is
+toolchain, the flashed bytes are kept as
+`bench-evidence/bench_session_2026-10-25/firmware_flash/firmware_bench_diag_0daae279.bin`.
+The previous build, `e083ae46` (on both boards 2026-10-18 → 2026-10-25), is
 the rollback image:
-[`firmware_bench_diag_0c1bb0a9.bin`](../../../bench-evidence/RS_13_vector_scene_2026-09-26/firmware/).
+[`firmware_bench_diag_e083ae46.bin`](../../../bench-evidence/RS_12_15_reverse_delivery_2026-10-18/firmware_flash/firmware_bench_diag_e083ae46.bin).
+The one before it, `0c1bb0a9` (2026-09-15 → 2026-10-18), is in
+[`RS_13_vector_scene_2026-09-26/firmware/`](../../../bench-evidence/RS_13_vector_scene_2026-09-26/firmware/).
 
 Flash with [`flash_l072.sh`](flash_l072.sh), which is
 [FLASH_RUNBOOK.md](../FLASH_RUNBOOK.md) §1–§2 as one script and reads
@@ -525,7 +527,7 @@ void or re-fly it only as the pass rule written before leg 1 says (the
 template's "never locks" row is a proposal until the operator agrees it). A
 re-fly needs a GO. Details: BENCH_RUNBOOK, "A leg", Base acquisition.
 
-On the RS-12.21 image (built 2026-10-25, not flashed yet) the base's scan
+On the RS-12.21 image (on both boards since 2026-10-25) the base's scan
 does not stay in FAILED: after its fourth failed attempt it scans on and
 sends a final RX_SCAN_FAILED every 30 s until it locks, so a final there is
 a 30 s report and a lock after it is a late acquisition. The report and
@@ -599,8 +601,8 @@ $TRAC "sudo -n $R $TI -u /work/radio_park.py"
 The script picks one of two paths from the VER reply (its JSON says which,
 `"path"`):
 
-- **firmware** (the RS-12.21 image, `"cap_bitmap": "0x000000FF"`; built
-  2026-10-25, not flashed yet): the park command. The L072 stops every
+- **firmware** (the RS-12.21 image, `"cap_bitmap": "0x000000FF"`; on both
+  boards since 2026-10-25): the park command. The L072 stops every
   receiver re-arm and sleeps until a host RXCONT write, a profile
   activation (the next daemon start) or a reset: `"persistent": true`. It
   works at once, with no wait. A `PARK_FAIL` (no answer, or refused while a

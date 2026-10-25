@@ -78,8 +78,8 @@ overrides the file for one run of these `legs/` scripts, for example
 | `power_up_guard.sh` | Waits for the boards. Stops the tractor camera unit. Stages the probes. Reads the L072 and parks it if it is listening. `--check-only` is the end-of-session check. `--stop-leg-daemons` clears an interrupted harness. Works over adb, or over ssh for the base. | both | reads the radio and parks it; never transmits |
 | `stage_boards.sh` | (Re)stages `/tmp/lifetrac_strict` (probes, injectors, `channel_survey_sniff.py`) and the harness's `/tmp/lifetrac_p0c/08_boot_user_app.cfg` (LF-clean), then the code tree. md5-verifies every file. `--probes-only` stages the probes and paho only (plus the tractor's `08_boot_user_app.cfg`). Refuses (exit 7) an `EVIDENCE_DIR` that holds committed files, before any board is touched (2026-10-22). | both | file copies only |
 | `push_fix_to_board.sh` | Pushes this checkout's `camera_service.py`, encoder, store and `vector_dry_run.py`, md5-checked, then runs an import smoke without any device. | one | none |
-| `youtube_window.ps1` | `-Open` / `-Front` / `-Close` the bench video window (its own Firefox profile, muted). `-Url`, `-ProfileDir`, `-FirefoxExe`. | none | none |
-| `scene_check.sh` | Before every camera run: window to the front, then frames from `/dev/video1` until 10.5 s after the camera's sixth frame (at most 20 s after its first). Needs ≥ 8 % of pixels changed over 10 s (0 = record only, for a still). No frame within 20 s, or fewer than 10 frames, fails with a `NO-FRAMES` reason (exit 4). | tractor camera | none |
+| `youtube_window.ps1` | `-Open` / `-Front` / `-Close` the bench video window (its own Firefox profile, muted). `-Url`, `-ProfileDir`, `-FirefoxExe`. When Windows refuses `-Front`'s focus change, it retries once with an Alt press and release around `SetForegroundWindow`, and it sends "f" only to a window then confirmed in front (2026-10-25). If the window is still not in front after the retry, `-Open` / `-Front` exit 6 (`NOT-IN-FRONT`), whatever the fullscreen state; the last line reports `player fullscreen:` (window size only) and `in front:`. The Alt goes to the window in front when it is sent: if the retry is refused too, the operator's app gets it. | none | none |
+| `scene_check.sh` | Before every camera run: window to the front, then frames from `/dev/video1` until 10.5 s after the camera's sixth frame (at most 20 s after its first). Needs ≥ 8 % of pixels changed over 10 s (0 = record only, for a still). No frame within 20 s, or fewer than 10 frames, fails with a `NO-FRAMES` reason (exit 4). A failed `-Front` (window not confirmed in front, or none) stops it before the camera opens, with no frame taken: `SCENE-CHECK-NOT-FRONT`, exit 5, and `leg_prep.sh` / `step1_pass.sh` abort (2026-10-25: a frame taken while the bench window was not in front caught a non-bench window). | tractor camera | none |
 | `step1_pass.sh` | One camera-only step-1 pass: fresh `bench_mqtt`, capture, then `camera_svc` with the profile's `LIFETRAC_REG_PROFILE`. `--from-work` runs the pushed tree. Refuses to run while a leg daemon is up. Exit 6 = camera_service's VECTOR cold-start clamp was seen (boot-log check or the pulled camera log), or no camera log from this pass with its `byte_budget` line came back: the pass is not valid at the profile's budget. | tractor | none (camera only) |
 | `leg_prep.sh` | Scene check, UART-holder check, health probes, `clear_retained`, pre-brackets, detached base capture. Writes the harness command, with `-StopDrainS` (4 s FHSS / 2 s DTS, `--stop-drain S`; 2026-10-22). Knows the RS-13.1 tags and the range-edge leg names. Refuses (exit 7) an `EVIDENCE_DIR` that holds committed files, before any board action. | both | wakes the receivers (RXCONT); does not transmit |
 | `link_sample.sh` | During a leg: the first `link_stats` message that has frames (P7). | base broker | none |
@@ -109,7 +109,11 @@ overrides the file for one run of these `legs/` scripts, for example
    ```
 
    Start it at least a minute before the first check, because two pre-roll
-   ads play first.
+   ads play first. If the bench profile opens windows with no page (seen
+   2026-10-25), run `-Close`, rename the profile folder
+   (`%TEMP%\lifetrac-bench\ff_bench_youtube`, or `FIREFOX_PROFILE_DIR`) to
+   e.g. `ff_bench_youtube.bak-<date>`, and run `-Open` again: it creates a
+   fresh profile.
 4. **DTS carrier.** This step is needed before the first profile-2 leg of the
    day.
    - Run a receive-only spot-check with the tractor parked:
@@ -231,7 +235,7 @@ that board with sudo and re-run (BENCH_RUNBOOK, "A leg").
   least ~2 min after the daemons stopped: a park readback taken right after
   the stop is not authoritative (the scan can still re-arm the receiver;
   BENCH_RUNBOOK, `radio_park.py`).
-- On the RS-12.21 image (built 2026-10-25, not flashed yet) `radio_park.py`
+- On the RS-12.21 image (on both boards since 2026-10-25) `radio_park.py`
   parks by the firmware command (`"path": "firmware"` in `leg<X>_park.txt`),
   which holds at the first attempt; a retry or a `PARK NOT CONFIRMED` there
   is a fault to report, not a scan still walking. The `--check-only`

@@ -136,9 +136,9 @@ That key is the dummy key CI uses. Real fleet keys (the PC's gitignored
    ```
 
 Only this toolchain rebuilds the bench image and the production image byte
-for byte: from the RS-12.21 source (2026-10-25, built, not flashed yet)
-bench `0daae279` and production `2c5e055a`; the flown pair `e083ae46` /
-`148de24e` (before #152: `0c1bb0a9` / `589c1203`). Any other GCC, including CI's Ubuntu
+for byte: from the RS-12.21 source (2026-10-25; the bench build on both
+boards since that day) bench `0daae279` and production `2c5e055a`; the
+pair before it `e083ae46` / `148de24e` (before #152: `0c1bb0a9` / `589c1203`). Any other GCC, including CI's Ubuntu
 `gcc-arm-none-eabi`, builds working firmware with different bytes. Expected
 md5s and the build steps are in
 [murata_l072/README.md](../../murata_l072/README.md).

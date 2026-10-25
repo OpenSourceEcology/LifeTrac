@@ -113,31 +113,34 @@ section 5 item 2, adopted 2026-10-24 as [DECISIONS.md](../../DECISIONS.md)
 D-FHSS1; branch `fhss-scan-recovery-2026-10-24`), built on the bench PC
 2026-10-25, repeated from a clean copy of the tree and again after
 `mingw32-make clean`, with the toolchain above and the default flags.
-**Built, not flashed** (the flash and its checks: the memo's section 6.1,
-on the operator's GO):
+**Both bench boards run the bench image since 2026-10-25**, flashed on the
+operator's GO by the memo's section 6.1 (tractor then base, Verify OK,
+`flash_rc=0` on both;
+[`bench_session_2026-10-25/`](../../bench-evidence/bench_session_2026-10-25/RESULTS.md),
+with a copy of the image in `firmware_flash/`):
 
 | image | md5 | size |
 |---|---|---|
-| `build/firmware_bench_diag.bin` (bench; not flashed yet) | `0daae27978089eb97ab35c18718b62b0` | 25 324 B |
+| `build/firmware_bench_diag.bin` (bench; on both boards since 2026-10-25) | `0daae27978089eb97ab35c18718b62b0` | 25 324 B |
 | `build/firmware.bin` (production, committed) | `2c5e055abff95126309a62409fafc654` | 25 324 B |
 
-The image flashed on the boards until then, at `13f20aa1` (the RS-12.15
-reverse-delivery fix, built 2026-10-14 and repeated after
-`mingw32-make clean`):
+The previous image, at `13f20aa1` (the RS-12.15 reverse-delivery fix,
+built 2026-10-14 and repeated after `mingw32-make clean`), is the rollback
+image:
 
 | image | md5 | size |
 |---|---|---|
-| `build/firmware_bench_diag.bin` (bench; on both boards since 2026-10-18) | `e083ae46a64686031b39866eca42e094` | 24 972 B |
+| `build/firmware_bench_diag.bin` (bench; on both boards 2026-10-18 → 2026-10-25) | `e083ae46a64686031b39866eca42e094` | 24 972 B |
 | `build/firmware.bin` (production) | `148de24e1f9acce417c46c2c69a5be6b` | 24 972 B |
 
-Both bench boards run `e083ae46` since 2026-10-18, flashed for the RS-12.15
-reverse-delivery round (Verify OK, `flash_rc=0` on both;
+Both bench boards ran `e083ae46` from 2026-10-18 to 2026-10-25, flashed for
+the RS-12.15 reverse-delivery round (Verify OK, `flash_rc=0` on both;
 [`RS_12_15_reverse_delivery_2026-10-18/`](../../bench-evidence/RS_12_15_reverse_delivery_2026-10-18/),
-with a copy of the image in `firmware_flash/`). Before that they ran the
-previous bench build, `0c1bb0a9573f813137f941dfa47177d0` (production twin
-`589c120323c2d5e7ef9f459d7a4ba42d`, 24 860 B, from `main` `bb4a2071`), from
-2026-09-15. The same toolchain reproduced both at `main` `f6e4b463` on
-2026-10-14, before this pair was built.
+with a copy of the image in `firmware_flash/`, the rollback copy). Before
+that they ran the older bench build, `0c1bb0a9573f813137f941dfa47177d0`
+(production twin `589c120323c2d5e7ef9f459d7a4ba42d`, 24 860 B, from `main`
+`bb4a2071`), from 2026-09-15. The same toolchain reproduced both at `main`
+`f6e4b463` on 2026-10-14, before the `e083ae46` pair was built.
 
 Check with `certutil -hashfile build\firmware_bench_diag.bin MD5`
 (PowerShell) or `md5sum build/firmware_bench_diag.bin`.

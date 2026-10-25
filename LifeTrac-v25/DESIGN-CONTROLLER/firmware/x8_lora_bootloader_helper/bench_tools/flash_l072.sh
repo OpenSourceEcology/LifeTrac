@@ -86,11 +86,11 @@ MD5=$(md5sum "$IMG" | cut -d' ' -f1)
 # 192 KB flash, of which the last 8 KB is the CFG region (include/memory_map.h).
 [ "$SIZE" -le $((184 * 1024)) ] || die "$IMGNAME is $SIZE B, larger than the 184 KB APP region"
 case "$MD5" in
-  0daae27978089eb97ab35c18718b62b0) KIND="RS-12.21 bench build (scan option (b) + L + d2, firmware park command, 0x0D split; built 2026-10-25)" ;;
+  0daae27978089eb97ab35c18718b62b0) KIND="RS-12.21 bench build, on both boards since 2026-10-25 (scan option (b) + L + d2, firmware park command, 0x0D split; built 2026-10-25)" ;;
   2c5e055abff95126309a62409fafc654) KIND="RS-12.21 PRODUCTION build: refuses diag register writes, so -ForceFrfHz and channel_survey_sniff.py fail on it -- bench boards normally run the bench build" ;;
-  e083ae46a64686031b39866eca42e094) KIND="bench build on both boards since 2026-10-18 (RS-12.15 reverse delivery, #152)" ;;
+  e083ae46a64686031b39866eca42e094) KIND="previous bench build, on both boards 2026-10-18 -> 2026-10-25 (RS-12.15 reverse delivery, #152; the rollback image)" ;;
   148de24e1f9acce417c46c2c69a5be6b) KIND="PRODUCTION build (main 3c8ced60): refuses diag register writes, so -ForceFrfHz and channel_survey_sniff.py fail on it -- bench boards normally run the bench build" ;;
-  0c1bb0a9573f813137f941dfa47177d0) KIND="previous bench build, on both boards 2026-09-15 -> 2026-10-18 (RS-12.15 v2; the rollback image)" ;;
+  0c1bb0a9573f813137f941dfa47177d0) KIND="older bench build, on both boards 2026-09-15 -> 2026-10-18 (RS-12.15 v2)" ;;
   589c120323c2d5e7ef9f459d7a4ba42d) KIND="previous PRODUCTION build (main bb4a2071): refuses diag register writes, so -ForceFrfHz and channel_survey_sniff.py fail on it -- bench boards normally run the bench build" ;;
   e8ad842489d5acfc09f204c7807e4661) KIND="RS-12.10 bench build (pre-clock-authority A/B control)" ;;
   5a160e4a8c9296c7d2e49727bdfb8880) KIND="RS-12.15 v2 bench build as flown in legs R and T" ;;

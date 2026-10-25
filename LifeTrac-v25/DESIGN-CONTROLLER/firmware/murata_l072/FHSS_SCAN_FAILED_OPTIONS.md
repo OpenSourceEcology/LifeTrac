@@ -6,8 +6,12 @@ RS-12.21 park command in the same image, the 0x0D split of section 7), with
 the decay-window trade-off of section 5 item 3 accepted
 ([`DECISIONS.md`](../../DECISIONS.md) D-FHSS1). Implemented on branch
 `fhss-scan-recovery-2026-10-24` and built 2026-10-25 (bench `0daae279`,
-production `2c5e055a`, section 9). **Not flashed; no radio used.** The
-flash and the first radio checks are planned in section 6.1.
+production `2c5e055a`, section 9). **Flashed on both bench boards
+2026-10-25** on the operator's GO (tractor then base: `Verify OK`,
+`flash_rc=0`), with every post-flash check and the first legs R1 and R2
+passed (section 6.1;
+[`RESULTS.md`](../../bench-evidence/bench_session_2026-10-25/RESULTS.md) of
+that day). T1, T2 and T4 with camera stalls are still to fly.
 **Date:** 2026-10-24 (main `5d00dac2`).
 **Decision owner:** the design owner (Dorkmo).
 **Rows:** RS-12.21 and RS-12.15 in [`../../TODO.md`](../../TODO.md).
@@ -52,7 +56,7 @@ including the variants without L, `noL`, that section 4 quotes).
   watchdog (c) all recover leg 6 in 100/100 replays. (d), a longer dwell,
   makes FAILED rarer but does not recover from it.
 - **Recommendation for the design owner (section 5; adopted 2026-10-24,
-  built 2026-10-25, not flashed):** option (b) with the
+  built and flashed 2026-10-25):** option (b) with the
   loss-timer fix L and a 2 s dwell, flashed together with the RS-12.21 park
   command it needs and a new code for one of the two 0x0D faults. L and
   the 2 s dwell also change the tractor's normal RS-12.15 decay window
@@ -392,7 +396,8 @@ the 0x0D split in one image) and accepted the decay-window trade-off of
 item 3 (more own-grid renumbering for more commands received; closing the
 decay window stays the open RS-12.15 grid-policy change). Recorded as
 [`DECISIONS.md`](../../DECISIONS.md) D-FHSS1. Implemented 2026-10-25 on
-branch `fhss-scan-recovery-2026-10-24`, built, **not flashed**:
+branch `fhss-scan-recovery-2026-10-24`, built, and **flashed on both bench
+boards 2026-10-25** (section 6.1):
 
 - scan: (b) in `radio/sx1276_rx.c` (the pure policy is unchanged, vector 16
   still pins "FAILED absorbs" there), L in `scan_drive`, d2 as a fixed
@@ -507,6 +512,18 @@ deploy to the X8s, which is also the operator's call.
 
 ### 6.1 Flash and verify plan (the next radio day)
 
+**Flown 2026-10-25** on the operator's GO ("proceed with any merges and you
+have a GO for any radio testing"), from main `d597b094`, as written below
+([`RESULTS.md`](../../bench-evidence/bench_session_2026-10-25/RESULTS.md),
+`firmware_flash/` and `legs/` beside it). Steps 1-10 passed: tractor then
+base flashed (`Verify OK`, `flash_rc=0`), `radio_park.py` `PARK_OK` with
+`cap_bitmap` `0x000000FF` and `path` firmware on both, `0x80` still at the
+check-only about 3 min later. R1 and R2 passed every Confirm item below
+that applied (R1's base-0x0D item was not exercised: the base locked in its
+first attempt). Both boards now run bench `0daae279`; step 11 was not
+needed. Not flown
+yet: T1, T2, T4 with stalls (the last item of this section).
+
 Written 2026-10-25 with both radios off, for the round after it. Both
 boards run `e083ae46` until step 6. Each step that flashes or opens
 `/dev/ttymxc3` needs the operator's GO: the flash GO covers steps 6-10
@@ -540,7 +557,8 @@ GO rule's exception), and the rollback and each leg need their own. Commands and
 4. Power-up guard and staging as every session (`legs/power_up_guard.sh`,
    `legs/stage_boards.sh`). On `e083ae46` the new `radio_park.py` reports
    `"cap_bitmap": "0x0000007F"`, `"park_cmd": "unknown_type"` and
-   `"path": "register"`: the fallback, as expected.
+   `"path": "register"`: the fallback, as expected (so it read on
+   2026-10-25).
 5. Stage and preflight each board without `--go`:
    `bash "$BT/flash_l072.sh" tractor "$FW"`, with
    `FW=$DC/firmware/murata_l072/build/firmware_bench_diag.bin`. Want the
@@ -548,10 +566,17 @@ GO rule's exception), and the rollback and each leg need their own. Commands and
    build (...)`, then `PREFLIGHT-OK`. The same for `base` (over ssh).
 6. Flash the tractor, then the base, one at a time:
    `bash "$BT/flash_l072.sh" tractor "$FW" --go`, then `base`. Success:
-   `Verify OK`, `flash_rc=0` and `PIPELINE-EXIT=0` in
+   `Verify OK`, `flash_rc=0` and `DONE: prep=0 flash=0 revive=0` in
    `/home/fio/pipeline_stamped.log`; the board reboots in 12-24 s and
-   `/tmp` is wiped. Keep the consoles and a copy of the image in a
-   `firmware_flash/` folder of the session, as on 2026-10-18
+   `/tmp` is wiped. `PIPELINE-EXIT=0` is not in that log:
+   `run_flash_bench.sh` prints it to the console after the pipeline
+   returns, and on the tractor the console misses it because adb drops at
+   the reboot (2026-10-25; the base's console had it). The base's
+   `flash_l072.sh` can hang on its dropped ssh session after the board
+   reboots: once the board answers on a new connection, stop it (its exit
+   status, 255 then, does not judge the flash). Keep the consoles and a
+   copy of the image in a `firmware_flash/` folder of the session, as on
+   2026-10-18
    (`bench-evidence/RS_12_15_reverse_delivery_2026-10-18/firmware_flash/`).
    Never put the production bin on a bench board.
 
@@ -621,6 +646,17 @@ profile 1, which ends the park; `leg_post.sh` parks again at the end.
     re-arm RXCONT every 2 s dwell);
   - STOP: `!! ACQUISITION FAILED` or `!! BASE NEVER LOCKED` on this image.
     Park, do not re-fly, and read the base's 0x0D lines first.
+  - **Flown 2026-10-25 as `2c_r1`, every item that applied PASS**
+    (RESULTS, R1): base
+    `cap=0x000000FF`; ACQUIRED 11.0 s after activation (599 of 609
+    fragments); no 0x0D or 0x0F line on either board during the leg (both
+    scans locked in their first attempt, so the base-0x0D item was not
+    exercised), Δ`tx_fifo_rb_bad` 0; base Δ`clk_demotion_reset` 1, the
+    RS-12.15 criteria PASS, PROBE 204/204; leg-end `PARK_OK` on the
+    firmware path at the first attempt on both, `0x80` at the check-only
+    2 min 11-16 s later: the park gate held with profile 1 active. The
+    post-bracket probe caught a final 0x0D (sub 0xE3) from the tractor 5 s
+    before that park: its scan was running, as (b) predicts.
 - **R2: the injector trigger and the tractor in FAILED (T4's first
   half).** The 2026-10-18 leg-X shape: profile 1, 480 s, KF requests off:
   `legs/leg_prep.sh 2c_<tag> image_bw250 --duration 480`, with
@@ -635,7 +671,13 @@ profile 1, which ends the park; `leg_post.sh` parks again at the end.
   on 2026-10-18. A tractor that keeps streaming holds FAILED (it has
   authority). If its stream stalls for 1 s or more it restarts its scan
   under (b), so on this image a later final 0x0D and moving
-  `clk_demotion_*` counters are normal.
+  `clk_demotion_*` counters are normal. **Flown 2026-10-25 as `2c_r2`,
+  every item PASS** (RESULTS, R2): tractor 0x0D `name=RX_SCAN_FAILED` sub
+  0x00, 0x01, 0x02, 0x83 at L072 uptime 33.6, 63.6, 93.6, 123.7 s; the
+  trigger fired on the 0x83 line only, 113 s after MONITORING; 93 of the
+  base's 95 commands heard with the tractor in FAILED (leg X: 36/36); the
+  RS-12.15 criteria PASS, stop rule not tripped; no later 0x0D, tractor
+  `clk_demotion_*` 0 (it streamed to the end and held FAILED).
 - **Later, not on the first day:** T1 (the base silent for ≥ 125 s, then
   the stream) needs a harness option that delays the tractor's stream,
   which is not built (build and test it offline first); T2 (a set of about
@@ -646,7 +688,8 @@ After the round: record it in the session's RESULTS.md, then update the
 `FLASH_RUNBOOK.md`, `BENCH_BOARDS.md`, `BENCH_RUNBOOK.md` "Board facts",
 `flash_l072.sh`'s build list) and the TODO.md RS-12.21 and RS-12.15 rows.
 End the session with both radios parked by the firmware path and the
-`--check-only` reading.
+`--check-only` reading. Done 2026-10-25 (the session ended with both radios
+at `0x80` at 15:02:35Z / 15:02:55Z).
 
 ## 7. Side item: FAULT code 0x0D means two faults
 
@@ -716,7 +759,7 @@ non-final scan attempt.
    the 2026-05-19 §13.1 #7 contract. Both md5s change: flash GO, md5
    tables (`.github/workflows/l072-bench-md5.yml`, `README.md`).
 
-**Adopted 2026-10-24, implemented 2026-10-25 (not flashed).** Items 1-3 as
+**Adopted 2026-10-24, implemented and flashed 2026-10-25.** Items 1-3 as
 proposed (`include/host_types.h`; the duplicate check covers every
 HOST_FAULT_CODE_*). Item 4: the hosts name a 0x0D with a valid scan sub
 RX_SCAN_FAILED on any image and keep the in-flight test only as a `basis=`
@@ -871,9 +914,11 @@ one CRC error (R:490-492).
 - Unchanged by the analysis of 2026-10-24: the bench image (md5
   `e083ae46a64686031b39866eca42e094`) and the production image (md5
   `148de24e1f9acce417c46c2c69a5be6b`), both rebuilt and checked that day;
-  `e083ae46` stays on both boards until the flash of section 6.1.
+  `e083ae46` stayed on both boards until the flash of section 6.1
+  (2026-10-25); its flown copy is the rollback image (step 11).
 - The adopted image (section 5, 2026-10-25; branch
-  `fhss-scan-recovery-2026-10-24`, built, not flashed): bench
+  `fhss-scan-recovery-2026-10-24`, built, on both bench boards since
+  2026-10-25): bench
   `build/firmware_bench_diag.bin` md5 `0daae27978089eb97ab35c18718b62b0`,
   production `build/firmware.bin` md5 `2c5e055abff95126309a62409fafc654`,
   25 324 B each (APP 25 324 / 188 416 B, RAM 6 748 / 17 920 B,

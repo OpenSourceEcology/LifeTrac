@@ -1,0 +1,185 @@
+image: firmware_bench_diag.bin  25324 B  md5 0daae27978089eb97ab35c18718b62b0
+       RS-12.21 bench build (scan option (b) + L + d2, firmware park command, 0x0D split; built 2026-10-25)
+settings: /c/Users/dorkm/Documents/GitHub/LifeTrac-bench-main/LifeTrac-v25/DESIGN-CONTROLLER/firmware/x8_lora_bootloader_helper/bench_tools/bench.env (non-empty environment variables win)
+=== base fio@192.168.1.117 (adb serial 2D0A1209DABC240B; the base is flashed over ssh): staging
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+kernel: 6.1.24-lmp-standard
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+=== base: preflight
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+PREFLIGHT-OK image=/tmp/lifetrac_p0c/firmware_bench_diag.bin size=25324 md5=0daae27978089eb97ab35c18718b62b0 REVIVE_MODE=reboot FLASH_VERIFY_ONLY=0
+FLASH_PREFLIGHT_ONLY=1: staging checked, stopping before openocd/UART/watchdog.
+=== base: FLASHING (radio-on event; REVIVE_MODE=reboot)
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+PREFLIGHT-OK image=/tmp/lifetrac_p0c/firmware_bench_diag.bin size=25324 md5=0daae27978089eb97ab35c18718b62b0 REVIVE_MODE=reboot FLASH_VERIFY_ONLY=0
+kmsg logger pid=126780 uptime_s=598650.32
+598650.416 === T-1 Sun Oct 25 14:11:28 UTC 2026 wdt_pet start (HW WDT is 60s, or 30s owned by systemd with the L2 drop-in) ===
+598650.630 wdt_pet started pid=126798 log=/home/fio/wdt_pet.log
+598650.637 === T0 Sun Oct 25 14:11:29 UTC 2026 prep_bridge ===
+598650.645 === [1/4] unexport x8h7 gpios (160..193) ===
+598650.652   unexport gpio163 OK
+598650.965 === [1.5/4] unexport x8h7 PWM channels ===
+598651.281 === [2/4] unbind in-kernel x8h7 gpio consumers ===
+598651.287   unbind cs42l52_regulator OK
+598651.593 === [3/4] rmmod x8h7 modules ===
+598652.145 === [4/4] verify ===
+598652.169   all x8h7 modules unloaded
+598652.170 === SUCCESS: bridge is now safe to halt with openocd ===
+598652.174 prep_rc=0
+598652.178 
+598652.184 === T1 Sun Oct 25 14:11:30 UTC 2026 flash /tmp/lifetrac_p0c/firmware_bench_diag.bin ===
+598652.195 === sanity ===
+598652.202 -rw-r--r-- 1 fio fio  2265 Oct 25 14:11 /tmp/lifetrac_p0c/07_assert_pa11_pf4_long.cfg
+598652.203 -rw-r--r-- 1 fio fio 25324 Oct 25 14:11 /tmp/lifetrac_p0c/firmware_bench_diag.bin
+598652.204 -rwxr-xr-x 1 fio fio 13015 Oct 25 14:11 /tmp/lifetrac_p0c/stm32_an3155_flasher.py
+598652.269 fuser /dev/ttymxc3 (pre-evict): 
+598653.049 fuser /dev/ttymxc3 (post-evict): 
+598653.064 
+598653.070 === diag 0: BASELINE passive listen 3.0s (no openocd, no NRST) ===
+598656.096 baseline_bytes=0
+598656.103 
+598656.108 === launching openocd (600s hold) ===
+598657.134 gpio10_value_before_unexport=1
+598657.143 OCD_PID=126910
+598658.182 
+598658.187 === openocd output so far ===
+598658.191 Open On-Chip Debugger 0.11.0-dirty (2025-07-14-18:35)
+598658.192 Licensed under GNU GPL v2
+598658.194 For bug reports, read
+598658.195 	http://openocd.org/doc/doxygen/bugs.html
+598658.196 Info : imx_gpio GPIO JTAG/SWD bitbang driver
+598658.197 Info : imx_gpio mmap: pagesize: 4096, regionsize: 131072
+598658.198 Info : clock speed 1805 kHz
+598658.199 Info : SWD DPIDR 0x6ba02477
+598658.200 Info : stm32h7x.cpu0: hardware has 0 breakpoints, 0 watchpoints
+598658.202 Info : stm32h7x.cpu0: external reset detected
+598658.203 Info : starting gdb server for stm32h7x.cpu0 on 3333
+598658.204 Info : Listening on port 3333 for gdb connections
+598658.205 target halted due to debug-request, current mode: Thread 
+598658.206 xPSR: 0x01000000 pc: 0x0800db4c msp: 0x24080000
+598658.207 Phase A: enable GPIOA + GPIOF clocks (bits 0 + 5)
+598658.208   RCC_AHB4ENR before = 0x00000000
+598658.209   RCC_AHB4ENR after  = 0x00000021
+598658.210 Phase B: drive PA_11 HIGH (LoRa BOOT0)
+598658.211   GPIOA_IDR.PA_11 = 1   (expect 1)
+598658.213 Phase C: pulse PF_4 LOW(250ms) then HIGH (LoRa NRST)
+598658.214   GPIOF_IDR.PF_4 (low)  = 0   (expect 0)
+598658.215   GPIOF_IDR.PF_4 (high) = 1   (expect 1)
+598658.216 Phase D: re-assert PA_11 HIGH
+598658.216   GPIOA_IDR.PA_11 (post-reset) = 1   (expect 1)
+598658.217 
+598658.219 READY: L072 in STM32 ROM bootloader on /dev/ttymxc3 @ 19200 8E1.
+598658.220 Holding halted for 600s with PA_11=HIGH (re-asserted every 1s).
+598658.221 Run flasher in a parallel shell.
+598658.222 
+598658.223 === configure UART 19200 8E1 raw ===
+598658.225 --- stty -a (post-config) ---
+598658.226 speed 19200 baud; rows 0; columns 0; line = 0;
+598658.227 intr = ^C; quit = ^\; erase = ^?; kill = ^U; eof = ^D; eol = <undef>;
+598658.228 eol2 = <undef>; swtch = <undef>; start = ^Q; stop = ^S; susp = ^Z; rprnt = ^R;
+598658.229 werase = ^W; lnext = ^V; discard = ^O; min = 1; time = 0;
+598658.231 parenb -parodd -cmspar cs8 hupcl -cstopb cread clocal -crtscts
+598658.232 -ignbrk -brkint -ignpar -parmrk -inpck -istrip -inlcr -igncr -icrnl -ixon -ixoff
+598658.233 -iuclc -ixany -imaxbel -iutf8
+598658.234 -opost -olcuc -ocrnl onlcr -onocr -onlret -ofill -ofdel nl0 cr0 tab0 bs0 vt0 ff0
+598658.235 -isig -icanon iexten -echo echoe echok -echonl -noflsh -xcase -tostop -echoprt
+598658.236 echoctl echoke -flusho -extproc
+598658.237 --- end stty ---
+598658.240 
+598658.245 === diag A: passive listen 3.0s post-NRST (expect EMPTY in ROM; if firmware runs and BOOT0 ignored, we should see LT_BOOT_HEARTBEAT here) ===
+598661.270 passive_bytes=0
+598661.276 
+598661.282 === diag B: raw 0x7F probe SKIPPED (FLASH_DIAG_RAW_PROBE!=1; would corrupt autobaud) ===
+598661.598 
+598661.604 === running flasher (with --verify) ===
+598661.704 Opening /dev/ttymxc3 at 19200 8E1...
+598661.705 Connecting to Bootloader...
+598661.706 Sending sync byte 0x7F...
+598661.715 Sending GET command (0x00 0xFF)...
+598661.736 Bootloader version: 31
+598661.738 Reading payload /tmp/lifetrac_p0c/firmware_bench_diag.bin...
+598661.739 Firmware size: 25324 bytes
+598661.741 Erasing memory... (This may take up to 60 seconds)
+598661.758 Received NACK!
+598661.760   mass-erase parameter NACK; falling back to page-by-page erase
+598661.762   page-by-page Extended Erase: 198 pages (25344 bytes)
+598662.659 Extended Erase complete! (198 page batches complete via page-by-page fallback)
+598662.663 Starting flash process...
+598681.912 [----------------------------------------] 1.0% (0x100 / 0x62EC)[----------------------------------------] 2.0% (0x200 / 0x62EC)[=---------------------------------------] 3.0% (0x300 / 0x62EC)[=---------------------------------------] 4.0% (0x400 / 0x62EC)[==--------------------------------------] 5.1% (0x500 / 0x62EC)[==--------------------------------------] 6.1% (0x600 / 0x62EC)[==--------------------------------------] 7.1% (0x700 / 0x62EC)[===-------------------------------------] 8.1% (0x800 / 0x62EC)[===-------------------------------------] 9.1% (0x900 / 0x62EC)[====------------------------------------] 10.1% (0xA00 / 0x62EC)[====------------------------------------] 11.1% (0xB00 / 0x62EC)[====------------------------------------] 12.1% (0xC00 / 0x62EC)[=====-----------------------------------] 13.1% (0xD00 / 0x62EC)[=====-----------------------------------] 14.2% (0xE00 / 0x62EC)[======----------------------------------] 15.2% (0xF00 / 0x62EC)[======----------------------------------] 16.2% (0x1000 / 0x62EC)[======----------------------------------] 17.2% (0x1100 / 0x62EC)[=======---------------------------------] 18.2% (0x1200 / 0x62EC)[=======---------------------------------] 19.2% (0x1300 / 0x62EC)[========--------------------------------] 20.2% (0x1400 / 0x62EC)[========--------------------------------] 21.2% (0x1500 / 0x62EC)[========--------------------------------] 22.2% (0x1600 / 0x62EC)[=========-------------------------------] 23.3% (0x1700 / 0x62EC)[=========-------------------------------] 24.3% (0x1800 / 0x62EC)[==========------------------------------] 25.3% (0x1900 / 0x62EC)[==========------------------------------] 26.3% (0x1A00 / 0x62EC)[==========------------------------------] 27.3% (0x1B00 / 0x62EC)[===========-----------------------------] 28.3% (0x1C00 / 0x62EC)[===========-----------------------------] 29.3% (0x1D00 / 0x62EC)[============----------------------------] 30.3% (0x1E00 / 0x62EC)[============----------------------------] 31.3% (0x1F00 / 0x62EC)[============----------------------------] 32.3% (0x2000 / 0x62EC)[=============---------------------------] 33.4% (0x2100 / 0x62EC)[=============---------------------------] 34.4% (0x2200 / 0x62EC)[==============--------------------------] 35.4% (0x2300 / 0x62EC)[==============--------------------------] 36.4% (0x2400 / 0x62EC)[==============--------------------------] 37.4% (0x2500 / 0x62EC)[===============-------------------------] 38.4% (0x2600 / 0x62EC)[===============-------------------------] 39.4% (0x2700 / 0x62EC)[================------------------------] 40.4% (0x2800 / 0x62EC)[================------------------------] 41.4% (0x2900 / 0x62EC)[================------------------------] 42.5% (0x2A00 / 0x62EC)[=================-----------------------] 43.5% (0x2B00 / 0x62EC)[=================-----------------------] 44.5% (0x2C00 / 0x62EC)[==================----------------------] 45.5% (0x2D00 / 0x62EC)[==================----------------------] 46.5% (0x2E00 / 0x62EC)[===================---------------------] 47.5% (0x2F00 / 0x62EC)[===================---------------------] 48.5% (0x3000 / 0x62EC)[===================---------------------] 49.5% (0x3100 / 0x62EC)[====================--------------------] 50.5% (0x3200 / 0x62EC)[====================--------------------] 51.6% (0x3300 / 0x62EC)[=====================-------------------] 52.6% (0x3400 / 0x62EC)[=====================-------------------] 53.6% (0x3500 / 0x62EC)[=====================-------------------] 54.6% (0x3600 / 0x62EC)[======================------------------] 55.6% (0x3700 / 0x62EC)[======================------------------] 56.6% (0x3800 / 0x62EC)[=======================-----------------] 57.6% (0x3900 / 0x62EC)[=======================-----------------] 58.6% (0x3A00 / 0x62EC)[=======================-----------------] 59.6% (0x3B00 / 0x62EC)[========================----------------] 60.7% (0x3C00 / 0x62EC)[========================----------------] 61.7% (0x3D00 / 0x62EC)[=========================---------------] 62.7% (0x3E00 / 0x62EC)[=========================---------------] 63.7% (0x3F00 / 0x62EC)[=========================---------------] 64.7% (0x4000 / 0x62EC)[==========================--------------] 65.7% (0x4100 / 0x62EC)[==========================--------------] 66.7% (0x4200 / 0x62EC)[===========================-------------] 67.7% (0x4300 / 0x62EC)[===========================-------------] 68.7% (0x4400 / 0x62EC)[===========================-------------] 69.8% (0x4500 / 0x62EC)[============================------------] 70.8% (0x4600 / 0x62EC)[============================------------] 71.8% (0x4700 / 0x62EC)[=============================-----------] 72.8% (0x4800 / 0x62EC)[=============================-----------] 73.8% (0x4900 / 0x62EC)[=============================-----------] 74.8% (0x4A00 / 0x62EC)[==============================----------] 75.8% (0x4B00 / 0x62EC)[==============================----------] 76.8% (0x4C00 / 0x62EC)[===============================---------] 77.8% (0x4D00 / 0x62EC)[===============================---------] 78.9% (0x4E00 / 0x62EC)[===============================---------] 79.9% (0x4F00 / 0x62EC)[================================--------] 80.9% (0x5000 / 0x62EC)[================================--------] 81.9% (0x5100 / 0x62EC)[=================================-------] 82.9% (0x5200 / 0x62EC)[=================================-------] 83.9% (0x5300 / 0x62EC)[=================================-------] 84.9% (0x5400 / 0x62EC)[==================================------] 85.9% (0x5500 / 0x62EC)[==================================------] 86.9% (0x5600 / 0x62EC)[===================================-----] 87.9% (0x5700 / 0x62EC)[===================================-----] 89.0% (0x5800 / 0x62EC)[===================================-----] 90.0% (0x5900 / 0x62EC)[====================================----] 91.0% (0x5A00 / 0x62EC)[====================================----] 92.0% (0x5B00 / 0x62EC)[=====================================---] 93.0% (0x5C00 / 0x62EC)[=====================================---] 94.0% (0x5D00 / 0x62EC)[======================================--] 95.0% (0x5E00 / 0x62EC)[======================================--] 96.0% (0x5F00 / 0x62EC)[======================================--] 97.0% (0x6000 / 0x62EC)[=======================================-] 98.1% (0x6100 / 0x62EC)[=======================================-] 99.1% (0x6200 / 0x62EC)[========================================] 100.0% (0x62EC / 0x62EC)
+598681.916 
+598681.917 Flash complete in 19.3 seconds! (1.3 KB/s)
+598681.918 Verifying flash readback...
+598699.914 Verify OK
+598699.945 flasher exit code = 0
+598699.950 
+598699.954 === killing openocd (126910) ===
+598700.962 /tmp/lifetrac_p0c/run_flash_l072.sh: line 205: 126910 Killed                  nohup openocd -f /usr/arduino/extra/openocd_script-imx_gpio.cfg -f $CFG > $OCD_LOG 2>&1 < /dev/null
+598700.973 
+598700.980 === final openocd log ===
+598700.983 Open On-Chip Debugger 0.11.0-dirty (2025-07-14-18:35)
+598700.984 Licensed under GNU GPL v2
+598700.985 For bug reports, read
+598700.987 	http://openocd.org/doc/doxygen/bugs.html
+598700.988 Info : imx_gpio GPIO JTAG/SWD bitbang driver
+598700.989 Info : imx_gpio mmap: pagesize: 4096, regionsize: 131072
+598700.991 Info : clock speed 1805 kHz
+598700.992 Info : SWD DPIDR 0x6ba02477
+598700.993 Info : stm32h7x.cpu0: hardware has 0 breakpoints, 0 watchpoints
+598700.994 Info : stm32h7x.cpu0: external reset detected
+598700.995 Info : starting gdb server for stm32h7x.cpu0 on 3333
+598700.996 Info : Listening on port 3333 for gdb connections
+598700.997 target halted due to debug-request, current mode: Thread 
+598700.998 xPSR: 0x01000000 pc: 0x0800db4c msp: 0x24080000
+598700.999 Phase A: enable GPIOA + GPIOF clocks (bits 0 + 5)
+598701.001   RCC_AHB4ENR before = 0x00000000
+598701.002   RCC_AHB4ENR after  = 0x00000021
+598701.003 Phase B: drive PA_11 HIGH (LoRa BOOT0)
+598701.005   GPIOA_IDR.PA_11 = 1   (expect 1)
+598701.006 Phase C: pulse PF_4 LOW(250ms) then HIGH (LoRa NRST)
+598701.007   GPIOF_IDR.PF_4 (low)  = 0   (expect 0)
+598701.008   GPIOF_IDR.PF_4 (high) = 1   (expect 1)
+598701.009 Phase D: re-assert PA_11 HIGH
+598701.010   GPIOA_IDR.PA_11 (post-reset) = 1   (expect 1)
+598701.011 
+598701.013 READY: L072 in STM32 ROM bootloader on /dev/ttymxc3 @ 19200 8E1.
+598701.014 Holding halted for 600s with PA_11=HIGH (re-asserted every 1s).
+598701.015 Run flasher in a parallel shell.
+598701.016 
+598701.017 === overall result: flasher RC=0 ===
+598701.018 flash_rc=0
+598701.019 
+598701.021 === T2 Sun Oct 25 14:12:19 UTC 2026 revive_bridge ===
+598701.022 REVIVE_MODE=reboot
+598701.030 === [1/5] kill stragglers ===
+598702.102 === [2/5] openocd: reset run + shutdown ===
+598702.574 Info : clock speed 1805 kHz
+598702.575 Info : SWD DPIDR 0x6ba02477
+598702.576 Info : stm32h7x.cpu0: hardware has 8 breakpoints, 4 watchpoints
+598702.577 Info : starting gdb server for stm32h7x.cpu0 on 3333
+598702.578 Info : Listening on port 3333 for gdb connections
+598702.579 target halted due to debug-request, current mode: Thread 
+598702.580 xPSR: 0x01000000 pc: 0x0800db4c msp: 0x24080000
+598702.581 shutdown command invoked
+598703.589 === REVIVE_MODE=reset_run_only: H7 running, modules left unloaded; caller reboots ===
+598703.595 revive_rc=0 (reset_run_only)
+598703.927 wdt_pet stopped pid=126798 (598703.611 CLOSE-WITH-MAGIC after 6 pets)
+598703.938 === T3 Sun Oct 25 14:12:22 UTC 2026 DONE: prep=0 flash=0 revive=0; REBOOTING (REVIVE_MODE=reboot) ===
+PIPELINE-EXIT=0 uptime_s=598704.04
+Read from remote host 192.168.1.117: Connection reset by peer
+client_loop: send disconnect: Connection reset by peer
+
+flash exit status: 255 (a dropped connection, e.g. 255 over ssh, is expected when REVIVE_MODE=reboot reboots the board)
+Next (FLASH_RUNBOOK section 4):
+  1. When the board is back: success = 'Verify OK' and 'flash_rc=0' in /home/fio/pipeline_stamped.log.
+  2. /tmp was wiped: re-stage /tmp/lifetrac_strict (and /tmp/lifetrac_p0c before another flash).
+  3. Tractor: stop lifetrac-camera.service and tractor-camera again; check 'fuser /dev/ttymxc3' is empty.
+  4. rs116_health_probe.py on the board, then park the radio (radio_park.py -> PARK_OK 0x80)
+     unless a leg follows under the same GO.

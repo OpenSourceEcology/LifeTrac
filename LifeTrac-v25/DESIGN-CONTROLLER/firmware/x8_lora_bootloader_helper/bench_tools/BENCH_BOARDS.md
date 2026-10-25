@@ -1,7 +1,8 @@
 # Bench boards: chips, firmware and board-resident software
 
-State as of **2026-10-10**, plus the boot-unit retirement of **2026-10-12**
-and the changes of **2026-10-14 to 2026-10-18** listed below.
+State as of **2026-10-10**, plus the boot-unit retirement of **2026-10-12**,
+the changes of **2026-10-14 to 2026-10-18** and the L072 flash of
+**2026-10-25** listed below.
 Both boards are measured from read-only captures:
 - base: [`bench-evidence/board_state_2026-10-04/base/`](../../../bench-evidence/board_state_2026-10-04/base/);
 - tractor: [`bench-evidence/board_state_2026-10-10/tractor/`](../../../bench-evidence/board_state_2026-10-10/tractor/).
@@ -21,6 +22,10 @@ both L072s flashed with the bench build `e083ae46` (2026-10-18,
 [`power_cycle_2026-10-18/`](../../../bench-evidence/bench_session_2026-10-14/power_cycle_2026-10-18/)
 and
 [`RS_12_15_reverse_delivery_2026-10-18/`](../../../bench-evidence/RS_12_15_reverse_delivery_2026-10-18/)).
+**Changed 2026-10-25:** both L072s flashed with the RS-12.21 bench build
+`0daae279` (tractor then base, Verify OK, `flash_rc=0`; the flash reboots
+both X8s;
+[`bench_session_2026-10-25/`](../../../bench-evidence/bench_session_2026-10-25/RESULTS.md)).
 
 The rest comes from a review of AI NOTES, bench-evidence,
 X8_HEALTH_AND_RECOVERY and git history.
@@ -56,7 +61,7 @@ goes with which module is not recorded.
 
 | chip | where | runs | LifeTrac-custom? | saved | notes |
 |---|---|---|---|---|---|
-| STM32L072 in the Murata CMWX1ZZABZ (+ SX1276, no firmware) | carrier | `firmware/murata_l072` bench build **`e083ae46`** since 2026-10-18 (RS-12.15 reverse delivery, #152); before that `0c1bb0a9`, 2026-09-15 → 2026-10-18. The RS-12.21 image (bench `0daae279`) is built, not flashed (2026-10-25; below) | **yes** | Source on `main` (`13f20aa1`, merged as `3c8ced60`). `e083ae46` builds byte-identically with arm-none-eabi-gcc **12.2.1 (Arm GNU Toolchain 12.2.MPACBTI-Rel1)**; the copy flashed on 2026-10-18 is in [`RS_12_15…/firmware_flash/`](../../../bench-evidence/RS_12_15_reverse_delivery_2026-10-18/firmware_flash/). Older binaries, the `0c1bb0a9` rollback image among them, and the full flashed-build inventory are in [`RS_13…/firmware/`](../../../bench-evidence/RS_13_vector_scene_2026-09-26/firmware/README.md). | The firmware never writes its own flash or EEPROM. Its option bytes were never recorded. The only proof of what is on the chip is the 2026-10-18 flash logs (Verify OK, `flash_rc=0` on both boards; copies in `RS_12_15…/firmware_flash/`; `run_flash_bench.sh` deletes the board copies at the next flash). |
+| STM32L072 in the Murata CMWX1ZZABZ (+ SX1276, no firmware) | carrier | `firmware/murata_l072` bench build **`0daae279`** since 2026-10-25 (the RS-12.21 image: scan option (b) + L + d2, the firmware park command, the 0x0D split; VER capability bitmap `0x000000FF`). Before that `e083ae46`, 2026-10-18 → 2026-10-25 (RS-12.15 reverse delivery, #152), and `0c1bb0a9`, 2026-09-15 → 2026-10-18 | **yes** | Source on `main` (`d597b094`, #168). `0daae279` builds byte-identically with arm-none-eabi-gcc **12.2.1 (Arm GNU Toolchain 12.2.MPACBTI-Rel1)**; the copy flashed on 2026-10-25 is in [`bench_session_2026-10-25/firmware_flash/`](../../../bench-evidence/bench_session_2026-10-25/firmware_flash/). The `e083ae46` rollback image is in [`RS_12_15…/firmware_flash/`](../../../bench-evidence/RS_12_15_reverse_delivery_2026-10-18/firmware_flash/firmware_bench_diag_e083ae46.bin). Older binaries, `0c1bb0a9` among them, and the full flashed-build inventory are in [`RS_13…/firmware/`](../../../bench-evidence/RS_13_vector_scene_2026-09-26/firmware/README.md). | The firmware never writes its own flash or EEPROM. Its option bytes were never recorded. The proof of what is on the chip is the 2026-10-25 flash logs (Verify OK, `flash_rc=0` on both boards; copies in `bench_session_2026-10-25/firmware_flash/`; `run_flash_bench.sh` deletes the board copies at the next flash) and, since that image, the VER capability bitmap (`0x000000FF`; `0x0000007F` on `e083ae46` and older), which `radio_park.py` prints. |
 | STM32H747 Cortex-M7 (flash bank 1) | X8 module | **stock Arduino x8h7** SPI bridge, programmed at boot by `stm32h7-program.service` from `/usr/arduino/extra/STM32H747AII6_CM7.bin`. The image differs per board: base sha256 `d81eaa81…`, tractor `0b03cd9c…`. | no | Part of each LmP image | **The tractor reflashes it at every boot.** Its `program-h7.sh` cannot read the version (the sysfs read times out), so it reprograms bank 1, `0x08000000`–`0x080709a4`, ending "Programming Finished … Verified OK"; bank 2 is not touched. The base's newer script prints "matches, No Update" after the same failed read, so on the base it is not proof. LifeTrac overwrote this bank with `tractor_h7` on 2026-05-04; it is stock again. |
 | STM32H747 Cortex-M4 (flash bank 2, `0x08100000`) | X8 module | **unknown, probably a May 2026 LifeTrac bench sketch**, started at every boot by x8h7 | probably | Sources only: `firmware/x8_uart_route_probe`, `x8_lora_bootloader_helper`, `portenta_m7_l072_passthrough_ping`, `tractor_h7`. The flashed ELFs were never kept. | Last recorded uploads: x8_uart_route_probe → 2D0A, x8_lora_bootloader_helper → 2E2C (the May notes mix up COM ports, so the per-board mapping is uncertain). No erase is recorded. No visible effect, since both L072s boot normally, but it is undocumented code. Identify it with the openocd dump in *Open items*, then decide whether to blank the slot. |
 | i.MX8M Mini boot chain, kernel, device tree | X8 module | stock LmP (U-Boot arms the 60 s WDOG) | no (two May bootargs/BLS experiments were removed by later reflashes) | 934 bundle on the PC (private archive, sha256) | The i.MX's own Cortex-M4 is unused. |
@@ -76,16 +81,14 @@ Repo L072 binaries that are on no board:
   "hello v0.2".
 - `board2_l072_flash_dump.bin` is a readback of an early LifeTrac build, not
   the factory image.
-- `firmware/murata_l072/build/firmware.bin` and the untracked
-  `build/firmware_bench_diag.bin` are the RS-12.21 image since 2026-10-25
-  (scan option (b) + L + d2, the firmware park command, the 0x0D split):
-  bench `0daae27978089eb97ab35c18718b62b0`, production
-  `2c5e055abff95126309a62409fafc654`, 25 324 B each
-  ([Expected md5s](../../murata_l072/README.md#expected-md5s)). **Built, not
-  flashed**: both boards run `e083ae46` until a flash GO. The flash and its
-  checks are planned in
+- `firmware/murata_l072/build/firmware.bin` is the RS-12.21 production
+  image (`2c5e055abff95126309a62409fafc654`, 25 324 B,
+  [Expected md5s](../../murata_l072/README.md#expected-md5s)); it is on no
+  board. Its bench twin, the untracked `build/firmware_bench_diag.bin`
+  (`0daae27978089eb97ab35c18718b62b0`), is the image on both L072s since
+  2026-10-25 (the L072 row above;
   [FHSS_SCAN_FAILED_OPTIONS.md](../../murata_l072/FHSS_SCAN_FAILED_OPTIONS.md)
-  §6.1; after it, update this file's L072 row and the date at the top.
+  §6.1).
 
 ## LifeTrac software living in the X8 Linux
 
