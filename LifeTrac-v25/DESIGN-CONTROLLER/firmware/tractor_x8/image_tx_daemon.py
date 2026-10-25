@@ -122,6 +122,7 @@ from method_h_stage2_tx_probe_v2 import (  # noqa: E402
     wait_for_tx_done,
     configure_regulatory_profile_if_needed,
     verify_modem_matches_profile,
+    install_fault_urc_logger,
     HOST_TYPE_RX_FRAME_URC,
     parse_rx_frame,
     read_reg,
@@ -598,6 +599,13 @@ class ImageTxDaemon:
     def _open_link(self) -> HostLink:
         LOG.info("opening L072 HostLink on %s @ %s", self.uart, self.baud)
         link = HostLink(self.uart, self.baud)
+        # 2026-10-24: log every FAULT_URC (one `FAULT_URC:` line, INFO/WARNING)
+        # wherever the reader takes it off the wire — boot drain, serial and
+        # command TX waits, command drains — not only in the pipelined-TX
+        # wait, the one LOG line before (the TX waits and boot drain only
+        # print() to stdout); leg 6 logged the 0x0D URCs at L072 uptime 34 s
+        # and 94 s, not the one due in between.
+        install_fault_urc_logger(link, LOG)
         # Match w2_02_tx_fragments.py priming sequence so the bench-proven
         # boot/configure/LBT-off setup applies identically.
         # 2026-05-25 W2-02 v3 fix: skip UART RESET_REQ when caller has
@@ -1441,6 +1449,9 @@ class ImageTxDaemon:
                     else:
                         _fail_fragment(tx_id, st, "QoS refusal cap reached")
                 elif ftype == HOST_TYPE_FAULT_URC:
+                    # Historical line, kept verbatim for the tools that grep
+                    # it; the link observer (_open_link, 2026-10-24) has
+                    # already logged this URC as `FAULT_URC:` with its decode.
                     payload = fr.get("payload", b"")
                     code = payload[0] if payload else None
                     if code not in BENIGN_FAULT_CODES:

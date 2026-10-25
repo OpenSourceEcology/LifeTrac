@@ -123,6 +123,7 @@ from method_h_stage2_tx_probe_v2 import (  # noqa: E402
     wait_for_tx_done,
     configure_regulatory_profile_if_needed,
     verify_modem_matches_profile,
+    install_fault_urc_logger,
     read_reg,
     write_reg,
     SX1276_REG_OP_MODE,
@@ -433,6 +434,12 @@ class ImageRxDaemon:
     def _open_link(self) -> HostLink:
         LOG.info("opening L072 HostLink on %s @ %s", self.uart, self.baud)
         link = HostLink(self.uart, self.baud)
+        # 2026-10-24: log every FAULT_URC (one `FAULT_URC:` line, INFO/WARNING)
+        # from here on, boot drain included. Leg 6's never-locked base could
+        # not be confirmed as a cold-start scan run-out (RX_SCAN_FAILED) —
+        # the RX loop below dropped those URCs at DEBUG (only the command TX
+        # wait and drain_boot print() one, untimestamped, to stdout).
+        install_fault_urc_logger(link, LOG)
         # 2026-05-25 W2-02 v3 fix: when an external NRST (gpio163 pulse)
         # has already reset the L072, sending another UART RESET_REQ on
         # top of the just-booted firmware races the boot sequence and
@@ -1336,7 +1343,9 @@ class ImageRxDaemon:
                     continue
                 if ftype != HOST_TYPE_RX_FRAME_URC:
                     # FAULT_URC / STATS / TX_DONE etc — not our concern
-                    # in the RX-only daemon. Log at DEBUG.
+                    # in the RX-only daemon. Log at DEBUG. (A FAULT_URC was
+                    # already logged as `FAULT_URC:` by the link observer
+                    # installed in _open_link, 2026-10-24.)
                     LOG.debug("ignoring host frame type=0x%02x", ftype or 0)
                     continue
 

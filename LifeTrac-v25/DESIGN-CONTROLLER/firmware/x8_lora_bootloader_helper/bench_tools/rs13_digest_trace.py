@@ -47,7 +47,18 @@ count at the check (RS13_RANGE_EDGE_LEG.md, Round A "A16 confirmation"):
 
     py -3 rs13_digest_trace.py <leg>_base.jsonl [<leg>_base.jsonl ...]
                               [--profile image_bw500] [--horizon 25] [--tail 25]
-                              [--rows LO:HI] [--strict]
+                              [--rows LO:HI] [--strict] [--archive DIR]
+
+The leg's harness archive (2026-10-24): the capture's head (the frames
+before the first one heard, RS-13.1 A7) is placed on the tractor's TX log,
+not assumed to sit in the camera's first u8 seq cycle (10-24 leg 6's first
+frame, seq 8, was the tractor's frame #264), and a capture with no clean +1
+seq step times its gaps by the leg's synth_fps (rs12_leg_report.py does the
+same). The archive is the one leg<X>_params.txt beside the capture names
+(radio_monitor_<timestamp>_<git_sha> next to the session folder, as
+leg_post.sh lays them out), or --archive for a single capture. Without the
+archive the head reads AMBIGUOUS; without both leg<X>_params.txt and
+--archive the seq gaps also keep the old cadence rule.
 
 Prints per capture: the `capture seq gaps` loss of record, the seq-gap rows,
 the store line (ttl_dropped, orphans, digests), the final digest_ok with the
@@ -181,18 +192,20 @@ def replay(frames: list, profile: str) -> tuple[object, list[dict]]:
     return dr, rows
 
 
-def loss_rows(rows: list[dict]) -> tuple[list[tuple[int, int]], int]:
+def loss_rows(rows: list[dict],
+              period_s: float | None = None) -> tuple[list[tuple[int, int]], int]:
     """``[(row, frames lost)]`` per seq gap, and the jump count.
 
     The same rules as rs12_leg_report.seq_gap_loss (the loss of record):
     runs of one codec, d = 0 a duplicate, whole wraps added back from the
     arrival times, a step of more than half the seq space that the elapsed
-    time cannot explain a jump (counter restart), not loss. The row is the
-    first frame received after the gap."""
+    time cannot explain a jump (counter restart), not loss; ``period_s``
+    (1 / the leg's synth_fps) times the steps when no clean +1 step does
+    (2026-10-24). The row is the first frame received after the gap."""
     parsed = [r for r in rows if r["codec"] is not None and r["seq"] is not None]
     steps = [b["t"] - a["t"] for a, b in zip(parsed, parsed[1:])
              if a["codec"] == b["codec"] and (b["seq"] - a["seq"]) % SEQ_MOD == 1]
-    period = statistics.median(steps) if steps else None
+    period = statistics.median(steps) if steps else (float(period_s) if period_s else None)
     gaps, jumps, last = [], 0, None
     for r in parsed:
         if last is None or last["codec"] != r["codec"]:
@@ -407,6 +420,41 @@ def leg_name(path: str) -> str:
     return m.group(1) if m else os.path.splitext(base)[0]
 
 
+def _read(path: str) -> str:
+    with open(path, encoding="utf-8", errors="replace") as fh:
+        return fh.read()
+
+
+def leg_archive(path: str, archive: str | None = None) -> tuple[dict, str | None, str]:
+    """``(params, archive dir or None, why not)`` for a capture (2026-10-24).
+
+    ``archive`` given: that harness archive and its params.txt. Else the
+    leg<X>_params.txt beside the capture (leg_post.sh copies the archive's
+    params.txt there) names it: radio_monitor_<timestamp>_<git_sha>, looked
+    for next to the session folder (bench-evidence/, where the harness
+    writes it), next to the legs folder, and in it. The archive must hold
+    tx_daemon.log."""
+    if archive is not None:
+        p = os.path.join(archive, "params.txt")
+        if not os.path.isfile(p) or not os.path.isfile(os.path.join(archive, "tx_daemon.log")):
+            return {}, None, f"--archive {archive} has no params.txt or no tx_daemon.log"
+        return rep.params_dict(_read(p)), archive, ""
+    legs = os.path.dirname(os.path.abspath(path))
+    p = os.path.join(legs, f"leg{leg_name(path)}_params.txt")
+    if not os.path.isfile(p):
+        return {}, None, (f"no {os.path.basename(p)} beside the capture and no --archive: "
+                          f"no tractor TX log to place it on")
+    params = rep.params_dict(_read(p))
+    ts, sha = params.get("timestamp"), params.get("git_sha")
+    if not ts or not sha:
+        return params, None, f"{os.path.basename(p)} names no timestamp and git_sha"
+    name = f"radio_monitor_{ts}_{sha}"
+    for d in (os.path.dirname(os.path.dirname(legs)), os.path.dirname(legs), legs):
+        if os.path.isfile(os.path.join(d, name, "tx_daemon.log")):
+            return params, os.path.join(d, name), ""
+    return params, None, f"its archive {name} is not beside the legs folder (give --archive)"
+
+
 def format_row(r: dict, marks: dict) -> str:
     if not r["parsed"]:
         line = f"#{r['idx']:3d} UNPARSEABLE {r['wire']:3d}B"
@@ -462,7 +510,7 @@ def _status_cell(e: dict) -> str:
 
 
 def analyse(path: str, profile_arg: str | None, horizon: int, tail: int,
-            max_loss: float) -> dict:
+            max_loss: float, archive: str | None = None) -> dict:
     meta_profile, frames = load_capture(path)
     if profile_arg and meta_profile and profile_arg != meta_profile:
         raise TraceError(f"--profile {profile_arg} but the capture was taken with "
@@ -480,18 +528,31 @@ def analyse(path: str, profile_arg: str | None, horizon: int, tail: int,
         raise TraceError(f"{path}: {dr.parse_errors} payload(s) the replay cannot parse, {bad} "
                          f"VECTOR body(ies) the store rejected{why}: a corrupt capture, or a "
                          f"store at another SHA than the base image that flew the leg; not scored")
-    gaps, jumps = loss_rows(rows)
-    seq = rep.seq_gap_loss([(r["t"], r["codec"], r["seq"]) for r in rows])
+    # 2026-10-24: the leg's synth_fps times a capture with no clean +1 step,
+    # and its archive's TX log places the head (leg 6)
+    params, arch, why = leg_archive(path, archive)
+    period = rep.nominal_period(params)
+    gaps, jumps = loss_rows(rows, period)
+    seq = rep.seq_gap_loss([(r["t"], r["codec"], r["seq"]) for r in rows], period)
     if sum(n for _, n in gaps) != seq["lost"]:      # the two must count the same frames
         raise TraceError(f"internal: seq-gap rows sum to {sum(n for _, n in gaps)} but "
                          f"rs12_leg_report counts {seq['lost']}")
+    if arch is None:
+        place = {"why": why}
+    else:
+        arch_rx = os.path.join(arch, "rx_daemon.log")
+        place = rep.place_capture(
+            [(ts, r["codec"], r["seq"]) for (ts, _), r in zip(frames, rows)],
+            _read(os.path.join(arch, "tx_daemon.log")),
+            _read(arch_rx) if os.path.isfile(arch_rx) else None, params)
     loss_pct = 100.0 * seq["lost"] / seq["expected"] if seq["expected"] else 0.0
     runs = mismatch_runs(rows, gaps, join_row(rows), horizon)
     eps = score_episodes(rows, dr.resync_episodes(), gaps, horizon=horizon, tail=tail,
                          loss_pct=loss_pct, max_loss_pct=max_loss, runs=runs)
     return {"path": path, "leg": leg_name(path), "profile": profile, "dr": dr, "rows": rows,
             "gaps": gaps, "jumps": jumps, "seq": seq, "loss_pct": loss_pct, "episodes": eps,
-            "runs": runs, "vector": sum(1 for r in rows if r["vector"])}
+            "runs": runs, "vector": sum(1 for r in rows if r["vector"]), "place": place,
+            "archive": arch}
 
 
 def report(res: dict, horizon: int, rows_range: tuple[int, int] | None) -> list[str]:
@@ -499,7 +560,8 @@ def report(res: dict, horizon: int, rows_range: tuple[int, int] | None) -> list[
     out = [f"== rs13_digest_trace: {os.path.basename(res['path'])} (leg {res['leg']}, profile "
            f"{res['profile']}, {len(rows)} rows, {res['vector']} vector; horizon {horizon} "
            f"rows) =="]
-    out += rep.format_seq_loss(res["seq"], os.path.basename(res["path"]), vdr.CODEC_NAMES)
+    out += rep.format_seq_loss(res["seq"], os.path.basename(res["path"]), vdr.CODEC_NAMES,
+                               res.get("place"))
     out.append(f"seq gaps (row, frames lost): {res['gaps']}"
                + (f"; {res['jumps']} jump(s) not counted" if res["jumps"] else ""))
     s = res["dr"].summary()
@@ -584,13 +646,20 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--strict", action="store_true",
                     help="exit 1 when an episode fails, or an episode or a DIGEST mismatch "
                          "run has no loss before it")
+    ap.add_argument("--archive",
+                    help="the leg's harness archive (radio_monitor_<stamp>_<sha>), for one "
+                         "capture: places the head on its tractor TX log (default: the one "
+                         "leg<X>_params.txt beside the capture names)")
     a = ap.parse_args(argv)
     if a.horizon < 1 or a.tail < 0:
         ap.error("--horizon must be >= 1 and --tail >= 0")
+    if a.archive and len(a.capture) > 1:
+        ap.error("--archive goes with one capture (several find theirs from their "
+                 "leg<X>_params.txt)")
     results, rc = [], 0
     for path in a.capture:
         try:
-            res = analyse(path, a.profile, a.horizon, a.tail, a.max_loss)
+            res = analyse(path, a.profile, a.horizon, a.tail, a.max_loss, a.archive)
         except TraceError as exc:
             print(f"{os.path.basename(path)}: CANNOT TRACE: {exc}")
             rc = 2

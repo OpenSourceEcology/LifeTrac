@@ -87,6 +87,7 @@ per board>.
 | kit commit | `<sha>` (the harness and bench kit every leg flies with) |
 | `-StopDrainS` | <s>, the same on every leg the rule pools (params `stop_drain_s`; `leg_prep.sh` writes 4 s on FHSS, 2 s on DTS, `--stop-drain S` to change it) |
 | `log_window` | `after_stop` on every leg (params). A leg that is not (`after_stop_unverified`, or absent) is re-flown, or dropped under this rule: <rule> |
+| a leg whose base never locks (FHSS) | **PROPOSAL (2026-10-24), not agreed yet.** The operator agrees to it, changes it or strikes it before leg 1, and this cell says which. Proposed: a leg whose base never locks the FHSS grid, as flagged by the acquisition check, is void and is re-flown once, in the same slot of the interleaving order (the same codec, before the order goes on). The flag is the leg report's `!! ACQUISITION FAILED` (also at the end of its first line), on positive evidence only: a cold or early final RX_SCAN_FAILED, or no frame within 120 s (4 scan attempts × 30 s) of the base's profile-1 activation on an instrument known to be on (the stats counter while the RX worker lives, or per-fragment logging shown on) that nothing contradicts (a lock shown, a FAULT_URC-logging daemon with no RX_SCAN_FAILED line, a base bracket whose radio_rx_ok outruns the host), read up to any profile switch. `rs13_probe_score.py` prints `!! base ACQUISITION FAILED` in that leg's block by the same rule. The command-delivery pool is then scored with `py -3 rs13_probe_score.py --margin <PP> --void-unlocked <every archive, the void leg's included>`, which lists the voided leg; the P3 sums leave it out. A second failure in a row ends the round for diagnosis: park, record, fly nothing more. A leg whose acquisition reads NOT DETERMINED (a first image reception within 120 s alone is no lock, and silence no instrument shows is no failure) or n/a is not void. `bracket_deltas.py`'s `!! BASE NEVER LOCKED` is a cross-check, not the trigger. The 2026-10-24 round had no such clause and stays scored as written, with its leg 6 (2b_f3, 4/5 probes from a base that never locked) counted. Agreed: <date, time, the operator's words \| changed to: … \| struck> |
 | written | <date, time, by whom — before leg 1> |
 
 ## Step 0 — image smoke
@@ -165,15 +166,23 @@ reports; every `PARK_TRANSIENT` and its re-park ~60 s later
 |---|---|---|---|---|---|---|
 | P1 | dry-run checks on the base capture (`RESULT:` line as written; failing check names; `store:` line orphans / digest mismatched / resync; final `digest_ok`) | | | n/a | window checks | |
 | P2 | frames published / s (`published frame_id` lines ÷ 300; a 1-fps FHSS leg also from lock: `n_frag` ÷ `span` of `frag_gap_report.py`, A7) | | | | n/a | |
-| P3 | loss: `capture seq gaps` line of `rs12_leg_report.py --capture` (the loss of record, A14; 1-fps FHSS: from lock + the `counting from seq 1` figure, A7); the report's `shared-window loss` line (the `loss … [whole logs]` line is the old whole-log figure); Δtx_ok ↔ Δrx_ok; comparison basis (interleaved legs or the margin stated before the legs, A15) | | | | n/a | |
+| P3 | loss: `capture seq gaps` line of `rs12_leg_report.py --capture` (the loss of record, A14; 1-fps FHSS: from lock + the `counting from seq 1` figure, A7; since 2026-10-24 the head line places the first frame heard on the tractor's TX log by its transport seq, so after a u8 seq wrap it names the tractor's frame #N, and it reads AMBIGUOUS, with no counting figure, when it cannot be placed or its TileDeltaFrame seq is not its transport seq, whatever the seq; the `tractor TX log:` line under it gives the share of the tractor's frames on air that never reached the capture, head and tail included, unless the TX log shows a batched train, a `batching:` line); the report's `shared-window loss` line (the `loss … [whole logs]` line is the old whole-log figure); Δtx_ok ↔ Δrx_ok; comparison basis (interleaved legs or the margin stated before the legs, A15) | | | | n/a | |
 | P4 | max fragments per frame (`done (pipelined): K fragments ok`: max K, count of K = 1 lines, ABORTED lines) | | | n/a | window | |
-| P5 | lock-loss gaps > 3 s (`frag_gap_report.py`) | n/a | | n/a | n/a | |
+| P5 | lock-loss gaps > 3 s (`frag_gap_report.py`; the gaps run from the first fragment to the last, and since 2026-10-24 its `head:` and `tail:` lines give the silence before and after them) | n/a | | n/a | n/a | |
 | P6 | switch: first ack JSON; publish stamp → first codec-6 payload (s) vs the bound incl. the encoder p95 (A9); return ack JSON; return command on air (`command TX … (on air)`, base log) and codec-1 resumed after (s) vs (1 + n) camera periods + 1 fragment airtime, n = codec-6 frames received after the on-air line (amended 2026-10-10, A18); stamp and publish in one board call (A13) | n/a | n/a | n/a | | |
 | P7 | link_stats `rx_codec_name` | | | n/a | | |
 | P8 | on-air encoder ms p95 vs the budget at the leg's camera rate (350 ms at 2 fps; amended 2026-10-10, A17); vs step 1 (%) and tx daemon `drop_full` / `drop_stale` for information | | | n/a | | |
 
 FHSS time authority (A11): tractor `tx_stream_streak_max` in the 2b
 post-bracket: <n> (≥ 8 = authority reached; < 8 expected at 1 fps).
+FHSS acquisition (2b; since 2026-10-24): the leg report's `acquisition:` line
+<first image reception N s after the base's profile-1 activation, within |
+past the 120 s budget> and its verdict line <ACQUIRED | NOT DETERMINED | !!
+ACQUISITION FAILED, with the evidence it names>; base `FAULT_URC:
+code=0x0D` lines in `rx_daemon.log` <none | per line: name, attempt, final,
+hw_suspect>; `bracket_deltas.py`
+`!! BASE NEVER LOCKED` <no | yes>. A failed acquisition goes by the pass rule's
+"never locks" row as it stood at leg 1 (agreed, changed or struck).
 P3 basis: <interleaved: pooled control x / y vs VECTOR x / y | margin stated
 before the legs (the "P3 frame loss" row of the "Pass rule (written before
 leg 1)" section above): the bound and verdict line>.
@@ -223,6 +232,9 @@ of each base capture):
 ### Anomalies for the record
 
 - <anything the logs show that the criteria do not cover>
+- <WARNING `FAULT_URC:` lines on either board (2026-10-24 daemons): code, name,
+  sub and log time; count them on the `FAULT_URC: code=0x.. sub=0x.. name=`
+  lines only, since the same URC can also leave a legacy line>
 
 ### GO / NO-GO
 

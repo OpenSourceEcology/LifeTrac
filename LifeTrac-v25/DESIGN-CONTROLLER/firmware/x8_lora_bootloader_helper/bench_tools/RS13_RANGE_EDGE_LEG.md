@@ -487,8 +487,8 @@ may fall on different days:
 |---|---|---|
 | step | nominal dB in the step chain, and its pads | `atten_log.csv` |
 | frames/s | `published frame_id` lines ÷ leg seconds. For a `mono_g4` frame, published means every fragment arrived; confirm max K in `tx_daemon.log` (`done (pipelined): K fragments ok`, K = 1 expected at `-TxBatch 0`) | archive `rx_daemon.log`, `tx_daemon.log` |
-| seq-gap loss | The `capture seq gaps` line of `rs12_leg_report.py --capture` (the loss of record, RS-13.1 A14). FHSS: from the first frame heard, with the `first frame heard at seq N` head and the `counting from seq 1` figure (RS-13.1 A7) | leg report |
-| longest silence | `frag_gap_report.py` `max_gap` and `gaps>3s`, for both codecs | archive |
+| seq-gap loss | The `capture seq gaps` line of `rs12_leg_report.py --capture` (the loss of record, RS-13.1 A14). FHSS: from the first frame heard, with the `first frame heard at seq N` head and the `counting from seq 1` figure (RS-13.1 A7). Since 2026-10-24 the head is placed on the tractor's TX log by the frame's transport seq (off the base's `published` line): after a u8 seq wrap the line names the tractor's frame #N, and it reads AMBIGUOUS, with no counting figure, when it cannot be placed or its TileDeltaFrame seq is not its transport seq, whatever the seq; a `tractor TX log:` line gives the share of the tractor's frames that never reached the capture, head and tail included (on a `tx_batch=0` leg only). FHSS also: the report's `acquisition:` line, the base's first image reception after its profile-1 activation against the 120 s scan budget, and the verdict line under it (ACQUIRED, NOT DETERMINED or `!! ACQUISITION FAILED`, on positive evidence only; BENCH_RUNBOOK, "A leg", Base acquisition) | leg report |
+| longest silence | `frag_gap_report.py` `max_gap` and `gaps>3s`, for both codecs; the gaps run from the first fragment to the last, and since 2026-10-24 its `head:` and `tail:` lines give the silence before and after them | archive |
 | epoch starts | `epoch starts: N received, M applied` (VECTOR) | capture summary |
 | resync and recovery | The dry-run `resync:` episodes line: count, frames and seconds per episode, and what ended each (digest, epoch start, or still open at the end). The in-step share is 1 − resync frames ÷ frames received. Isolated-loss episodes are scored by the A16 rule at steps with loss ≤ 10 %. At heavier loss, overlapping losses legitimately stretch episodes: record them, do not score them (`rs13_digest_trace.py <legs>/leg<X>_base.jsonl`; its table classes each episode as PASS, FAIL, not scored, join or no loss) | capture summary, `leg_replay.py`, `rs13_digest_trace.py` |
 | store | `orphans`, `digest` checked / mismatched, `ttl_dropped`; the final `scene:` line (horizon mode, layers, `digest_ok`) | capture summary |
@@ -522,7 +522,12 @@ void for the edge.
   - the 66 dB step;
   - on FHSS, two consecutive steps on which the base never acquires (no
     frame heard): acquisition, not demodulation, then sets the limit;
-    record that step.
+    record that step. Since 2026-10-24 the leg report's `acquisition:` lines
+    read it (`!! ACQUISITION FAILED`: positive evidence of no frame within
+    120 s of the base's profile-1 activation, or of a scan that ran out;
+    `NOT DETERMINED` is no such step). On a walk step that is the measurement, not a
+    void leg; a pass-rule clause that voids a never-locked leg (the 0 dB
+    pair) does not apply to the walk.
 - **Closing check** after every walk (`B0close`, `C0close`): the step chain
   back to 0 dB, then one 120 s VECTOR leg. Its median RSSI must be within
   2 dB of R0, and its loss no worse than the 0 dB legs'. If not, a connector
@@ -619,7 +624,12 @@ Python tools and `adb pull` (RS-13.1 A6).
   again. Touch no RF hardware before `PARK_OK` and `radio_state.py` `0x80`
   on both boards.
 - **The FHSS acquisition head grows as the signal weakens** (A7). Read FHSS
-  loss from lock, and record the seq of the first frame heard at every step.
+  loss from lock, and record the seq of the first frame heard at every step,
+  with the tractor frame it was (the head line, since 2026-10-24), the
+  report's `acquisition:` time and its verdict line. A base that decodes nothing within 120 s of
+  its profile-1 activation has run out of scan attempts, and scan FAILED
+  holds for the rest of the leg. It happened at full signal too: 2026-10-24
+  leg 6, on the antennas at −62 dBm.
 - **A closed enclosure warms the base over a long round.** Read the X8's
   `/sys/class/thermal/thermal_zone*/temp` at the start and end of each round.
 - **The RS-13.1 traps apply unchanged**: staging rot, retained topics, the
@@ -728,6 +738,7 @@ every DTS leg <yes / list>.
 | kit commit | `<sha>` (the harness and bench kit every leg flies with) |
 | `-StopDrainS` | <s>, the same on every leg the rule pools (params `stop_drain_s`; `leg_prep.sh` writes 2 s on DTS) |
 | `log_window` | `after_stop` on every leg (params). A leg that is not (`after_stop_unverified`, or absent) is re-flown, or dropped under this rule: <rule> |
+| a leg whose base never locks (FHSS) | <n/a: DTS legs only>. For FHSS legs at full signal (the `C0v` / `C0m` pair): the "never locks" row of RS13_RESULTS_TEMPLATE.md, a **proposal** (2026-10-24) that the operator agrees to, changes or strikes before leg 1: a leg flagged by the acquisition check (the leg report's `!! ACQUISITION FAILED`, on positive evidence; a leg `NOT DETERMINED` is not flagged) is void and re-flown once in the same slot, its frames stay out of the P3 sums (a probe pool, if any, is scored with `rs13_probe_score.py --void-unlocked`), and a second failure in a row ends the round for diagnosis. On a walk step a failed acquisition is the measurement, not a void leg. Agreed: <date, time, the operator's words \| changed to: … \| struck> |
 | written | <date, time, by whom — before leg 1> |
 
 ## Round A — the 0 dB step (DTS @ <pick>)
@@ -775,7 +786,7 @@ Closing check `B0close`: RSSI <dBm> (R0 <dBm>), loss <%>; <OK | suspect>.
 
 ## Round C — FHSS walk
 
-| step dB | leg | codec | s | archive | frames/s | seq-gap loss (from lock) | first frame heard (seq) | max gap s / gaps>3s | epoch starts rx/applied | resync episodes | in step % | orphans | RSSI med / min | SNR med / min | CRC err | streak_max | level | notes |
+| step dB | leg | codec | s | archive | frames/s | seq-gap loss (from lock) | first frame heard (seq; tractor frame #; s after the base's activation) | max gap s / gaps>3s | epoch starts rx/applied | resync episodes | in step % | orphans | RSSI med / min | SNR med / min | CRC err | streak_max | level | notes |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 
 Closing check `C0close`: <…>.

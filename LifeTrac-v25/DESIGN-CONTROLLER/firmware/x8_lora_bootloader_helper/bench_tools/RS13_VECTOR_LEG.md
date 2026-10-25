@@ -96,6 +96,7 @@ Each row is spelled out in the step it belongs to; this is the checklist.
 | every profile-2 leg | a same-day receive-only spot-check, then `-ForceFrfHz <spot-checked carrier>` on the harness line; check `FRF readback: … (OK)` at that carrier on both boards in the archive | all nine RS-13.1 DTS legs flew on 915.000 MHz, the RS-11.6 emitter's channel, and their losses fold on its 7.08 s period (A19) |
 | session start | point `EVIDENCE_DIR` in `bench.env` at a new dated folder; since 2026-10-22 the leg scripts refuse one that holds committed files (`BENCH_EVIDENCE_APPEND=1` on every script of the leg for a deliberate append; legs/README.md, "Evidence folder guard") | on 2026-10-22 the flight `bench.env` still pointed at the committed 2026-10-19 record |
 | after every leg | LEG CHECKS `LOG_WINDOW after_stop` (green), i.e. `log_window=after_stop` in `params.txt`; record `log_window` and `stop_drain_s` per leg in RESULTS (Amendment 2026-10-22) | the harness read the logs while the daemons ran up to 2026-10-19 (`received > sent`, one base send more in the brackets than on air); since 2026-10-22 it checks the stops instead of assuming them |
+| after every FHSS leg (2026-10-24) | read the leg report's `acquisition:` line and the verdict line under it (Step 2). `!! ACQUISITION FAILED`, which also ends the report's first line on the console, means positive evidence that the base's scan ran out into FAILED, and the leg measures that, not the link (a first image reception within 120 s alone shows no lock: `confirmed acquisition: NOT DETERMINED`): record it, and void or keep the leg only as the pass rule's "never locks" row says (RS13_RESULTS_TEMPLATE.md; a proposal until the operator agrees it before leg 1). A re-fly is a radio leg like any other | 2026-10-24 leg 6 (2b_f3): the base decoded its first frame 138 s after its profile-1 activation, past the 120 s scan budget, heard 5 of 606 frames and fired 5 probes, and the rule written before leg 1 pooled its 4/5 |
 
 ## Amendments 2026-10-10
 
@@ -537,6 +538,65 @@ codec run (each encoder path numbers its own frames, so a 2d switch is not
 loss) and reports any frames numbered before the first one heard on a separate
 `first frame heard at seq N` line (the FHSS acquisition head, A7).
 
+Since 2026-10-24 (done in code, tested offline, not yet used on a flown leg)
+the report places that first frame on the tractor's TX log (`txdone_arrival`,
+`-LogFragArrivals 1`), by the params.txt clock offsets (the archives from
+2026-10-24 on) or, in an older archive, by the daemons' start times. It
+matches the frame's transport seq, read off the base's `published frame_id=N
+seq=S` line at its capture time (the counter `txdone_arrival` logs), not its
+TileDeltaFrame seq, which is the camera's own counter (a 2d switch restarts
+it at 1 under VECTOR). The head was counted as if the first frame heard sat
+in the camera's first u8 seq cycle; 2026-10-24 leg 6's first frame, seq 8,
+was the tractor's frame #264, and the old line read 98/103. Three forms:
+
+- the frame is in the first u8 cycle: the line reads as before;
+- after a wrap: `first frame heard at seq 8 is the tractor's frame #264 on
+  air (1 u8 seq wrap before it, by its TX log)`, with the head and the
+  `counting from seq 1` figure taken from that frame (leg 6: 489/494, up to
+  the last frame heard);
+- it cannot be placed (no published line at its capture time, or no clock
+  offsets and start times that fit several frames), or its TileDeltaFrame
+  seq is not its transport seq: `the head is AMBIGUOUS`, whatever its seq
+  (seq 1 can be frame #257, seq 0 is #256 at the earliest), with no figure
+  counting from seq 1.
+
+A `tractor TX log:` line under it gives the tractor's frames on air, the
+capture's first and last frames among them, and the share that never reached
+the capture, head and tail included (leg 6: 601/606 = 99.2 %); it withholds
+the share, and counts trains, when its TX log shows a batched train (a
+`batching:` line; a batched train carries several frames, the capture
+counts frames). A capture with
+no clean +1 seq step now times its gaps by the leg's `synth_fps` (the period
+reads `(the leg's synth_fps: no clean +1 step to time it by)`), so an outage
+of more than 128 frames is counted, not booked as a counter restart (leg 6:
+226/231, not 91/96). `rs13_digest_trace.py` prints the same lines: it finds
+the archive from the `leg<X>_params.txt` beside the capture (`leg_post.sh`
+copies it there), or from `--archive <dir>` for one capture; without either
+the head reads AMBIGUOUS.
+
+On a profile-1 leg the report adds an `acquisition:` line after the loss
+lines (`acquisition: n/a` on other profiles): the base's first image reception against the FHSS cold-start scan budget,
+120 s after its profile-1 activation (4 attempts × 30 s; the fourth failure
+enters scan FAILED, which is absorbing, and a follower there never hops).
+A frame received is not a lock (the L072 delivers a frame whose FHSS header
+it rejected), so the verdict line under it rests on positive evidence:
+`confirmed acquisition: ACQUIRED` (a base-bracket LOCKED → SCANNING
+demotion, or at least 25 % of the tractor's fragments decoded on the
+50-channel hop set), `NOT DETERMINED`, or `!! ACQUISITION FAILED` (a cold or
+early final RX_SCAN_FAILED, or no frame within the budget on the stats
+counter while its RX worker lives or with per-fragment logging shown on,
+when no lock shown, FAULT_URC-logging daemon without an RX_SCAN_FAILED line
+or base bracket contradicts that silence; the check stops at a profile
+switch), and then the report's
+first line ends with `!! ACQUISITION FAILED (see the acquisition line
+below)`, so `leg_post.sh`'s console excerpt shows it. The exit code does not
+change. The leg's loss and
+command figures then measure the acquisition failure, not the link
+(BENCH_RUNBOOK, "A leg", Base acquisition, for what to do). Base
+RX_SCAN_FAILED faults (`FAULT_URC:` lines, logged since 2026-10-24) are
+listed under it, with the final one, when the base logged it, as the point
+its scan entered FAILED.
+
 **Park last** — [`radio_park.py`](radio_park.py) on both boards → `PARK_OK`
 with both readbacks `0x80`, after the post-brackets and reports (BENCH_RUNBOOK,
 A leg). `PARK_TRANSIENT` (`opmode_after_settle` ≠ `0x80`) means the base's
@@ -624,7 +684,12 @@ pass rule (Amendment 2026-10-22, item 2). Record `log_window` and
   (A11, `tx_stream_streak_max` < 8): read P2/P3 from lock and record the
   streak; no base commands on this leg. Its base capture takes
   `--min-frames 200` at 1 fps: after a 57 s acquisition only ~245 frames can
-  arrive, and `min_frames 247 < 250` failed both rounds by the letter.
+  arrive, and `min_frames 247 < 250` failed both rounds by the letter. At any
+  rate, read the report's `acquisition:` line and the verdict under it: a
+  base that decodes no frame within 120 s of its profile-1 activation has
+  run out of scan attempts, and a follower in scan FAILED does not follow
+  the hop grid for the rest of the leg (2026-10-24 leg 6), so the leg then
+  measures that.
 - **2c — control, DTS, `mono_g4` at boot:** the same as 2a with
   `-CamExtraEnv "-e LIFETRAC_ENCODE_MODE=6"`; base capture without `--strict`
   (its checks are for VECTOR; the `frames:` line and `by codec` still count,
@@ -690,9 +755,9 @@ Also record, once per leg while VECTOR frames flow:
 |---|---|---|---|---|---|
 | P1 | dry-run checks on the base capture: PASS on `parse_ok`, `all_vector`, `one_fragment`, `store_clean`, `epoch_seen`, `first_apply`, `applied_ratio`, `min_frames`; `no_orphans` and `digest` judged by the store's own loss rule — record the `store:` line (orphans, digest checked / mismatched, resync) and require resync 0 or every resync ended — by the next epoch start, or by 3 consecutive matching DIGESTs (the store's DIGEST exit, `resync_digest_ends`; read the dry-run `resync:` episodes line, not the `resync N` count) — and the final `scene:` line must not read `digest_ok False` (the dry run's own end check, `ends_ok`); it reads `None` when no DIGEST has arrived since the last epoch start — the store's `_reset` clears the flag, and after a range-1/2 start the encoder sends no DIGEST until TTL_FRAMES + 3 frames after the youngest freed id (`encode_vector.py` `_digest_quiet_until`) — so record `scripts/leg_replay.py`'s `last DIGEST checked` line next to it: a run that the last epoch start ended is recovered by the store's rule but not confirmed by a DIGEST inside the capture, and the record says so; and every mismatch run must start at a recorded frame loss (a sequence gap in the base capture) or at the base joining mid-epoch after acquisition — a mismatch with no loss before it fails P1 (it is an encoder/store defect; RS-13.1 A1 would have passed the bare rule). The encoder's DIGEST mirror is "the state the base holds if every frame arrived", so one lost frame carrying an UPD, define or GAIN makes the next DIGEST mismatch and later records orphans: the raw `RESULT: PASS` is expected only on a loss-free leg — record it as well | required | n/a | `store_clean`, `epoch_seen`, and `no_orphans` / `digest` by the same rule (capture without `--strict`; read the `[PASS]`/`[FAIL]` lines) | `vector_dry_run.py` |
 | P2 | frames published per second ≥ 90 % of the camera rate: `published frame_id` lines in `rx_daemon.log` ÷ 300 ≥ 1.8 at 2 fps (≥ 0.9 at 1 fps). An FHSS leg at 1 fps is read **from lock**: published frames ÷ the span from the first to the last published frame (`frag_gap_report.py`'s `n_frag … span …`), with the whole-leg figure recorded beside it (A7: 245 ÷ 300 = 0.82 whole-leg, 1.00 from lock, on both rounds) | required | baseline | n/a | harness archive |
-| P3 | frame loss not worse than the control: the `capture seq gaps` loss of `rs12_leg_report.py --capture` (A14; on a 1-fps FHSS leg this is the loss from lock — record the `counting from seq 1` figure too, A7), the report's `shared-window loss` line (the `loss … [whole logs]` line is the old whole-log figure), and radio Δtx_ok ↔ Δrx_ok from the brackets. **Single legs compare only** (a) **interleaved** — control and VECTOR legs alternated in one session (e.g. 2c, 2a, 2c′, 2a′) and their pooled seq-gap losses compared — or (b) against a **margin stated in RESULTS before the legs**. **Amended 2026-10-22, from the next round** ([Amendment 2026-10-22](#amendment-2026-10-22), item 1): "not worse" is the margin rule written in RESULTS before leg 1 ("Pass rule (written before leg 1)": the margin and the legs per codec): frames received / expected per codec, pooled from the `capture seq gaps` lines, and NOT WORSE when the one-sided 95 % lower bound of VECTOR minus control (Newcombe hybrid score interval) is above −margin, every pooled leg with `log_window=after_stop` and one `-StopDrainS` (item 2). *Was:* absent another statement, "not worse" meant not significantly worse: two-sided Fisher exact test on lost / received of the VECTOR leg against the control, p ≥ 0.05 (round 3's 2a: 4 / 303 against 1 / 304, p ≈ 0.2). The same control lost 6.5 % on 2026-09-27 and 0.3 % on 2026-10-03, more than the effect P3 tests, and VECTOR frames ride fuller than mono_g4 (p50 242 B vs 148 B on the video), i.e. longer on air per frame (A15) | required | baseline | n/a | `leg*_report.txt`, brackets |
+| P3 | frame loss not worse than the control: the `capture seq gaps` loss of `rs12_leg_report.py --capture` (A14; on a 1-fps FHSS leg this is the loss from lock — record the `counting from seq 1` figure too, A7), the report's `shared-window loss` line (the `loss … [whole logs]` line is the old whole-log figure), and radio Δtx_ok ↔ Δrx_ok from the brackets (since 2026-10-24 the head is placed on the tractor's TX log, and an FHSS leg whose acquisition failed goes by the pass rule's "never locks" row; Step 2). **Single legs compare only** (a) **interleaved** — control and VECTOR legs alternated in one session (e.g. 2c, 2a, 2c′, 2a′) and their pooled seq-gap losses compared — or (b) against a **margin stated in RESULTS before the legs**. **Amended 2026-10-22, from the next round** ([Amendment 2026-10-22](#amendment-2026-10-22), item 1): "not worse" is the margin rule written in RESULTS before leg 1 ("Pass rule (written before leg 1)": the margin and the legs per codec): frames received / expected per codec, pooled from the `capture seq gaps` lines, and NOT WORSE when the one-sided 95 % lower bound of VECTOR minus control (Newcombe hybrid score interval) is above −margin, every pooled leg with `log_window=after_stop` and one `-StopDrainS` (item 2). *Was:* absent another statement, "not worse" meant not significantly worse: two-sided Fisher exact test on lost / received of the VECTOR leg against the control, p ≥ 0.05 (round 3's 2a: 4 / 303 against 1 / 304, p ≈ 0.2). The same control lost 6.5 % on 2026-09-27 and 0.3 % on 2026-10-03, more than the effect P3 tests, and VECTOR frames ride fuller than mono_g4 (p50 242 B vs 148 B on the video), i.e. longer on air per frame (A15) | required | baseline | n/a | `leg*_report.txt`, brackets |
 | P4 | one fragment per VECTOR frame: every per-frame completion line in `tx_daemon.log` has K = 1. The harness runs `-TxPipeline v3`, which logs `frame seq=N done (pipelined): K fragments ok` (only v2 logs `done: K`): `grep -cE "done( \(pipelined\))?: 1 fragments ok"` > 0, so an empty grep cannot pass; `grep -cE "done( \(pipelined\))?: ([2-9]\|[1-9][0-9]+) fragments ok"` = 0; `ABORTED( \(pipelined\))?` lines listed. The legs run `-TxBatch 0`, so K counts one frame's fragments, not a batched train. At 1 fps the encode-to-fit packer kept mono_g4 to one fragment as well, so P4 is not a contrast with 2c (A10) | required | n/a | inside the VECTOR window | harness archive |
-| P5 | keyframe-storm signature absent on FHSS: `frag_gap_report.py` shows no gap > 3 s during image traffic | 2b required | n/a | n/a | `leg2b_gaps.txt` |
+| P5 | keyframe-storm signature absent on FHSS: `frag_gap_report.py` shows no gap > 3 s during image traffic. Its gaps run from the first fragment to the last; since 2026-10-24 its `head:` line gives the silence from the base's profile activation (and, with the params.txt clock offsets, from the tractor's first txdone) to the first fragment, and its `tail:` line the silence from the last fragment to the tractor's last txdone and to the base daemon's stop (leg 6: 138.1 s / 131.6 s and 55.9 s / 62.7 s, around gaps that spanned only 115 s) | 2b required | n/a | n/a | `leg2b_gaps.txt` |
 | P6 | over-the-air switch: first `"source": "lora_cmd"` ack after the publish stamp `requested 9, effective 9, effective_name vector, codec 6, clamped false, quality 80`; first codec-6 payload in the base capture ≤ 1 camera period + the **encoder's own time** (`ms_total` p95, the leg's P8 figure) + 1 fragment airtime + one command gate after the publish stamp (both on the base clock; A9 — without the encode time the bound is ≈ 2.5 s at 1 fps and RS-13.1 measured 2.55 / 2.68 s, with it ≈ 3.0 s); the stamp taken in the **same board call** as the publish and checked against the base's `command TX … (on air)` line (A13); return ack `effective 6, quality 55` (tile dial untouched, §6) and — **amended 2026-10-10 (A18), from the next round** — codec-1 resumes within one camera period + the in-flight frame(s) + one fragment airtime of the return command going on air: first codec-1 payload ≤ (1 + n) camera periods + 1 fragment airtime after the return command's `command TX … (on air)` line, n = the codec-6 frames the base receives between that line and the first codec-1 payload, n ≤ `tx_pipeline_depth` + `tx_prepare_ahead` (3 on the harness defaults, `params.txt`; a larger n fails); round 4: n = 1, bound 1.10 s, measured 0.77 s. RS-13.1 was judged by "codec-1 frames resume within one camera period of the return command going on air" (Amendments 2026-10-10 item 2) | n/a | n/a | required | `leg2d_acks.txt`, `leg2d_switch_times.txt`, `leg2d_base.jsonl`, archive `rx_daemon.log` |
 | P7 | link_stats `rx_codec_name` = `vector` during VECTOR | required | n/a | required | `mosquitto_sub` line |
 | P8 | encoder keeps up on air — **amended 2026-10-10 (A17), from the next round:** `vector_stats` `ms_total` p95 in the archived `camera_service.log` ≤ the encoder budget at the leg's camera rate, 350 ms at 2 fps (a leg at another rate states its budget, 70 % of its period, in RESULTS before it flies); the p95 relative to the step-1 figure of the same profile, and the tx daemon's `drop_full` / `drop_stale`, recorded for information. RS-13.1 was judged by "within the step-1 figure ± 20 %" (Amendments 2026-10-10 item 1) | required | n/a | window | `tractor-log` on the archive's `camera_service.log`; `tx_daemon.log` |
@@ -771,6 +836,13 @@ consistent within one log; P6 timing uses the base clock alone.
 - The leg report's counter `loss` line is not the loss of record: the base's
   last `stats:` line is up to 10 s old when the log ends (A14), and a dead
   stats thread freezes it (RS-12.17). Use the `capture seq gaps` line.
+- Since 2026-10-24 both daemons log every FAULT_URC as one `FAULT_URC:
+  code=0x.. sub=0x.. name=...` line. The same URC can also leave a legacy
+  line: the tractor's `FAULT during pipelined TX:`, or an untimestamped
+  stdout `FAULT_URC during TX wait:` / `FAULT_URC during settle` on either
+  board. Count faults on the `FAULT_URC: ... name=` lines only; a grep for
+  `FAULT` counts some twice. Code 0x0D is two different faults (BENCH_RUNBOOK,
+  "A leg", FAULT lines).
 - A1 / A1b / A1c (the encoder's unverified live shapes, stale-colour re-sends,
   the range-2 refresh that keeps masses) are fixed in PR #138; on an image or a
   `/work` tree without the fix a static scene desyncs on a loss-free path

@@ -84,7 +84,7 @@ overrides the file for one run of these `legs/` scripts, for example
 | `leg_prep.sh` | Scene check, UART-holder check, health probes, `clear_retained`, pre-brackets, detached base capture. Writes the harness command, with `-StopDrainS` (4 s FHSS / 2 s DTS, `--stop-drain S`; 2026-10-22). Knows the RS-13.1 tags and the range-edge leg names. Refuses (exit 7) an `EVIDENCE_DIR` that holds committed files, before any board action. | both | wakes the receivers (RXCONT); does not transmit |
 | `link_sample.sh` | During a leg: the first `link_stats` message that has frames (P7). | base broker | none |
 | `leg2d_switch.sh` | Leg 2d only: the override publishes at T+60 s and T+180 s, plus the acks. | base broker | **the base transmits** (0x63 commands) |
-| `leg_post.sh` | Collects the capture, post-brackets, `rs12_leg_report --capture`, `frag_gap_report`, P2/P4 and the tractor-log, each written whole to `legs/`; copies the archive's `tractor_ocd_reset.log`, `inject.log`, `inject_trigger.txt` as `leg<X>_*`; runs the RS-13 scorers and `bracket_deltas.py` (a failing scorer never stops it: see the `scorer exit codes:` line); then **parks** (with retries). A committed or wrongly dated `EVIDENCE_DIR` gets a WARNING in its transcript, never a stop, so the park always runs (2026-10-22). | both | parks; never transmits |
+| `leg_post.sh` | Collects the capture, post-brackets, `rs12_leg_report --capture`, `frag_gap_report`, P2/P4 and the tractor-log, each written whole to `legs/`; copies the archive's `tractor_ocd_reset.log`, `inject.log`, `inject_trigger.txt` as `leg<X>_*`; runs the RS-13 scorers and `bracket_deltas.py` (a failing scorer never stops it: see the `scorer exit codes:` line); then **parks** (with retries). A committed or wrongly dated `EVIDENCE_DIR` gets a WARNING in its transcript, never a stop, so the park always runs (2026-10-22). On an FHSS leg whose base caught no frame within 120 s, the report's first line on its console ends `!! ACQUISITION FAILED` (2026-10-24, below). | both | parks; never transmits |
 | `leg_replay.py` | PC only: replays a base capture (seq gaps per codec run, resync episodes, last DIGEST). `py -3 leg_replay.py <leg> <image_bw500\|image_bw250> [--evidence-dir DIR \| --capture FILE]`; it reads `<DIR>/leg<leg>_base.jsonl` (default DIR: `$EVIDENCE_DIR`, which only the scripts export, so pass `--evidence-dir` from a plain shell). `leg_post.sh` runs it for you and keeps its output as `leg<X>_replay.txt`. On a capture with no VECTOR frame (mono_g4) it prints `digest_ok n/a (no VECTOR frame)`. | none | none |
 
 ## A session
@@ -196,6 +196,24 @@ source's stop either way), and a hint line under LOG_WINDOW. The leg report
 then prints a `!! LOG WINDOW UNVERIFIED` note below its loss lines, which
 can fall outside the 8 lines `leg_post.sh` shows on the console: read
 `leg<X>_report.txt`.
+
+On an FHSS leg, read the end of the report's first line on the console
+(2026-10-24; tested offline, not yet used on a flown leg). `!! ACQUISITION
+FAILED (see the acquisition line below)` means positive evidence that the
+base's scan ran out into FAILED (a cold or early final RX_SCAN_FAILED, or no
+frame within 120 s of its profile-1 activation on an instrument known to be
+on, with nothing contradicting that silence): it never followed the hop
+grid, so the leg's loss and command figures
+measure that, not the link (2026-10-24 leg 6). The `acquisition:` line (the
+first image reception), the verdict line under it (`!! ACQUISITION FAILED`,
+`confirmed acquisition: ACQUIRED` or `NOT DETERMINED`, with the evidence),
+and the base's 0x0D `FAULT_URC:` lines are in `leg<X>_report.txt`. The
+STOP RULE line of `leg<X>_deltas.txt` should then end `(!! BASE NEVER LOCKED
+above: ...)`, and `leg<X>_probe_score.txt` holds `!! base ACQUISITION
+FAILED`. Let
+the post step finish (it parks), record the leg, and void or re-fly it only
+as the pass rule written before leg 1 says (BENCH_RUNBOOK, "A leg", Base
+acquisition); a re-fly needs a GO.
 
 Every adb push is checked and md5-compared with the PC copy; the archive
 keeps `deploy_md5.txt`. A leg that stops at `[DEPLOY]` with
@@ -319,20 +337,34 @@ that the bench has no attenuator path.
     2026-10-22 the block names a `log_window` other than `after_stop`, and
     a `!! base command TX attempts other than PROBE (0x69)` line means the
     base sent other opcodes during a `-ReactiveFire 1` leg (control or
-    profile traffic; 0x63 is expected on a 2d switch leg);
+    profile traffic; 0x63 is expected on a 2d switch leg). Since 2026-10-24
+    an FHSS leg's block ends with a `base acquisition:` line (ACQUIRED, NOT
+    DETERMINED, or `!! base ACQUISITION FAILED` on positive evidence);
   - `../rs13_rf_extract.py <archive> --lines` -> `leg<X>_rf.txt` (every leg);
   - `../rs13_rf_extract.py --leak <archive>` -> `leg<X>_leak.txt` (`leak_*`
     legs);
   - `../rs13_digest_trace.py leg<X>_base.jsonl` -> `leg<X>_digest_trace.txt`
-    (skipped when the capture's summary counts no VECTOR frame);
-  - `../bracket_deltas.py <legs> <X>` -> `leg<X>_deltas.txt`.
+    (skipped when the capture's summary counts no VECTOR frame). Since
+    2026-10-24 it places the capture's head on the tractor's TX log of the
+    archive that `leg<X>_params.txt` names (copied there by this step, before
+    the scorers), looked for next to the session folder, by the frame's
+    transport seq off that archive's `rx_daemon.log`; without it the head
+    reads AMBIGUOUS;
+  - `../bracket_deltas.py <legs> <X>` -> `leg<X>_deltas.txt`. Since
+    2026-10-24 an FHSS leg whose base never locked gets a `!! BASE NEVER
+    LOCKED` line, which the console does not show; the STOP RULE line it
+    shows points at it.
 
   A scorer that fails never stops the post step or the park; the
   `scorer exit codes:` line lists every exit code. The pooled runs (R0 or,
   on the antennas, `--path antenna` over the legs; the §8.6 codec pool,
   with `--margin <PP>` against the margin written in RESULTS before leg 1;
   the A16 verdict over 2a + 2a′) stay manual: RS13_RANGE_EDGE_LEG.md. The
-  codec pool refuses legs of different `log_window` values (exit 1).
+  codec pool refuses legs of different `log_window` values (exit 1). Add
+  `--void-unlocked` to it (2026-10-24) only when the pass rule written before
+  leg 1 says so: it leaves the FHSS legs whose base acquisition FAILED on
+  positive evidence out of the pool and lists them (never a leg NOT
+  DETERMINED).
 
 ## Step 1: camera-only dry run (no radio)
 

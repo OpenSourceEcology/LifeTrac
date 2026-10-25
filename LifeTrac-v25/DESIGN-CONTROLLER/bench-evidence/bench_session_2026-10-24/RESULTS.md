@@ -364,7 +364,7 @@ the walker model and the code, not logged.)
 | 15:36:07.76 | tractor 08:27:30.912 | tractor scan attempt 0 FAIL (0x0D sub 0x20) | `tx_daemon.log:237` |
 | about 15:36:08.5, 15:36:38.5, 15:37:08.5 | – | base attempts 0, 1, 2 fail (model) | – |
 | 15:37:07.61 | tractor 08:28:30.758 | tractor attempt 2 FAIL (0x0D sub 0x02) | `tx_daemon.log:729` |
-| about 15:37:38.5 | – | base final FAIL (+120 s): scan FAILED, which is absorbing (`sx1276_rx_scan_policy.c:153`); the modem to standby (`sx1276_rx.c:665-685`) on the walker's last channel, ch 9 (dwell 60 = index 59 mod 50). The daemon's 5 s `_ensure_rxcont` re-arms RXCONT there without a retune (`image_rx_daemon.py:1312-1316`) (model and code) | – |
+| about 15:37:38.5 | – | base final FAIL (+120 s): scan FAILED, which is absorbing (`sx1276_rx_scan_policy.c:153`); the modem to standby (`sx1276_rx.c:665-685`) on the walker's last channel, ch 9 (dwell 60 = index 59 mod 50). The daemon's 5 s `_ensure_rxcont` re-arms RXCONT there without a retune (`image_rx_daemon.py:1312-1316` at `d28bc2ca`) (model and code) | – |
 | 15:37:56.54 | base 15:37:55.675 | catch 1: #264 (seq 8), slot (13,17) on the fitted grid, ch 9; −62 dBm / 10 dB. PROBE 1 at (13,18) ch 44 | `rx_daemon.log:67-73` |
 | 15:37:56.77 | tractor 08:29:19.918 | tractor hears PROBE 1 (rx#1) | `tx_daemon.log:1135` |
 | 15:38:11.11 | base 15:38:10.240 | catch 2: #293 (seq 37), (14,40) ch 44, the PROBE-1 channel. PROBE 2 at (14,41) ch 6, heard | `rx_daemon.log:93-99`; `tx_daemon.log:1257` |
@@ -405,7 +405,7 @@ each PROBE's TX channel (44, 6, 18). After each TX the receiver is re-armed
 where it is, by the firmware's own post-TX re-arm (`sx1276_tx.c:156-160`;
 the daemon's earlier raw RXCONT write is mirrored into the firmware's
 tracked state, `host_cmd.c:570-584`) and by the daemon's `_ensure_rxcont`
-(`image_rx_daemon.py:870-873`). Neither retunes. Every tractor frame on the parked channel in each parked
+(`image_rx_daemon.py:870-873` at `d28bc2ca`). Neither retunes. Every tractor frame on the parked channel in each parked
 window was caught, and no other: 5 of the 231 frames from the first catch on,
 about 1 in 50 channels. Evidence for it: the parked channels, the counter fingerprint
 (aligned 0, snapped 3, epoch_drift 2, demotion 0, dio0 10), `radio_state` 4
@@ -504,11 +504,11 @@ needs a new GO.
 
 - `rs12_leg_report.py` and `rs13_digest_trace.py` print "first frame heard
   at seq 8: the 7 frame(s) numbered before it … counting from seq 1: 98/103
-  = 95.1 %". The A7 head assumes no u8 wrap (`tools/rs12_leg_report.py:333`).
+  = 95.1 %". The A7 head assumes no u8 wrap (`tools/rs12_leg_report.py:333` at `d28bc2ca`).
   Seq 8 was frame #264, and the true figure is 601/606 = 99.2 %.
 - The capture line "lost 91/96 = 94.8 %" books the 102 → 238 step as a
   counter-restart "jump": with no clean +1 step there is no period, so any
-  step over 128 is a jump (`tools/rs12_leg_report.py:287-294`). `leg_replay.py`
+  step over 128 is a jump (`tools/rs12_leg_report.py:287-294` at `d28bc2ca`). `leg_replay.py`
   and `legs/leg2b_f3_p2p4.txt` give 226/231 on the same capture.
 - `frag_gap_report.py`'s "gaps>3s=4, max_gap 68.1 s" spans only the 115 s
   between the first and last frames heard. It leaves out the 131.6 s before
