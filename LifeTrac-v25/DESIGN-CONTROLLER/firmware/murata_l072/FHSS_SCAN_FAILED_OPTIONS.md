@@ -685,8 +685,8 @@ profile 1, which ends the park; `leg_post.sh` parks again at the end.
 - **Later, not on the first day:** T1 (the base silent for ≥ 125 s, then
   the stream) needs a harness option that delays the tractor's stream,
   which is not built (build and test it offline first); T2 (a set of about
-  10 cold starts); T4 with camera stalls. **T2 flown 2026-10-25 (GO "it is
-  clear to GO on the next test"), PASS**
+  10 cold starts); T4 with camera stalls. **T2 flown 2026-10-25 on the
+  operator's GO, PASS**
   ([`RESULTS.md`](../../bench-evidence/bench_session_2026-10-25_t2/RESULTS.md)):
   ten 180 s FHSS legs, `mono_g4` and VECTOR alternating, `-ReactiveFire 1`;
   every start `confirmed acquisition: ACQUIRED`, first frame 11.0-62.4 s

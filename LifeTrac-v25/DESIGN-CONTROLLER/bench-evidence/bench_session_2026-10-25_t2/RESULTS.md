@@ -6,8 +6,8 @@ stranded, every park `PARK_OK` on the firmware path, both radios `0x80` at
 the end-of-session check (18:58:35Z / 18:58:40Z). The plan and pass rule
 below were written before leg 1 and are unchanged.
 
-GO 2026-10-25 about 15:20Z: "Feel free to merge when you are confident.
-Also it is clear to GO on the next test". The next test in
+GO 2026-10-25, after the morning session: "Feel free to merge when you
+are confident. Also it is clear to GO on the next teste". The next test in
 `FHSS_SCAN_FAILED_OPTIONS.md` section 6.1 that needs no new tooling is T2,
 a set of about 10 cold starts.
 
@@ -82,7 +82,7 @@ leg, `legs/leg<X>_*` and the harness archive
 | cold-start rate | 0 of 10 starts without a frame by 120 s (SIL-E2 at 2 fps: 1.3 %; old image, walker model 7-9 %). Descriptive only, and see "What T2 did and did not sample" below. |
 | park | PASS. 20 of 20 leg-end parks `PARK_OK`, `"path": "firmware"`, at the first attempt. End-of-session `--check-only` 2 min 26 s / 2 min 31 s after the last park: `0x80` on both (tractor 18:58:35Z, base 18:58:40Z). |
 | kit | PASS. Every leg: `LOG_WINDOW after_stop`; the tractor L072 reset landed (`DONE: BOOT0 LOW, NRST released`); deploy md5 52/52 on both boards; base `L072 VER warm-up ok (attempt 1) cap=0x000000FF`; all seven scorers exit 0; `leg<X>_deltas.txt` 6 PASS, no FAIL or STOP (tractor Δ`clk_demotion_reset` 0, Δ`tx_first_anchor` 1, Δ`fhss_dec_snapped` 0, Δ`fhss_dec_rej_epoch_drift` 0, base `tx_stream_streak_max` 1). No `0x0F` on any leg. No tractor `0x0D` except on leg 5: attempt 0 and 1 (not final) at L072 uptime 34.0 s and 64.0 s, from the tractor's own scan, which has nothing to lock on until the base's PROBEs start (the base's first PROBE at 62.4 s, 18:14:39.5Z). |
-| privacy | PASS. `youtube_window.ps1 -Front` exit 0 (bench window in front) before every prep, and every `scene_check.sh` frame taken with it in front. The captures were rendered and checked before commit (below). |
+| privacy | PASS. `youtube_window.ps1` exit 0 with the bench window in front before every prep (`-Open` before leg 1, `-Front` before each later leg), and every `scene_check.sh` frame taken with it in front. The captures were rendered and checked before commit (below). |
 
 **Acquisition times.** Sorted: 11.0, 11.1, 11.1, 11.1, 11.1, 11.1, 26.4,
 26.5, 26.9, 62.4 s (median 11.1 s). By workload: all five VECTOR starts
