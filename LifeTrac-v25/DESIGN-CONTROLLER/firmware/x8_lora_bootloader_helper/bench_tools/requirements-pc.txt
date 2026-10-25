@@ -14,8 +14,14 @@
 # on 2026-10-17 to the versions base_station/requirements.lock.txt pins for
 # the flown base image, which close the Dependabot alerts on this file
 # (installed on the bench PC the same day; base_station suite 1616 passed).
-# numpy/opencv match base_station/requirements-dev.txt. numpy 2.4 needs
-# Python >= 3.11.
+# Pillow was raised again on 2026-10-24 to 13.0.0, the first version that
+# fixes the 41 Pillow alerts Dependabot opened on this file from 2026-10-22
+# (installed on the bench PC the same day; base_station suite 1721 passed,
+# the 10 Windows-only test_x8_watchdog_ownership_sil.py failures aside).
+# That puts Pillow ahead of both lock files: they record the flown images,
+# which still run 12.3.0.
+# numpy/opencv match base_station/requirements-dev.txt. numpy 2.4 and
+# Pillow 13 need Python >= 3.11.
 # To run the base-station SIL suite, install base_station/requirements-dev.txt
 # instead (it is a superset for that purpose).
 #
@@ -40,7 +46,7 @@ opencv-python-headless==4.14.0.94
 
 # camera_service (publish_synthetic_frames.py -TxFeed host) and
 # base_station/image_pipeline codec_decode / fallback_render.
-Pillow==12.3.0
+Pillow==13.0.0
 
 # base_station/lora_proto.py AES-GCM (imported lazily; needed by anything that
 # builds or opens encrypted frames on the PC).
