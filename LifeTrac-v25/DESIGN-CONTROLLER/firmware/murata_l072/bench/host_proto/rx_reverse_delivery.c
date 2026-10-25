@@ -82,6 +82,10 @@
  * radio-affecting call with its time and caller. Scenario 5's hash is the
  * same against the pre-fix sx1276_rx.c: the follower path is
  * call-for-call, microsecond-for-microsecond unchanged.
+ *
+ * check-rx-scan-failed-follower (rx_scan_failed_follower.c) reuses this
+ * simulation: it #includes this file with RX_REVERSE_DELIVERY_SIM_ONLY
+ * defined, which leaves out the scenarios below and main().
  */
 
 #include <stdbool.h>
@@ -1442,6 +1446,7 @@ static void check_structure(void) {
           "[%s] %u commands delivered twice", g_sc.name, g_sc.recv_dup);
 }
 
+#ifndef RX_REVERSE_DELIVERY_SIM_ONLY
 /* ------------------------------------------------------------------ */
 /* Scenarios                                                           */
 /* ------------------------------------------------------------------ */
@@ -1802,3 +1807,4 @@ int main(int argc, char **argv) {
            " follower path unchanged, self-follow bounded by authority\n");
     return 0;
 }
+#endif /* !RX_REVERSE_DELIVERY_SIM_ONLY */

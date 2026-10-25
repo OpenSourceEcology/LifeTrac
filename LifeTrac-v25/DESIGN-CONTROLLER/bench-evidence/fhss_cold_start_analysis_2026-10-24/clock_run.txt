@@ -1,0 +1,49 @@
+leg              n_rx  r_bh(base L072 vs base host)  r_th(tractor L072 vs host)  r_bt(1) r_bt(2)   [ppm; negative = base L072 slower]
+20260912_164512    294      +231      +891      -736     -697
+20260912_165805   1102      +186      +410      -293     -268
+20260912_170541    451      +253      +560      -379     -438
+20260912_184432    687      +153      +725      -636     -651
+20260914_112026   1157      -456     +1421     -1937    -1514
+20260914_113052   1119      -200      +961     -1220     -988
+20260914_130207   1218      -610      +989     -1640    -1590
+20260914_130945   1181      -377      +516      -924    -1185
+20260914_153752    860       -34      +500      -588     -538
+20260914_154752   1048      +470      -358      +790     +792
+20260914_161016   1235      +246      -386      +586     +618
+20260914_170031    456      -314      +313      -686     -865
+20260914_171517    608      +603      -374      +871     +823
+20260915_130259    603      -304     +1349     -1714    -1702
+20260927_113144    245     -1070     +1306     -2435    -2419
+20261003_163532    245      -178     +1732     -1966    -1943
+20261004_103105    554      -682     +2496     -3229    -3236
+20261018_110651    943     -1979     +2092     -4122    -4153
+20261018_111558   1086     -1846     +1482     -3363    -3356
+20261018_112639   1185     -1769     +1926     -3727    -3735
+20261018_113831   1880     -1669     +1784     -3527    -3630
+20261024_095315    475     -1399     +1756     -3210    -3169
+20261024_100249    558     -1348     +1324     -2729    -2733
+20261024_101341    523     -1220     +1816     -3088    -3079
+20261024_102247    552      -780     +1572     -2411    -2438
+20261024_103156    590      -767     +1875     -2692    -2683
+20261024_104056      5      -610     +1652     -2366    -2406
+r_bh range -1979..+603 ppm (median -456); r_th range -386..+2496 (median +1324); r_bt(1) range -4122..+871 (median -1937)
+2026-10-24 legs: r_bh -1399..-610; r_th +1324..+1875; r_bt(1) -3210..-2366; r_bt(2) -3169..-2406
+
+leg 6: base fw_us vs tractor slot-grid time over the 5 catches: -2299 ppm (residuals +3.9, +1.7, -4.1, -4.7, +3.2 ms)
+catch 1: frame #264 slot (13,17) ch 9 ToA 166.5 ms, SNAPPED, base clock age 0.0 s; PROBE (13,18) ch 44 = next slot, heard; OK - frag log 49 ms
+catch 2: frame #293 slot (14,40) ch 44 ToA 166.5 ms, SNAPPED, base clock age 0.0 s; PROBE (14,41) ch 6 = next slot, heard; OK - frag log 49 ms
+catch 3: frame #346 slot (17,22) ch 6 ToA 146.0 ms, EPOCH_DRIFT, base clock age 26.3 s; PROBE (17,22) ch 6 = same slot, NOT heard; OK - frag log 49 ms
+catch 4: frame #358 slot (18,2) ch 6 ToA 164.0 ms, SNAPPED, base clock age 0.0 s; PROBE (18,3) ch 18 = next slot, heard; OK - frag log 49 ms
+catch 5: frame #494 slot (24,43) ch 18 ToA 125.6 ms, EPOCH_DRIFT, base clock age 68.0 s; PROBE (24,43) ch 18 = same slot, heard; OK - frag log 49 ms
+PROBE labels + outcomes, jitter +-1 ms: no drift (4 ppm) -4 ppm: B none in 0-20 ms; leg-6 fit -2299 ppm: B 10.0-12.0 ms; 10-24 smallest -2366 ppm: B 10.0-12.0 ms; 10-24 largest -3210 ppm: B none in 0-20 ms; rates that fit some B: -2375..-1275 ppm
+PROBE labels + outcomes, jitter +-2 ms: no drift (4 ppm) -4 ppm: B none in 0-20 ms; leg-6 fit -2299 ppm: B 9.0-13.0 ms; 10-24 smallest -2366 ppm: B 9.0-13.0 ms; 10-24 largest -3210 ppm: B none in 0-20 ms; rates that fit some B: -2375..-1200 ppm
+PROBE labels + outcomes, jitter +-3 ms: no drift (4 ppm) -4 ppm: B none in 0-20 ms; leg-6 fit -2299 ppm: B 8.0-14.0 ms; 10-24 smallest -2366 ppm: B 8.0-14.0 ms; 10-24 largest -3210 ppm: B none in 0-20 ms; rates that fit some B: -2375..-1125 ppm
+  PROBE after catch at (17,22), clock age 26.3 s: lag 60 ms at -2299 ppm; keyed at tractor in-slot 194 ms (B = 11 ms), base clock reads 134 ms; ends at 220 ms (slot boundary 200)
+  PROBE after catch at (24,43), clock age 68.0 s: lag 156 ms at -2299 ppm; keyed at tractor in-slot 174 ms (B = 11 ms), base clock reads 18 ms; ends at 200 ms (slot boundary 200)
+Free-run drift at the measured base-vs-tractor rates: 10-24 legs 2.4-3.2 ms/s, archive max 4.1 ms/s; two +-2 ppm TCXOs: <= 0.004 ms/s
+  over 0.5 s (2 fps frame interval): 1.2-1.6 ms (10-24), 2.1 ms (archive max), 0.002 ms (TCXO)
+  over 1.0 s (authority streak gap): 2.4-3.2 ms (10-24), 4.1 ms (archive max), 0.004 ms (TCXO)
+  over 2.0 s (LOCK_LOSS_MS = CLOCK_FRESH_MS): 4.7-6.4 ms (10-24), 8.2 ms (archive max), 0.008 ms (TCXO)
+    4.0 ms (12 ms head start minus the ~8 ms retune + skew budget (sx1276_fhss_clock.h)) reached after 1.2-1.7 s (10-24), 1.0 s (archive max), 1000 s (TCXO)
+   15.0 ms (TX fit guard) reached after 4.7-6.3 s (10-24), 3.6 s (archive max), 3750 s (TCXO)
+  100.0 ms (half a slot) reached after 31.2-42.3 s (10-24), 24.3 s (archive max), 25000 s (TCXO)

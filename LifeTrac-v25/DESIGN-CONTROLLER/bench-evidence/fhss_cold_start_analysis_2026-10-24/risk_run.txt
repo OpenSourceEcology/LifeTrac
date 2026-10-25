@@ -1,0 +1,85 @@
+=== A. replay of each leg (its own TX schedule), activation swept -5..+5 s ===
+leg              kind    fps  tx/s q    t_obs  | P(no catch <=120 s) at base tick 0 / -610 / -1000 / -1400 ppm | median t_catch | P(t<=t_obs)
+20260912_164512  camera  2    3.10 0.62   40.2 |   1.4%   1.2%   1.2%   0.8% |  30.2  30.3  30.3  30.3 | 0.69
+20260912_165805  camera  2    3.27 0.65   10.3 |   0.6%   1.0%   1.2%   1.0% |  22.2  21.9  21.9  22.2 | 0.29
+20260912_170541  camera  2    3.26 0.65   10.2 |   0.4%   0.2%   0.0%   0.2% |  22.5  22.5  22.5  22.5 | 0.28
+20260912_184432  camera  2    3.16 0.63   10.9 |   1.0%   0.8%   0.4%   0.4% |  28.3  28.2  28.3  28.3 | 0.11
+20260914_112026  synth   2    3.62 0.72   28.3 |   0.0%   0.0%   0.0%   0.0% |  28.8  29.1  29.1  29.1 | 0.48
+20260914_113052  synth   2    3.62 0.72   28.3 |   0.0%   0.0%   0.0%   0.0% |  29.1  29.1  29.1  29.1 | 0.48
+20260914_130207  synth   2    3.94 0.78    7.3 |   0.0%   0.0%   0.0%   0.0% |  16.4  16.4  16.4  16.4 | 0.08
+20260914_130945  synth   2    3.86 0.77   21.8 |   0.0%   0.0%   0.0%   0.0% |  19.9  19.9  19.9  19.9 | 0.54
+20260914_153752  synth   1.5  2.86 0.57   13.3 |   3.2%   2.8%   2.8%   2.8% |  21.2  22.0  21.0  21.0 | 0.29
+20260914_154752  synth   2    3.57 0.71   26.8 |   0.0%   0.0%   0.0%   0.0% |  19.8  19.7  19.8  19.8 | 0.69
+20260914_161016  synth   2    3.94 0.79    7.3 |   1.2%   0.6%   0.2%   0.0% |  19.3  19.3  19.4  19.4 | 0.03
+20260914_170031  camera  2    2.44 0.49    3.5 |   1.0%   0.8%   0.6%   1.0% |  21.9  22.0  22.3  22.0 | 0.07
+20260914_171517  camera  2    2.44 0.49   68.3 |   2.0%   1.8%   1.6%   1.4% |  21.2  21.2  21.3  21.3 | 0.87
+20260915_130259  camera  2    2.08 0.42   40.1 |   4.6%   4.2%   4.0%   4.8% |  25.5  25.5  25.5  25.5 | 0.74
+20260927_113144  camera  1    0.94 0.19   64.9 |  26.2%  27.2%  27.2%  26.0% |  38.5  38.4  38.5  39.3 | 0.54
+20261003_163532  camera  1    0.94 0.19   64.9 |  29.8%  30.6%  30.4%  29.2% |  38.3  38.2  38.2  38.4 | 0.56
+20261004_103105  camera  2    1.89 0.38   30.7 |   8.6%   9.2%   8.6%   8.2% |  24.2  24.3  24.2  24.3 | 0.51
+20261018_110651  camera  2    3.12 0.62    8.8 |   0.0%   0.0%   0.0%   0.0% |  25.2  25.2  25.1  25.1 | 0.03
+20261018_111558  synth   2    3.73 0.74   44.1 |   0.0%   0.0%   0.0%   0.0% |  27.4  27.4  27.4  27.4 | 0.78
+20261018_112639  synth   2    3.73 0.74   25.0 |   0.0%   0.0%   0.0%   0.0% |  27.3  27.4  27.4  27.4 | 0.48
+20261018_113831  synth   2    3.73 0.74   44.1 |   0.0%   0.0%   0.0%   0.0% |  27.4  27.5  27.4  27.5 | 0.79
+20261024_095315  camera  2    1.91 0.38   75.0 |   8.4%   8.6%   8.2%   7.0% |  25.9  26.0  26.0  26.9 | 0.84
+20261024_100249  camera  2    1.90 0.38   34.5 |   8.8%   8.4%   7.0%   5.4% |  28.4  28.4  28.5  28.7 | 0.61
+20261024_101341  camera  2    1.90 0.38   51.5 |  10.4%  10.0%   9.8%   9.2% |  34.8  34.8  34.8  34.8 | 0.62
+20261024_102247  camera  2    1.90 0.38   34.5 |   9.2%   7.8%   6.0%   4.8% |  31.2  31.3  31.4  31.5 | 0.54
+20261024_103156  camera  2    1.90 0.38   15.3 |   5.0%   6.0%   6.4%   5.8% |  33.7  28.5  28.5  28.5 | 0.25
+20261024_104056  camera  2    1.90 0.38  138.1 |   9.8%   9.2%   9.2%   9.4% |  23.8  26.4  26.3  26.4 | 0.91
+
+A all 27                     n=27  -   0 ppm: mean P(no catch <=120 s)  4.87 %, expected legs 1.32, P(0 legs) 0.24, P(1 leg) 0.38, P(>=1) 0.76
+A all 27                     n=27  - 610 ppm: mean P(no catch <=120 s)  4.83 %, expected legs 1.30, P(0 legs) 0.24, P(1 leg) 0.38, P(>=1) 0.76
+A all 27                     n=27  -1000 ppm: mean P(no catch <=120 s)  4.62 %, expected legs 1.25, P(0 legs) 0.25, P(1 leg) 0.39, P(>=1) 0.75
+A all 27                     n=27  -1400 ppm: mean P(no catch <=120 s)  4.35 %, expected legs 1.17, P(0 legs) 0.28, P(1 leg) 0.39, P(>=1) 0.72
+A camera (1 fragment/frame)  n=17  -   0 ppm: mean P(no catch <=120 s)  7.48 %, expected legs 1.27, P(0 legs) 0.25, P(1 leg) 0.38, P(>=1) 0.75
+A camera (1 fragment/frame)  n=17  - 610 ppm: mean P(no catch <=120 s)  7.47 %, expected legs 1.27, P(0 legs) 0.25, P(1 leg) 0.38, P(>=1) 0.75
+A camera (1 fragment/frame)  n=17  -1000 ppm: mean P(no catch <=120 s)  7.16 %, expected legs 1.22, P(0 legs) 0.26, P(1 leg) 0.39, P(>=1) 0.74
+A camera (1 fragment/frame)  n=17  -1400 ppm: mean P(no catch <=120 s)  6.74 %, expected legs 1.15, P(0 legs) 0.28, P(1 leg) 0.40, P(>=1) 0.72
+A synth (multi-fragment)     n=10  -   0 ppm: mean P(no catch <=120 s)  0.44 %, expected legs 0.04, P(0 legs) 0.96, P(1 leg) 0.04, P(>=1) 0.04
+A synth (multi-fragment)     n=10  - 610 ppm: mean P(no catch <=120 s)  0.34 %, expected legs 0.03, P(0 legs) 0.97, P(1 leg) 0.03, P(>=1) 0.03
+A synth (multi-fragment)     n=10  -1000 ppm: mean P(no catch <=120 s)  0.30 %, expected legs 0.03, P(0 legs) 0.97, P(1 leg) 0.03, P(>=1) 0.03
+A synth (multi-fragment)     n=10  -1400 ppm: mean P(no catch <=120 s)  0.28 %, expected legs 0.03, P(0 legs) 0.97, P(1 leg) 0.03, P(>=1) 0.03
+A calibration (-1000 ppm): P_model(t_catch <= t_obs) over the 26 legs that caught by 120 s: mean 0.47, quartiles [0.27, 0.53, 0.69]
+A leg 6 (2b_f3): P(no catch) ['9.8%', '9.2%', '9.2%', '9.4%']
+Empirical: 1 of 27 legs past 120 s = 3.7 % (exact 95 % CI 0.09-19.0 %)
+
+=== B. synthetic one-fragment-per-frame streams on each leg grid, harness timing ===
+B 1 fps all 27      n=27 -   0 ppm: P(no LOCK <=120 s) mean 26.51 % (legs 13.2-37.8 %) | stream already on: mean 27.20 % (legs 17.4-36.7 %)
+B 1 fps all 27      n=27 - 610 ppm: P(no LOCK <=120 s) mean 25.31 % (legs 13.3-35.2 %) | stream already on: mean 25.77 % (legs 16.4-34.1 %)
+B 1 fps all 27      n=27 -1000 ppm: P(no LOCK <=120 s) mean 24.55 % (legs 12.9-35.8 %) | stream already on: mean 24.55 % (legs 15.1-32.4 %)
+B 1 fps all 27      n=27 -1400 ppm: P(no LOCK <=120 s) mean 23.48 % (legs 12.3-33.9 %) | stream already on: mean 23.24 % (legs 13.8-30.1 %)
+B 1 fps camera ToA  n=17 -   0 ppm: P(no LOCK <=120 s) mean 23.78 % (legs 13.2-31.7 %) | stream already on: mean 25.31 % (legs 17.4-32.9 %)
+B 1 fps camera ToA  n=17 - 610 ppm: P(no LOCK <=120 s) mean 22.94 % (legs 13.3-29.9 %) | stream already on: mean 24.16 % (legs 16.4-33.4 %)
+B 1 fps camera ToA  n=17 -1000 ppm: P(no LOCK <=120 s) mean 22.15 % (legs 12.9-30.2 %) | stream already on: mean 22.89 % (legs 15.1-32.4 %)
+B 1 fps camera ToA  n=17 -1400 ppm: P(no LOCK <=120 s) mean 21.22 % (legs 12.3-27.4 %) | stream already on: mean 21.79 % (legs 13.8-30.1 %)
+B 1 fps synth ToA   n=10 -   0 ppm: P(no LOCK <=120 s) mean 31.16 % (legs 24.3-37.8 %) | stream already on: mean 30.41 % (legs 25.4-36.7 %)
+B 1 fps synth ToA   n=10 - 610 ppm: P(no LOCK <=120 s) mean 29.35 % (legs 23.5-35.2 %) | stream already on: mean 28.52 % (legs 24.1-34.1 %)
+B 1 fps synth ToA   n=10 -1000 ppm: P(no LOCK <=120 s) mean 28.62 % (legs 22.4-35.8 %) | stream already on: mean 27.37 % (legs 23.0-31.4 %)
+B 1 fps synth ToA   n=10 -1400 ppm: P(no LOCK <=120 s) mean 27.31 % (legs 21.6-33.9 %) | stream already on: mean 25.71 % (legs 22.4-28.3 %)
+
+B 2 fps all 27      n=27 -   0 ppm: P(no LOCK <=120 s) mean  9.29 % (legs  5.3-19.5 %) | stream already on: mean  8.27 % (legs  3.7-14.6 %)
+B 2 fps all 27      n=27 - 610 ppm: P(no LOCK <=120 s) mean  8.71 % (legs  4.9-18.8 %) | stream already on: mean  7.54 % (legs  3.8-12.7 %)
+B 2 fps all 27      n=27 -1000 ppm: P(no LOCK <=120 s) mean  8.14 % (legs  4.3-18.7 %) | stream already on: mean  6.74 % (legs  2.9-11.9 %)
+B 2 fps all 27      n=27 -1400 ppm: P(no LOCK <=120 s) mean  7.16 % (legs  3.3-18.4 %) | stream already on: mean  5.68 % (legs  2.0-10.9 %)
+B 2 fps camera ToA  n=17 -   0 ppm: P(no LOCK <=120 s) mean  8.18 % (legs  5.3-12.9 %) | stream already on: mean  7.69 % (legs  3.7-14.6 %)
+B 2 fps camera ToA  n=17 - 610 ppm: P(no LOCK <=120 s) mean  7.74 % (legs  4.9-12.1 %) | stream already on: mean  7.10 % (legs  3.8-12.7 %)
+B 2 fps camera ToA  n=17 -1000 ppm: P(no LOCK <=120 s) mean  7.17 % (legs  4.3-12.0 %) | stream already on: mean  6.31 % (legs  2.9-11.9 %)
+B 2 fps camera ToA  n=17 -1400 ppm: P(no LOCK <=120 s) mean  6.33 % (legs  3.3-11.2 %) | stream already on: mean  5.46 % (legs  2.0-10.9 %)
+B 2 fps synth ToA   n=10 -   0 ppm: P(no LOCK <=120 s) mean 11.16 % (legs  8.2-19.5 %) | stream already on: mean  9.24 % (legs  6.6-12.8 %)
+B 2 fps synth ToA   n=10 - 610 ppm: P(no LOCK <=120 s) mean 10.38 % (legs  7.5-18.8 %) | stream already on: mean  8.30 % (legs  5.8-11.1 %)
+B 2 fps synth ToA   n=10 -1000 ppm: P(no LOCK <=120 s) mean  9.78 % (legs  5.6-18.7 %) | stream already on: mean  7.47 % (legs  5.2-10.9 %)
+B 2 fps synth ToA   n=10 -1400 ppm: P(no LOCK <=120 s) mean  8.56 % (legs  4.4-18.4 %) | stream already on: mean  6.04 % (legs  3.4- 8.8 %)
+
+B 5 fps all 27      n=27 -   0 ppm: P(no LOCK <=120 s) mean  0.00 % (legs  0.0- 0.0 %) | stream already on: mean  0.00 % (legs  0.0- 0.1 %)
+B 5 fps all 27      n=27 - 610 ppm: P(no LOCK <=120 s) mean  0.00 % (legs  0.0- 0.0 %) | stream already on: mean  0.00 % (legs  0.0- 0.0 %)
+B 5 fps all 27      n=27 -1000 ppm: P(no LOCK <=120 s) mean  0.00 % (legs  0.0- 0.0 %) | stream already on: mean  0.00 % (legs  0.0- 0.0 %)
+B 5 fps all 27      n=27 -1400 ppm: P(no LOCK <=120 s) mean  0.00 % (legs  0.0- 0.0 %) | stream already on: mean  0.00 % (legs  0.0- 0.0 %)
+B 5 fps camera ToA  n=17 -   0 ppm: P(no LOCK <=120 s) mean  0.00 % (legs  0.0- 0.0 %) | stream already on: mean  0.01 % (legs  0.0- 0.1 %)
+B 5 fps camera ToA  n=17 - 610 ppm: P(no LOCK <=120 s) mean  0.00 % (legs  0.0- 0.0 %) | stream already on: mean  0.00 % (legs  0.0- 0.0 %)
+B 5 fps camera ToA  n=17 -1000 ppm: P(no LOCK <=120 s) mean  0.00 % (legs  0.0- 0.0 %) | stream already on: mean  0.00 % (legs  0.0- 0.0 %)
+B 5 fps camera ToA  n=17 -1400 ppm: P(no LOCK <=120 s) mean  0.00 % (legs  0.0- 0.0 %) | stream already on: mean  0.00 % (legs  0.0- 0.0 %)
+B 5 fps synth ToA   n=10 -   0 ppm: P(no LOCK <=120 s) mean  0.00 % (legs  0.0- 0.0 %) | stream already on: mean  0.00 % (legs  0.0- 0.0 %)
+B 5 fps synth ToA   n=10 - 610 ppm: P(no LOCK <=120 s) mean  0.00 % (legs  0.0- 0.0 %) | stream already on: mean  0.00 % (legs  0.0- 0.0 %)
+B 5 fps synth ToA   n=10 -1000 ppm: P(no LOCK <=120 s) mean  0.00 % (legs  0.0- 0.0 %) | stream already on: mean  0.00 % (legs  0.0- 0.0 %)
+B 5 fps synth ToA   n=10 -1400 ppm: P(no LOCK <=120 s) mean  0.00 % (legs  0.0- 0.0 %) | stream already on: mean  0.00 % (legs  0.0- 0.0 %)
